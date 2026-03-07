@@ -48,18 +48,30 @@ struct ClockView: View {
                         .accessibilityLabel(task.title)
                 }
 
+                // Clock hands: hour and minute
+                let minuteHandDiameter = outerRadius*2 - arcThickness*2 - ringInset - 10
+
+                TimeHand(now: now)
+                    .stroke(Color.primary, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .frame(width: minuteHandDiameter * 0.5, height: minuteHandDiameter * 0.5)
+                    .shadow(radius: 1)
+
+                MinuteHand(now: now)
+                    .stroke(Color.primary.opacity(0.9), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .frame(width: minuteHandDiameter, height: minuteHandDiameter)
+                    .shadow(radius: 1)
+
+                SecondHand(now: now)
+                    .stroke(Color.red.opacity(0.9), style: StrokeStyle(lineWidth: 1, lineCap: .round))
+                    .frame(width: minuteHandDiameter, height: minuteHandDiameter)
+                    .shadow(radius: 0.5)
+
                 // Center dot
                 Circle()
                     .fill(Color.primary)
                     .frame(width: 6, height: 6)
 
-                // Current time hand
-                TimeHand(now: now)
-                    .stroke(Color.primary, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .frame(width: outerRadius*2 - arcThickness*2 - ringInset, height: outerRadius*2 - arcThickness*2 - ringInset)
-                    .shadow(radius: 1)
-
-                // 12/3/6/9 labels
+                // Hour number labels (1–12)
                 ClockLabels()
                     .foregroundStyle(.secondary)
             }
@@ -149,14 +161,88 @@ struct TimeHand: Shape {
     }
 }
 
+// Minute hand on a 12-hour dial
+struct MinuteHand: Shape {
+    var now: Date
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height)/2
+
+        let comps = Calendar.current.dateComponents([.hour, .minute, .second], from: now)
+        let minute = Double(comps.minute ?? 0)
+        let second = Double(comps.second ?? 0)
+
+        // Minute hand with second contribution for smooth sweep
+        let totalMinutes = minute + second/60
+        let angleDeg = totalMinutes * 6 - 90 // 6 deg per minute, -90 to top
+        let angle = Angle.degrees(angleDeg)
+
+        let end = CGPoint(
+            x: center.x + cos(CGFloat(angle.radians)) * radius,
+            y: center.y + sin(CGFloat(angle.radians)) * radius
+        )
+        p.move(to: center)
+        p.addLine(to: end)
+        return p
+    }
+}
+
+// Second hand on a 12-hour dial
+struct SecondHand: Shape {
+    var now: Date
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height)/2
+
+        let comps = Calendar.current.dateComponents([.second, .nanosecond], from: now)
+        let second = Double(comps.second ?? 0)
+        let nano = Double(comps.nanosecond ?? 0)
+
+        // Smooth sweep with sub-second contribution
+        let totalSeconds = second + nano / 1_000_000_000
+        let angleDeg = totalSeconds * 6 - 90 // 6 deg per second, -90 to top
+        let angle = Angle.degrees(angleDeg)
+
+        // Second hand typically extends slightly beyond center in the opposite direction
+        let tip = CGPoint(
+            x: center.x + cos(CGFloat(angle.radians)) * radius,
+            y: center.y + sin(CGFloat(angle.radians)) * radius
+        )
+        let tail = CGPoint(
+            x: center.x - cos(CGFloat(angle.radians)) * radius * 0.2,
+            y: center.y - sin(CGFloat(angle.radians)) * radius * 0.2
+        )
+
+        p.move(to: tail)
+        p.addLine(to: tip)
+        return p
+    }
+}
+
 struct ClockLabels: View {
     var body: some View {
-        ZStack {
-            Text("12").offset(y: -120)
-            Text("3").offset(x: 120)
-            Text("6").offset(y: 120)
-            Text("9").offset(x: -120)
+        GeometryReader { proxy in
+            let size = min(proxy.size.width, proxy.size.height)
+            let radius = size / 2
+            // Place labels slightly inside the tick marks
+            let labelRadius = radius - 28
+
+            ZStack {
+                ForEach(1...12, id: \.self) { hour in
+                    let angle = Angle.degrees(Double(hour) * 30 - 90)
+                    let x = cos(CGFloat(angle.radians)) * labelRadius
+                    let y = sin(CGFloat(angle.radians)) * labelRadius
+
+                    Text("\(hour)")
+                        .font(.caption)
+                        .position(x: radius + x, y: radius + y)
+                        .accessibilityLabel("\(hour)")
+                }
+            }
         }
-        .font(.caption)
     }
 }
