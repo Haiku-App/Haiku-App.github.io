@@ -94,16 +94,21 @@ struct ClockView: View {
                     .foregroundStyle(numeralColor)
 
                 // Clock hands: hour and minute
-                let hourHandLength = innerCircleRadius - 6
-                let minuteHandLength = innerCircleRadius + (middleRingWidth * 0.6)
+                let hourHandLength = innerCircleRadius - 36
+                let minuteHandLength = innerCircleRadius - 8
+                let secondHandLength = innerCircleRadius - 2
 
                 TimeHand(now: now)
-                    .stroke(handColor, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .stroke(handColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .frame(width: hourHandLength * 2, height: hourHandLength * 2)
 
                 MinuteHand(now: now)
                     .stroke(handColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .frame(width: minuteHandLength * 2, height: minuteHandLength * 2)
+
+                SecondHand(now: now)
+                    .stroke(Color(red: 0.9, green: 0.35, blue: 0.35), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                    .frame(width: secondHandLength * 2, height: secondHandLength * 2)
 
                 // Center dot
                 Circle()
@@ -194,6 +199,35 @@ struct MinuteHand: Shape {
 
         let totalMinutes = minute + second/60
         let angleDeg = totalMinutes * 6 - 90
+        let angle = Angle.degrees(angleDeg)
+
+        let end = CGPoint(
+            x: center.x + cos(CGFloat(angle.radians)) * radius,
+            y: center.y + sin(CGFloat(angle.radians)) * radius
+        )
+        
+        p.move(to: center)
+        p.addLine(to: end)
+        return p
+    }
+}
+
+// Second hand on a 12-hour dial
+struct SecondHand: Shape {
+    var now: Date
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height)/2
+
+        let comps = Calendar.current.dateComponents([.second, .nanosecond], from: now)
+        let second = Double(comps.second ?? 0)
+        let nano = Double(comps.nanosecond ?? 0)
+
+        // Smooth sweep with sub-second contribution
+        let totalSeconds = second + nano / 1_000_000_000
+        let angleDeg = totalSeconds * 6 - 90 // 6 deg per second, -90 to top
         let angle = Angle.degrees(angleDeg)
 
         let end = CGPoint(

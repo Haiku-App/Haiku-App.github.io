@@ -14,9 +14,9 @@ struct ContentView: View {
         ClockTask(title: "Focus", startMinutes: 13*60, endMinutes: 14*60, color: Color(red: 0.36, green: 0.61, blue: 0.84))
     ]
 
-    // Update every second to keep the hand current
+    // Update frequently for smooth second hand sweep
     @State private var now: Date = Date()
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationStack {
