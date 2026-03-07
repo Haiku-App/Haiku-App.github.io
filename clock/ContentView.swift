@@ -168,7 +168,19 @@ struct ContentView: View {
                 List {
                     ForEach(tasksByDate[selectedDate, default: []]) { task in
                         let timeString = "\(formatTime(minutes: task.startMinutes)) - \(formatTime(minutes: task.endMinutes))"
-                        TaskRow(time: timeString, title: task.title, color: task.color)
+                        TaskRow(
+                            time: timeString,
+                            title: task.title,
+                            color: task.color,
+                            isCompleted: task.isCompleted,
+                            onToggle: {
+                                if let index = tasksByDate[selectedDate]?.firstIndex(where: { $0.id == task.id }) {
+                                    withAnimation {
+                                        tasksByDate[selectedDate]?[index].isCompleted.toggle()
+                                    }
+                                }
+                            }
+                        )
                             .listRowBackground(Color.clear)
                             .listRowInsets(EdgeInsets(top: 14, leading: 40, bottom: 14, trailing: 40))
                             .listRowSeparator(.hidden)
@@ -374,6 +386,8 @@ struct TaskRow: View {
     var time: String
     var title: String
     var color: Color
+    var isCompleted: Bool
+    var onToggle: () -> Void
     
     var body: some View {
         HStack(spacing: 16) {
@@ -382,34 +396,46 @@ struct TaskRow: View {
                 if parts.count == 2 {
                     Text(parts[0])
                         .font(.system(size: 14, weight: .light))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(.white.opacity(isCompleted ? 0.3 : 0.8))
+                        .strikethrough(isCompleted, color: .white.opacity(0.3))
                     Text(parts[1])
                         .font(.system(size: 12, weight: .light))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.white.opacity(isCompleted ? 0.2 : 0.5))
+                        .strikethrough(isCompleted, color: .white.opacity(0.2))
                 } else {
                     Text(time)
                         .font(.system(size: 14, weight: .light))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(.white.opacity(isCompleted ? 0.3 : 0.8))
+                        .strikethrough(isCompleted, color: .white.opacity(0.3))
                 }
             }
             .frame(width: 70, alignment: .leading)
             
             // Vertical separator
             Rectangle()
-                .fill(.white.opacity(0.3))
+                .fill(.white.opacity(isCompleted ? 0.1 : 0.3))
                 .frame(width: 1)
                 .frame(minHeight: 30)
             
             // Colored Leaf icon
             Image(systemName: "leaf.fill")
                 .font(.system(size: 14))
-                .foregroundStyle(color)
+                .foregroundStyle(isCompleted ? color.opacity(0.3) : color)
             
             Text(title)
                 .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(.white.opacity(isCompleted ? 0.4 : 0.9))
+                .strikethrough(isCompleted, color: .white.opacity(0.4))
             
             Spacer()
+            
+            // Checkbox
+            Button(action: onToggle) {
+                Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22, weight: .light))
+                    .foregroundStyle(isCompleted ? color.opacity(0.5) : color)
+            }
+            .buttonStyle(.plain)
         }
     }
 }

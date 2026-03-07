@@ -83,7 +83,7 @@ struct ClockView: View {
                 // Scheduled Tasks
                 ForEach(tasks) { task in
                     TaskArc(startMinutes: task.start12h, endMinutes: task.end12h)
-                        .stroke(task.color, style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
+                        .stroke(task.color.opacity(task.isCompleted ? 0.3 : 1.0), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
                         .frame(width: ringRadius * 2, height: ringRadius * 2)
                         // Add glow if currently being dragged
                         .shadow(color: activeDrag?.taskId == task.id ? task.color.opacity(0.8) : .clear, radius: 4)

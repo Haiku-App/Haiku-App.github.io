@@ -15,6 +15,7 @@ struct ClockTask: Identifiable, Hashable {
     var startMinutes: Int   // minutes from midnight
     var endMinutes: Int     // minutes from midnight
     var color: Color
+    var isCompleted: Bool = false
 
     /// Normalize to 12h range in minutes [0, 720)
     var start12h: Double { Double(startMinutes % 720) }
