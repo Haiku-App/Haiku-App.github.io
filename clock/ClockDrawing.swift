@@ -207,17 +207,13 @@ struct SecondHand: Shape {
         let angleDeg = totalSeconds * 6 - 90 // 6 deg per second, -90 to top
         let angle = Angle.degrees(angleDeg)
 
-        // Second hand typically extends slightly beyond center in the opposite direction
+        // Start at exact center so the hand originates from the center dot
         let tip = CGPoint(
             x: center.x + cos(CGFloat(angle.radians)) * radius,
             y: center.y + sin(CGFloat(angle.radians)) * radius
         )
-        let tail = CGPoint(
-            x: center.x - cos(CGFloat(angle.radians)) * radius * 0.2,
-            y: center.y - sin(CGFloat(angle.radians)) * radius * 0.2
-        )
 
-        p.move(to: tail)
+        p.move(to: center)
         p.addLine(to: tip)
         return p
     }

@@ -20,7 +20,7 @@ struct ContentView: View {
 
     // Update every 30s to keep the hand current
     @State private var now: Date = Date()
-    private let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationStack {
@@ -68,3 +68,4 @@ struct ContentView: View {
 #Preview {
     ContentView()
 }
+
