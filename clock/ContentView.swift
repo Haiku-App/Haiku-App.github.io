@@ -5,10 +5,24 @@ struct ContentView: View {
     @State private var now = Date()
     private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
-    @State private var tasks: [ClockTask] = [
-        ClockTask(title: "Matcha Tasting", startMinutes: 14*60, endMinutes: 15*60, color: Color(red: 0.85, green: 0.78, blue: 0.58)), // Gold
-        ClockTask(title: "Garden Walk", startMinutes: 16*60, endMinutes: 17*60 + 30, color: Color(red: 0.75, green: 0.55, blue: 0.45)) // Muted Terracotta
-    ]
+    @State private var selectedDate = Calendar.current.startOfDay(for: Date())
+    
+    @State private var tasksByDate: [Date: [ClockTask]] = {
+        let today = Calendar.current.startOfDay(for: Date())
+        return [
+            today: [
+                ClockTask(title: "Matcha Tasting", startMinutes: 14*60, endMinutes: 15*60, color: Color(red: 0.85, green: 0.78, blue: 0.58)), // Gold
+                ClockTask(title: "Garden Walk", startMinutes: 16*60, endMinutes: 17*60 + 30, color: Color(red: 0.75, green: 0.55, blue: 0.45)) // Muted Terracotta
+            ]
+        ]
+    }()
+
+    private var currentTasksBinding: Binding<[ClockTask]> {
+        Binding(
+            get: { tasksByDate[selectedDate, default: []] },
+            set: { tasksByDate[selectedDate] = $0 }
+        )
+    }
 
     private let bgColor = Color(red: 0.18, green: 0.23, blue: 0.18) // Muted Sage Green
     private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
@@ -25,26 +39,46 @@ struct ContentView: View {
 
             VStack(spacing: 0) {
                 // Header
-                VStack(spacing: 4) {
+                VStack(spacing: 8) {
                     Text("HAIKU")
                         .font(.system(size: 26, weight: .regular, design: .serif))
                         .foregroundStyle(goldColor)
                         .tracking(2)
 
-                    HStack {
-                        Spacer()
-                        Text(currentMonthYear())
-                            .font(.system(size: 14, weight: .light, design: .serif))
-                            .foregroundStyle(.white.opacity(0.7))
-                        
-                        Button(action: { showingAddTask = true }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(goldColor)
+                    ZStack {
+                        // Centered Date and Chevrons
+                        HStack(spacing: 16) {
+                            Button(action: { changeDate(by: -1) }) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(goldColor.opacity(0.8))
+                            }
+                            
+                            Text(formattedSelectedDate())
+                                .font(.system(size: 14, weight: .medium, design: .serif))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .frame(minWidth: 100, alignment: .center)
+                                .id(selectedDate) // Forces animation on change
+                                .transition(.opacity)
+                            
+                            Button(action: { changeDate(by: 1) }) {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(goldColor.opacity(0.8))
+                            }
                         }
-                        .padding(.leading, 8)
+                        
+                        // Right-aligned Plus Button
+                        HStack {
+                            Spacer()
+                            Button(action: { showingAddTask = true }) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundStyle(goldColor)
+                            }
+                            .padding(.trailing, 40)
+                        }
                     }
-                    .padding(.horizontal, 40)
                 }
                 .padding(.top, 20)
 
@@ -54,6 +88,8 @@ struct ContentView: View {
                 Group {
                     if selectedTab == .clock {
                         clockContentView()
+                            .id(selectedDate) // Animate view transition when date changes
+                            .transition(.asymmetric(insertion: .opacity, removal: .opacity))
                     } else if selectedTab == .week {
                         Text("Week View").font(.title).foregroundStyle(goldColor)
                     } else if selectedTab == .today {
@@ -93,7 +129,7 @@ struct ContentView: View {
             now = date
         }
         .sheet(isPresented: $showingAddTask) {
-            AddTaskView(tasks: $tasks)
+            AddTaskView(tasks: currentTasksBinding)
         }
     }
 
@@ -104,43 +140,71 @@ struct ContentView: View {
                 .frame(height: 20)
                 
             // Clock
-            ClockView(now: now, tasks: $tasks)
+            ClockView(now: now, tasks: currentTasksBinding)
                 .frame(width: 280, height: 280)
+                
+            // Daily Quote
+            Text(timeQuote(for: selectedDate))
+                .font(.system(size: 13, weight: .light, design: .serif))
+                .foregroundStyle(.white.opacity(0.4))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+                .padding(.top, 24)
 
             Spacer()
-                .frame(height: 50)
+                .frame(height: 26)
 
             // Task List
-            List {
-                ForEach(tasks) { task in
-                    TaskRow(time: formatTime(minutes: task.startMinutes), title: task.title, color: task.color)
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 14, leading: 40, bottom: 14, trailing: 40))
-                        .listRowSeparator(.hidden)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                if let index = tasks.firstIndex(where: { $0.id == task.id }) {
-                                    withAnimation {
-                                        tasks.remove(at: index)
-                                    }
-                                }
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
+            if tasksByDate[selectedDate, default: []].isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "cup.and.saucer")
+                        .font(.system(size: 32))
+                        .foregroundStyle(goldColor.opacity(0.5))
+                    Text("No tasks scheduled")
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundStyle(.white.opacity(0.5))
                 }
+            } else {
+                List {
+                    ForEach(tasksByDate[selectedDate, default: []]) { task in
+                        let timeString = "\(formatTime(minutes: task.startMinutes)) - \(formatTime(minutes: task.endMinutes))"
+                        TaskRow(time: timeString, title: task.title, color: task.color)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 14, leading: 40, bottom: 14, trailing: 40))
+                            .listRowSeparator(.hidden)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    if let index = tasksByDate[selectedDate]?.firstIndex(where: { $0.id == task.id }) {
+                                        withAnimation {
+                                            tasksByDate[selectedDate]?.remove(at: index)
+                                        }
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
             
             Spacer()
         }
     }
+    
+    private func changeDate(by days: Int) {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            if let newDate = Calendar.current.date(byAdding: .day, value: days, to: selectedDate) {
+                selectedDate = newDate
+            }
+        }
+    }
 
-    private func currentMonthYear() -> String {
+    private func formattedSelectedDate() -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        return formatter.string(from: now)
+        formatter.dateFormat = "MMMM d"
+        return formatter.string(from: selectedDate)
     }
 
     private func formatTime(minutes: Int) -> String {
@@ -154,6 +218,23 @@ struct ContentView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
         return formatter.string(from: date)
+    }
+
+    private func timeQuote(for date: Date) -> String {
+        let quotes = [
+            "“Time is the longest distance between two places.” — Tennessee Williams",
+            "“The two most powerful warriors are patience and time.” — Leo Tolstoy",
+            "“Time you enjoy wasting is not wasted time.” — Marthe Troly-Curtin",
+            "“Punctuality is the thief of time.” — Oscar Wilde",
+            "“Time flies over us, but leaves its shadow behind.” — Nathaniel Hawthorne",
+            "“There is never enough time to do everything, but there is always enough time to do the most important thing.” — Brian Tracy",
+            "“Lost time is never found again.” — Benjamin Franklin",
+            "“Time changes everything except something within us which is always surprised by change.” — Thomas Hardy"
+        ]
+        
+        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 0
+        let index = dayOfYear % quotes.count
+        return quotes[index]
     }
 }
 
@@ -296,15 +377,28 @@ struct TaskRow: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            Text(time)
-                .font(.system(size: 14, weight: .light))
-                .foregroundStyle(.white.opacity(0.6))
-                .frame(width: 60, alignment: .leading)
+            VStack(alignment: .leading, spacing: 4) {
+                let parts = time.components(separatedBy: " - ")
+                if parts.count == 2 {
+                    Text(parts[0])
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundStyle(.white.opacity(0.8))
+                    Text(parts[1])
+                        .font(.system(size: 12, weight: .light))
+                        .foregroundStyle(.white.opacity(0.5))
+                } else {
+                    Text(time)
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            .frame(width: 70, alignment: .leading)
             
             // Vertical separator
             Rectangle()
                 .fill(.white.opacity(0.3))
-                .frame(width: 1, height: 16)
+                .frame(width: 1)
+                .frame(minHeight: 30)
             
             // Colored Leaf icon
             Image(systemName: "leaf.fill")
