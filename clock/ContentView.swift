@@ -9,42 +9,51 @@ import SwiftUI
 import Combine
 
 struct ContentView: View {
-    // Sample tasks for demo
+    // Sample tasks matching the image's aesthetic
     @State private var tasks: [ClockTask] = [
-        ClockTask(title: "Standup", startMinutes: 9*60 + 0, endMinutes: 9*60 + 30, color: .blue),
-        ClockTask(title: "Design Review", startMinutes: 10*60 + 15, endMinutes: 11*60, color: .pink),
-        ClockTask(title: "Lunch", startMinutes: 12*60, endMinutes: 13*60, color: .green),
-        ClockTask(title: "1:1", startMinutes: 14*60, endMinutes: 14*60 + 30, color: .orange),
-        ClockTask(title: "Focus", startMinutes: 15*60, endMinutes: 16*60 + 30, color: .purple)
+        ClockTask(title: "Focus", startMinutes: 13*60, endMinutes: 14*60, color: Color(red: 0.36, green: 0.61, blue: 0.84))
     ]
 
-    // Update every 30s to keep the hand current
+    // Update every second to keep the hand current
     @State private var now: Date = Date()
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                ClockView(tasks: tasks, now: now)
-                    .frame(width: 320, height: 320)
-                    .padding(.top, 16)
+            ZStack {
+                    // Dark green background
+                Color(red: 0.05, green: 0.15, blue: 0.08).ignoresSafeArea()
+                
+                VStack(spacing: 32) {
+                    ClockView(tasks: tasks, now: now)
+                        .frame(width: 320, height: 320)
+                        .padding(.top, 32)
 
-                // Simple legend/list
-                List(tasks) { task in
-                    HStack(spacing: 12) {
-                        Circle().fill(task.color).frame(width: 12, height: 12)
-                        VStack(alignment: .leading) {
-                            Text(task.title).font(.body)
-                            Text("\(formatTime(task.startMinutes)) – \(formatTime(task.endMinutes))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    // Simple legend/list
+                    List(tasks) { task in
+                        HStack(spacing: 12) {
+                            Circle().fill(task.color).frame(width: 12, height: 12)
+                            VStack(alignment: .leading) {
+                                Text(task.title)
+                                    .font(.body)
+                                    .foregroundStyle(.white)
+                                Text("\(formatTime(task.startMinutes)) – \(formatTime(task.endMinutes))")
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
                         }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                     }
+                    .listStyle(.plain)
+                    .scrollDisabled(true)
                 }
-                .listStyle(.plain)
             }
             .navigationTitle("Clock Agenda")
+            .toolbarBackground(Color(red: 0.05, green: 0.15, blue: 0.08), for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
+        .preferredColorScheme(.dark) // Force dark mode
         .onReceive(timer) { date in
             now = date
         }
@@ -68,4 +77,3 @@ struct ContentView: View {
 #Preview {
     ContentView()
 }
-
