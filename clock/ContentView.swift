@@ -31,10 +31,11 @@ struct ContentView: View {
     private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
 
     enum Tab {
-        case clock, week, today, profile
+        case clock, week, analytics, profile
     }
     @State private var selectedTab: Tab = .clock
     @State private var showingAddTask = false
+    @AppStorage("is24HourClock") private var is24HourClock = false
 
     var body: some View {
         ZStack {
@@ -97,10 +98,10 @@ struct ContentView: View {
                             .transition(.asymmetric(insertion: .opacity, removal: .opacity))
                     } else if selectedTab == .week {
                         Text("Week View").font(.title).foregroundStyle(goldColor)
-                    } else if selectedTab == .today {
-                        Text("Today's Agenda").font(.title).foregroundStyle(goldColor)
-                    } else if selectedTab == .profile {
+                    } else if selectedTab == .analytics {
                         ProfileAnalyticsView(tasksByDate: tasksByDate)
+                    } else if selectedTab == .profile {
+                        ProfileSettingsView(is24HourClock: $is24HourClock)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -117,8 +118,8 @@ struct ContentView: View {
                         selectedTab = .week
                     }
                     Spacer()
-                    TabBarButton(icon: "calendar.day.timeline.left", text: "Today", isSelected: selectedTab == .today) {
-                        selectedTab = .today
+                    TabBarButton(icon: "chart.pie.fill", text: "Analytics", isSelected: selectedTab == .analytics) {
+                        selectedTab = .analytics
                     }
                     Spacer()
                     TabBarButton(icon: "person.fill", text: "Profile", isSelected: selectedTab == .profile) {
@@ -173,7 +174,7 @@ struct ContentView: View {
                 .frame(height: 20)
                 
             // Clock
-            ClockView(now: now, tasks: currentTasksBinding, isFlowState: $isFlowState)
+            ClockView(now: now, tasks: currentTasksBinding, isFlowState: $isFlowState, is24HourClock: is24HourClock)
                 .frame(width: 280, height: 280)
                 .scaleEffect(isFlowState ? 1.15 : 1.0)
                 
@@ -283,23 +284,30 @@ struct ContentView: View {
         comps.minute = min
         let date = Calendar.current.date(from: comps) ?? Date()
         let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
+        formatter.dateFormat = is24HourClock ? "HH:mm" : "h:mm a"
         return formatter.string(from: date)
     }
 
     private func timeQuote(for date: Date) -> String {
         let quotes = [
-            "“Time is the longest distance between two places.” — Tennessee Williams",
+            "“A year from now you will wish you had started today.” — Karen Lamb",
+            "“How we spend our days is, of course, how we spend our lives.” — Annie Dillard",
+            "“The bad news is time flies. The good news is you're the pilot.” — Michael Altshuler",
+            "“Do not wait: the time will never be 'just right'. Start where you stand.” — Napoleon Hill",
+            "“We must use time as a tool, not as a couch.” — John F. Kennedy",
+            "“If you spend too much time thinking about a thing, you'll never get it done.” — Bruce Lee",
+            "“It is not that we have a short time to live, but that we waste a lot of it.” — Seneca",
+            "“The common man is not concerned about the passage of time, the man of talent is driven by it.” — Arthur Schopenhauer",
+            "“You don't have to see the whole staircase, just take the first step.” — Martin Luther King Jr.",
             "“The two most powerful warriors are patience and time.” — Leo Tolstoy",
-            "“Time you enjoy wasting is not wasted time.” — Marthe Troly-Curtin",
-            "“Tough times never last, but tough people do.” — Robert H. Schuller",
-            "“Punctuality is the thief of time.” — Oscar Wilde",
-            "“Time flies over us, but leaves its shadow behind.” — Nathaniel Hawthorne",
-            "“There is never enough time to do everything, but there is always enough time to do the most important thing.” — Brian Tracy",
-            "“Lost time is never found again.” — Benjamin Franklin",
-            "“Time changes everything except something within us which is always surprised by change.” — Thomas Hardy"
+            "“You are what you do, not what you say you'll do.” — C.G. Jung",
+            "“There are seven days in the week and 'someday' isn't one of them.” — Shaquille O'Neal",
+            "“If it is important to you, you will find a way. If not, you'll find an excuse.” — Ryan Blair",
+            "“The future depends on what you do today.” — Mahatma Gandhi",
+            "“Discipline is choosing between what you want now and what you want most.” — Abraham Lincoln",
+            "“You don't have to be great to start, but you have to start to be great.” — Zig Ziglar"
         ]
-        
+
         // Use .day within .year to compute day-of-year (1-based). Fallback to 1 on failure.
         let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 1
         let index = dayOfYear % quotes.count
@@ -675,6 +683,36 @@ struct ProfileAnalyticsView: View {
     }
 }
 
+struct ProfileSettingsView: View {
+    @Binding var is24HourClock: Bool
+    
+    private let bgColor = Color(red: 0.18, green: 0.23, blue: 0.18) // Muted Sage Green
+    private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
+
+    var body: some View {
+        VStack(spacing: 40) {
+            Text("SETTINGS")
+                .font(.system(size: 14, weight: .regular, design: .serif))
+                .foregroundStyle(goldColor)
+                .tracking(2)
+            
+            Toggle("24-Hour Clock", isOn: $is24HourClock)
+                .font(.system(size: 16, weight: .medium, design: .serif))
+                .foregroundStyle(.white.opacity(0.9))
+                .padding()
+                .tint(goldColor)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(red: 0.15, green: 0.20, blue: 0.15))
+                        .shadow(color: Color(red: 0.12, green: 0.16, blue: 0.12), radius: 5, x: 4, y: 4)
+                        .shadow(color: Color(red: 0.22, green: 0.28, blue: 0.22), radius: 5, x: -4, y: -4)
+                )
+                .padding(.horizontal, 40)
+        }
+    }
+}
+
 #Preview {
     ContentView()
 }
+

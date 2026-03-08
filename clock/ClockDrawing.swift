@@ -4,6 +4,7 @@ struct ClockView: View {
     var now: Date
     @Binding var tasks: [ClockTask]
     @Binding var isFlowState: Bool
+    var is24HourClock: Bool = false
 
     // Palette matching the Haiku image
     private let clockFaceColor = Color(red: 0.18, green: 0.23, blue: 0.18)
@@ -28,6 +29,8 @@ struct ClockView: View {
         var taskId: UUID
         var mode: Mode
         var initialMouseMinute: Double
+        var lastMouseMinute: Double
+        var accumulatedDelta: Double
         var initialStartMinutes: Int
         var initialEndMinutes: Int
 
@@ -74,12 +77,12 @@ struct ClockView: View {
                     )
                 
                 // Task Tracks (Concentric AM/PM Rings)
-                let ringWidth: CGFloat = 12
+                let ringWidth: CGFloat = is24HourClock ? 24 : 18
                 let pmRingRadius = radius - (ringWidth/2)
                 let amRingRadius = pmRingRadius - ringWidth - 4
                 
                 // Neumorphic Base
-                let faceRadius = amRingRadius - (ringWidth/2) - 4
+                let faceRadius = is24HourClock ? (pmRingRadius - (ringWidth/2) - 4) : (amRingRadius - (ringWidth/2) - 4)
                 
                 Circle()
                     .fill(clockFaceColor)
@@ -91,29 +94,43 @@ struct ClockView: View {
                     )
                     .allowsHitTesting(false)
                 
-                // Empty AM Track (Inner)
-                Circle()
-                    .stroke(taskTrackColor.opacity(0.7), lineWidth: ringWidth)
-                    .frame(width: amRingRadius * 2, height: amRingRadius * 2)
-                    .allowsHitTesting(false)
-                
-                // Empty PM Track (Outer)
-                Circle()
-                    .stroke(taskTrackColor, lineWidth: ringWidth)
-                    .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
-                    .allowsHitTesting(false)
+                if is24HourClock {
+                    // Empty 24H Track (Outer)
+                    Circle()
+                        .stroke(taskTrackColor, lineWidth: ringWidth)
+                        .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
+                        .allowsHitTesting(false)
+                        
+                    Text("24H")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(goldColor.opacity(0.3))
+                        .position(x: center.x, y: center.y - pmRingRadius)
+                        .allowsHitTesting(false)
+                } else {
+                    // Empty AM Track (Inner)
+                    Circle()
+                        .stroke(taskTrackColor.opacity(0.7), lineWidth: ringWidth)
+                        .frame(width: amRingRadius * 2, height: amRingRadius * 2)
+                        .allowsHitTesting(false)
+                    
+                    // Empty PM Track (Outer)
+                    Circle()
+                        .stroke(taskTrackColor, lineWidth: ringWidth)
+                        .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
+                        .allowsHitTesting(false)
 
-                // Track Indicators
-                Text("AM")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(goldColor.opacity(0.3))
-                    .position(x: center.x, y: center.y - amRingRadius)
-                    .allowsHitTesting(false)
-                Text("PM")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(goldColor.opacity(0.3))
-                    .position(x: center.x, y: center.y - pmRingRadius)
-                    .allowsHitTesting(false)
+                    // Track Indicators
+                    Text("AM")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(goldColor.opacity(0.3))
+                        .position(x: center.x, y: center.y - amRingRadius)
+                        .allowsHitTesting(false)
+                    Text("PM")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(goldColor.opacity(0.3))
+                        .position(x: center.x, y: center.y - pmRingRadius)
+                        .allowsHitTesting(false)
+                }
                 
                 // Scheduled Tasks
                 ForEach(tasks) { task in
@@ -125,11 +142,12 @@ struct ClockView: View {
                     let glowRadius: CGFloat = (isActive && (pulseState || isFlowState)) ? (isFlowState ? 16 : 8) : (isDragging ? 4 : 0)
                     let glowColor = task.color.opacity((isActive && (pulseState || isFlowState)) ? (isFlowState ? 0.8 : 0.6) : (isDragging ? 0.8 : 0))
 
-                    ForEach(Array(getFragments(for: task).enumerated()), id: \.offset) { index, frag in
-                        let r = frag.isAM ? amRingRadius : pmRingRadius
+                    let frags = is24HourClock ? [TaskFragment(isAM: false, startMinutes: Double(task.startMinutes), endMinutes: Double(task.endMinutes), task: task)] : getFragments(for: task)
+                    ForEach(Array(frags.enumerated()), id: \.offset) { index, frag in
+                        let r = is24HourClock ? pmRingRadius : (frag.isAM ? amRingRadius : pmRingRadius)
 
                         ZStack {
-                            TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes)
+                            TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
                                 .stroke(task.color.opacity(opacity), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
                                 .frame(width: r * 2, height: r * 2)
                                 .shadow(color: glowColor, radius: glowRadius)
@@ -140,7 +158,8 @@ struct ClockView: View {
                             // Emoji at midpoint of the arc
                             if !isDragging && (frag.endMinutes - frag.startMinutes) > 15 {
                                 let midMinute = frag.startMinutes + (frag.endMinutes - frag.startMinutes) / 2
-                                let angle = Angle.degrees(midMinute * 0.5 - 90)
+                                let angleDeg = is24HourClock ? (midMinute * 0.25 - 90) : (midMinute * 0.5 - 90)
+                                let angle = Angle.degrees(angleDeg)
                                 let x = cos(CGFloat(angle.radians)) * r
                                 let y = sin(CGFloat(angle.radians)) * r
 
@@ -155,24 +174,41 @@ struct ClockView: View {
                 }
 
                 // Clock Dots and Numbers
-                ForEach(0..<12, id: \.self) { i in
-                    let angle = Angle.degrees(Double(i) * 30 - 90)
+                let numDots = is24HourClock ? 24 : 12
+                ForEach(0..<numDots, id: \.self) { i in
+                    let angleDeg = is24HourClock ? (Double(i) * 15 - 90) : (Double(i) * 30 - 90)
+                    let angle = Angle.degrees(angleDeg)
                     let dotDistance = faceRadius - 20
                     
                     let x = cos(CGFloat(angle.radians)) * dotDistance
                     let y = sin(CGFloat(angle.radians)) * dotDistance
                     
-                    if i % 3 == 0 { // 12, 3, 6, 9
-                        let hourNumber = i == 0 ? 12 : i
-                        Text("\(hourNumber)")
-                            .font(.system(size: 14, weight: .light, design: .serif))
-                            .foregroundStyle(goldColor)
-                            .position(x: center.x + x, y: center.y + y)
+                    if is24HourClock {
+                        if i % 6 == 0 { // 24, 6, 12, 18
+                            let hourNumber = i == 0 ? 24 : i
+                            Text("\(hourNumber)")
+                                .font(.system(size: 14, weight: .light, design: .serif))
+                                .foregroundStyle(goldColor)
+                                .position(x: center.x + x, y: center.y + y)
+                        } else if i % 2 == 0 {
+                            Circle()
+                                .fill(goldColor.opacity(0.6))
+                                .frame(width: 3, height: 3)
+                                .position(x: center.x + x, y: center.y + y)
+                        }
                     } else {
-                        Circle()
-                            .fill(goldColor.opacity(0.6))
-                            .frame(width: 3, height: 3)
-                            .position(x: center.x + x, y: center.y + y)
+                        if i % 3 == 0 { // 12, 3, 6, 9
+                            let hourNumber = i == 0 ? 12 : i
+                            Text("\(hourNumber)")
+                                .font(.system(size: 14, weight: .light, design: .serif))
+                                .foregroundStyle(goldColor)
+                                .position(x: center.x + x, y: center.y + y)
+                        } else {
+                            Circle()
+                                .fill(goldColor.opacity(0.6))
+                                .frame(width: 3, height: 3)
+                                .position(x: center.x + x, y: center.y + y)
+                        }
                     }
                 }
                 .allowsHitTesting(false)
@@ -237,7 +273,7 @@ struct ClockView: View {
                 let minuteHandLength = faceRadius * 0.75
                 let secondHandLength = faceRadius * 0.85
 
-                TimeHand(now: now)
+                TimeHand(now: now, is24HourClock: is24HourClock)
                     .stroke(goldColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .frame(width: hourHandLength * 2, height: hourHandLength * 2)
                     .shadow(color: .black.opacity(0.4), radius: 3, x: 1, y: 2)
@@ -280,17 +316,18 @@ struct ClockView: View {
         let dist = sqrt(dx*dx + dy*dy)
         let radius = size.width / 2
         
-        let ringWidth: CGFloat = 12
+        let ringWidth: CGFloat = is24HourClock ? 24 : 18
         let pmRingRadius = radius - (ringWidth/2)
         let amRingRadius = pmRingRadius - ringWidth - 4
         
-        let isAMClick = abs(dist - amRingRadius) < abs(dist - pmRingRadius)
+        let isAMClick = is24HourClock ? false : abs(dist - amRingRadius) < abs(dist - pmRingRadius)
         
         // Ensure user is tapping near one of the tracks
-        if abs(dist - (isAMClick ? amRingRadius : pmRingRadius)) > 30 { return }
+        let targetRadius = is24HourClock ? pmRingRadius : (isAMClick ? amRingRadius : pmRingRadius)
+        if abs(dist - targetRadius) > 30 { return }
         
         let min12h = minute(from: location, in: size)
-        let absoluteMinute = isAMClick ? min12h : min12h + 720
+        let absoluteMinute = is24HourClock ? (min12h * 2) : (isAMClick ? min12h : min12h + 720)
         
         // Find if we touched an existing task
         for task in tasks {
@@ -302,7 +339,7 @@ struct ClockView: View {
                 if distToStart <= 15 { mode = .resizeStart }
                 else if distToEnd <= 15 { mode = .resizeEnd }
                 
-                activeDrag = DragInfo(taskId: task.id, mode: mode, initialMouseMinute: min12h, initialStartMinutes: task.startMinutes, initialEndMinutes: task.endMinutes)
+                activeDrag = DragInfo(taskId: task.id, mode: mode, initialMouseMinute: min12h, lastMouseMinute: min12h, accumulatedDelta: 0, initialStartMinutes: task.startMinutes, initialEndMinutes: task.endMinutes)
                 return
             }
         }
@@ -314,9 +351,13 @@ struct ClockView: View {
         let currentMin = minute(from: location, in: size)
         var totalDelta = currentMin - drag.initialMouseMinute
         
-        // Handle wrap-around the 12-hour dial
+        // Handle wrap-around the dial
         if totalDelta > 360 { totalDelta -= 720 }
         else if totalDelta < -360 { totalDelta += 720 }
+        
+        if is24HourClock {
+            totalDelta *= 2 // Because 360 degrees = 1440 minutes
+        }
         
         var task = tasks[index]
         let oldStart = task.startMinutes
@@ -394,7 +435,7 @@ struct ClockView: View {
 
     private func formatTime(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
+        formatter.dateFormat = is24HourClock ? "HH:mm" : "h:mm a"
         return formatter.string(from: date)
     }
 }
@@ -403,6 +444,7 @@ struct ClockView: View {
 
 struct TimeHand: Shape {
     var now: Date
+    var is24HourClock: Bool = false
 
     func path(in rect: CGRect) -> Path {
         var p = Path()
@@ -414,8 +456,14 @@ struct TimeHand: Shape {
         let minute = Double(comps.minute ?? 0)
         let second = Double(comps.second ?? 0)
 
-        let totalMinutes12h = (hour.truncatingRemainder(dividingBy: 12)) * 60 + minute + second/60
-        let angleDeg = totalMinutes12h * 0.5 - 90
+        let angleDeg: Double
+        if is24HourClock {
+            let totalMinutes24h = hour * 60 + minute + second/60
+            angleDeg = totalMinutes24h * 0.25 - 90
+        } else {
+            let totalMinutes12h = (hour.truncatingRemainder(dividingBy: 12)) * 60 + minute + second/60
+            angleDeg = totalMinutes12h * 0.5 - 90
+        }
         let angle = Angle.degrees(angleDeg)
 
         let end = CGPoint(
@@ -486,6 +534,7 @@ struct SecondHand: Shape {
 struct TaskArc: Shape {
     var startMinutes: Double
     var endMinutes: Double
+    var is24HourClock: Bool = false
 
     func path(in rect: CGRect) -> Path {
         var p = Path()
@@ -493,7 +542,7 @@ struct TaskArc: Shape {
         let radius = min(rect.width, rect.height)/2
 
         func angle(for minutes: Double) -> Angle {
-            let deg = minutes * 0.5 - 90
+            let deg = is24HourClock ? (minutes * 0.25 - 90) : (minutes * 0.5 - 90)
             return .degrees(deg)
         }
 
