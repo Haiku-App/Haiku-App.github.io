@@ -209,6 +209,7 @@ struct ContentView: View {
                                     withAnimation {
                                         tasksByDate[selectedDate]?[index].isCompleted.toggle()
                                     }
+                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                                 }
                             }
                         )

@@ -26,7 +26,9 @@ struct ClockView: View {
     struct DragInfo {
         var taskId: UUID
         var mode: Mode
-        var lastMouseMinute: Double
+        var initialMouseMinute: Double
+        var initialStartMinutes: Int
+        var initialEndMinutes: Int
 
         enum Mode {
             case move, resizeStart, resizeEnd, create
@@ -66,7 +68,6 @@ struct ClockView: View {
                             .onEnded { _ in
                                 activeDrag = nil
                                 tasks.sort { $0.startMinutes < $1.startMinutes }
-                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
                             }
                     )
                 
@@ -243,63 +244,74 @@ struct ClockView: View {
                 if distToStart <= 15 { mode = .resizeStart }
                 else if distToEnd <= 15 { mode = .resizeEnd }
                 
-                activeDrag = DragInfo(taskId: task.id, mode: mode, lastMouseMinute: min12h)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                activeDrag = DragInfo(taskId: task.id, mode: mode, initialMouseMinute: min12h, initialStartMinutes: task.startMinutes, initialEndMinutes: task.endMinutes)
                 return
             }
         }
     }
 
     private func handleDragChange(location: CGPoint, size: CGSize) {
-        guard var drag = activeDrag, let index = tasks.firstIndex(where: { $0.id == drag.taskId }) else { return }
+        guard let drag = activeDrag, let index = tasks.firstIndex(where: { $0.id == drag.taskId }) else { return }
         
         let currentMin = minute(from: location, in: size)
-        var delta = currentMin - drag.lastMouseMinute
+        var totalDelta = currentMin - drag.initialMouseMinute
         
         // Handle wrap-around the 12-hour dial
-        if delta > 360 { delta -= 720 }
-        else if delta < -360 { delta += 720 }
-        
-        if abs(delta) < 1 { return } // Prevent tiny jitters
+        if totalDelta > 360 { totalDelta -= 720 }
+        else if totalDelta < -360 { totalDelta += 720 }
         
         var task = tasks[index]
         let oldStart = task.startMinutes
         let oldEnd = task.endMinutes
         
+        // Aim assist: snaps to nearest 30 mins if within 8 minutes
+        func snap(_ val: Int) -> Int {
+            let remainder = val % 30
+            if remainder < 8 { return val - remainder }
+            if remainder > 22 { return val + (30 - remainder) }
+            return val
+        }
+        
         switch drag.mode {
         case .move:
-            task.startMinutes += Int(delta)
-            task.endMinutes += Int(delta)
+            let rawStart = drag.initialStartMinutes + Int(totalDelta)
+            let snappedStart = snap(rawStart)
+            let duration = drag.initialEndMinutes - drag.initialStartMinutes
+            
+            task.startMinutes = snappedStart
+            task.endMinutes = snappedStart + duration
             
             // Constrain to 24h
             if task.startMinutes < 0 {
-                let dur = task.endMinutes - task.startMinutes
                 task.startMinutes = 0
-                task.endMinutes = dur
+                task.endMinutes = duration
             } else if task.endMinutes > 1440 {
-                let dur = task.endMinutes - task.startMinutes
                 task.endMinutes = 1440
-                task.startMinutes = 1440 - dur
+                task.startMinutes = 1440 - duration
             }
 
         case .resizeStart:
-            task.startMinutes += Int(delta)
+            let rawStart = drag.initialStartMinutes + Int(totalDelta)
+            task.startMinutes = snap(rawStart)
             if task.startMinutes < 0 { task.startMinutes = 0 }
             if task.startMinutes > task.endMinutes - 5 { task.startMinutes = task.endMinutes - 5 }
         case .resizeEnd, .create:
-            task.endMinutes += Int(delta)
+            let rawEnd = drag.initialEndMinutes + Int(totalDelta)
+            task.endMinutes = snap(rawEnd)
             if task.endMinutes > 1440 { task.endMinutes = 1440 }
             if task.endMinutes < task.startMinutes + 5 { task.endMinutes = task.startMinutes + 5 }
         }
         
-        // Haptic feedback every 15 minutes of dragging
-        if abs(task.startMinutes - oldStart) >= 15 || abs(task.endMinutes - oldEnd) >= 15 {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        // Haptic feedback when snapping to a new 30 or 60 min boundary
+        let startChangedToSnap = task.startMinutes != oldStart && task.startMinutes % 30 == 0
+        let endChangedToSnap = task.endMinutes != oldEnd && task.endMinutes % 30 == 0
+        
+        if startChangedToSnap || endChangedToSnap {
+            let isHour = (task.startMinutes % 60 == 0) || (task.endMinutes % 60 == 0)
+            UIImpactFeedbackGenerator(style: isHour ? .medium : .soft).impactOccurred()
         }
         
         tasks[index] = task
-        drag.lastMouseMinute = currentMin
-        activeDrag = drag
     }
 
     private func minute(from location: CGPoint, in size: CGSize) -> Double {
