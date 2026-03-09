@@ -3,7 +3,12 @@ internal import Combine
 
 struct ContentView: View {
     @State private var now = Date()
-    private let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+    // Slow down timer in Canvas to prevent update loop crashes
+    private let timer = Timer.publish(
+        every: ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" ? 1.0 : 0.05, 
+        on: .main, 
+        in: .common
+    ).autoconnect()
 
     @State private var selectedDate = Calendar.current.startOfDay(for: Date())
     @StateObject private var calendarManager = CalendarManager()
@@ -31,7 +36,7 @@ struct ContentView: View {
     private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
 
     enum Tab {
-        case clock, week, analytics, profile
+        case clock, todo, analytics, profile
     }
     @State private var selectedTab: Tab = .clock
     @State private var showingAddTask = false
@@ -96,8 +101,8 @@ struct ContentView: View {
                         clockContentView()
                             .id(selectedDate) // Animate view transition when date changes
                             .transition(.asymmetric(insertion: .opacity, removal: .opacity))
-                    } else if selectedTab == .week {
-                        Text("Week View").font(.title).foregroundStyle(goldColor)
+                    } else if selectedTab == .todo {
+                        TodoView(tasks: currentTasksBinding)
                     } else if selectedTab == .analytics {
                         ProfileAnalyticsView(tasksByDate: tasksByDate)
                     } else if selectedTab == .profile {
@@ -114,8 +119,8 @@ struct ContentView: View {
                         selectedTab = .clock
                     }
                     Spacer()
-                    TabBarButton(icon: "calendar", text: "Week", isSelected: selectedTab == .week) {
-                        selectedTab = .week
+                    TabBarButton(icon: "list.bullet", text: "To-Do", isSelected: selectedTab == .todo) {
+                        selectedTab = .todo
                     }
                     Spacer()
                     TabBarButton(icon: "chart.pie.fill", text: "Analytics", isSelected: selectedTab == .analytics) {
@@ -134,7 +139,16 @@ struct ContentView: View {
             }
         }
         .onReceive(timer) { date in
-            now = date
+            // Stop rapid re-renders in Canvas which cause GroupRecordingError
+            if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+                let currentSecond = Calendar.current.component(.second, from: date)
+                let lastSecond = Calendar.current.component(.second, from: now)
+                if currentSecond != lastSecond {
+                    now = date
+                }
+            } else {
+                now = date
+            }
         }
         .sheet(isPresented: $showingAddTask) {
             AddTaskView(tasks: currentTasksBinding)
@@ -288,26 +302,26 @@ struct ContentView: View {
         return formatter.string(from: date)
     }
 
-    private func timeQuote(for date: Date) -> String {
-        let quotes = [
-            "“A year from now you will wish you had started today.” — Karen Lamb",
-            "“How we spend our days is, of course, how we spend our lives.” — Annie Dillard",
-            "“The bad news is time flies. The good news is you're the pilot.” — Michael Altshuler",
-            "“Do not wait: the time will never be 'just right'. Start where you stand.” — Napoleon Hill",
-            "“We must use time as a tool, not as a couch.” — John F. Kennedy",
-            "“If you spend too much time thinking about a thing, you'll never get it done.” — Bruce Lee",
-            "“It is not that we have a short time to live, but that we waste a lot of it.” — Seneca",
-            "“The common man is not concerned about the passage of time, the man of talent is driven by it.” — Arthur Schopenhauer",
-            "“You don't have to see the whole staircase, just take the first step.” — Martin Luther King Jr.",
-            "“The two most powerful warriors are patience and time.” — Leo Tolstoy",
-            "“You are what you do, not what you say you'll do.” — C.G. Jung",
-            "“There are seven days in the week and 'someday' isn't one of them.” — Shaquille O'Neal",
-            "“If it is important to you, you will find a way. If not, you'll find an excuse.” — Ryan Blair",
-            "“The future depends on what you do today.” — Mahatma Gandhi",
-            "“Discipline is choosing between what you want now and what you want most.” — Abraham Lincoln",
-            "“You don't have to be great to start, but you have to start to be great.” — Zig Ziglar"
-        ]
+    private let quotes: [String] = [
+        "“A year from now you will wish you had started today.” — Karen Lamb",
+        "“How we spend our days is, of course, how we spend our lives.” — Annie Dillard",
+        "“The bad news is time flies. The good news is you're the pilot.” — Michael Altshuler",
+        "“Do not wait: the time will never be 'just right'. Start where you stand.” — Napoleon Hill",
+        "“We must use time as a tool, not as a couch.” — John F. Kennedy",
+        "“If you spend too much time thinking about a thing, you'll never get it done.” — Bruce Lee",
+        "“It is not that we have a short time to live, but that we waste a lot of it.” — Seneca",
+        "“The common man is not concerned about the passage of time, the man of talent is driven by it.” — Arthur Schopenhauer",
+        "“You don't have to see the whole staircase, just take the first step.” — Martin Luther King Jr.",
+        "“The two most powerful warriors are patience and time.” — Leo Tolstoy",
+        "“You are what you do, not what you say you'll do.” — C.G. Jung",
+        "“There are seven days in the week and 'someday' isn't one of them.” — Shaquille O'Neal",
+        "“If it is important to you, you will find a way. If not, you'll find an excuse.” — Ryan Blair",
+        "“The future depends on what you do today.” — Mahatma Gandhi",
+        "“Discipline is choosing between what you want now and what you want most.” — Abraham Lincoln",
+        "“You don't have to be great to start, but you have to start to be great.” — Zig Ziglar"
+    ]
 
+    private func timeQuote(for date: Date) -> String {
         // Use .day within .year to compute day-of-year (1-based). Fallback to 1 on failure.
         let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 1
         let index = dayOfYear % quotes.count
@@ -711,6 +725,89 @@ struct ProfileSettingsView: View {
         }
     }
 }
+
+
+struct TodoView: View {
+    @Binding var tasks: [ClockTask]
+    
+    private let bgColor = Color(red: 0.18, green: 0.23, blue: 0.18) // Muted Sage Green
+    private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
+
+    // Helper for formatting time
+    @AppStorage("is24HourClock") private var is24HourClock = false
+    private func formatTime(minutes: Int) -> String {
+        let m = minutes % (24 * 60)
+        let h = m / 60
+        let min = m % 60
+        var comps = DateComponents()
+        comps.hour = h
+        comps.minute = min
+        let date = Calendar.current.date(from: comps) ?? Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = is24HourClock ? "HH:mm" : "h:mm a"
+        return formatter.string(from: date)
+    }
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("TO-DO")
+                .font(.system(size: 14, weight: .regular, design: .serif))
+                .foregroundStyle(goldColor)
+                .tracking(2)
+                .padding(.top, 40)
+            
+            if tasks.isEmpty {
+                Spacer()
+                VStack(spacing: 12) {
+                    Image(systemName: "list.bullet.clipboard")
+                        .font(.system(size: 32))
+                        .foregroundStyle(goldColor.opacity(0.5))
+                    Text("No tasks scheduled")
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                Spacer()
+            } else {
+                List {
+                    ForEach(tasks) { task in
+                        let timeString = "\(formatTime(minutes: task.startMinutes)) - \(formatTime(minutes: task.endMinutes))"
+                        TaskRow(
+                            time: timeString,
+                            title: task.title,
+                            color: task.color,
+                            isCompleted: task.isCompleted,
+                            onToggle: {
+                                if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                                    withAnimation {
+                                        tasks[index].isCompleted.toggle()
+                                    }
+                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                }
+                            }
+                        )
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 14, leading: 40, bottom: 14, trailing: 40))
+                        .listRowSeparator(.hidden)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                if let index = tasks.firstIndex(where: { $0.id == task.id }) {
+                                    withAnimation {
+                                        tasks.remove(at: index)
+                                    }
+                                }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+            }
+        }
+    }
+}
+
 
 #Preview {
     ContentView()

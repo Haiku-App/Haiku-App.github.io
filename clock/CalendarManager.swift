@@ -4,7 +4,9 @@ import SwiftUI
 internal import Combine
 
 class CalendarManager: ObservableObject {
-    private let eventStore = EKEventStore()
+    private lazy var eventStore: EKEventStore = {
+        return EKEventStore()
+    }()
     
     // Convert EKEvent to ClockTask
     private let themeColors: [Color] = [
@@ -16,6 +18,11 @@ class CalendarManager: ObservableObject {
     ]
 
     func requestAccess(completion: @escaping (Bool) -> Void) {
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            completion(true)
+            return
+        }
+        
         if #available(iOS 17.0, *) {
             eventStore.requestFullAccessToEvents { granted, error in
                 DispatchQueue.main.async {
@@ -32,6 +39,10 @@ class CalendarManager: ObservableObject {
     }
 
     func fetchEvents(for date: Date) -> [ClockTask] {
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            return [] // Return dummy or empty data for preview
+        }
+        
         let cal = Calendar.current
         let startOfDay = cal.startOfDay(for: date)
         
