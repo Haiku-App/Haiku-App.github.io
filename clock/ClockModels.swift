@@ -101,7 +101,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
     }
     var textForeground: Color {
         switch self {
-        case .sakura: return Color(red: 0.4, green: 0.3, blue: 0.35)
+        case .sakura: return Color(red: 0.5, green: 0.1, blue: 0.25) // Plum red
         default: return .white
         }
     }

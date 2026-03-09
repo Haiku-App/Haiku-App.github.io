@@ -2,6 +2,7 @@ import SwiftUI
 internal import Combine
 
 struct ContentView: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     @State private var now = Date()
     // Slow down timer in Canvas to prevent update loop crashes
     private let timer = Timer.publish(
@@ -19,7 +20,7 @@ struct ContentView: View {
         let today = Calendar.current.startOfDay(for: Date())
         return [
             today: [
-                ClockTask(title: "Matcha Tasting", startMinutes: 14*60, endMinutes: 15*60, color: Color(red: 0.85, green: 0.78, blue: 0.58)), // Gold
+                ClockTask(title: "Matcha Tasting", startMinutes: 14*60, endMinutes: 15*60, color: AppTheme.sage.accent), // Gold
                 ClockTask(title: "Garden Walk", startMinutes: 16*60, endMinutes: 17*60 + 30, color: Color(red: 0.75, green: 0.55, blue: 0.45)) // Muted Terracotta
             ]
         ]
@@ -32,8 +33,8 @@ struct ContentView: View {
         )
     }
 
-    private let bgColor = Color(red: 0.18, green: 0.23, blue: 0.18) // Muted Sage Green
-    private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
+    private var bgColor: Color { currentTheme.bg }
+    private var goldColor: Color { currentTheme.accent }
 
     enum Tab {
         case clock, todo, analytics, profile
@@ -65,7 +66,7 @@ struct ContentView: View {
                             
                             Text(formattedSelectedDate())
                                 .font(.system(size: 14, weight: .medium, design: .serif))
-                                .foregroundStyle(.white.opacity(0.9))
+                                .foregroundStyle(currentTheme.textForeground.opacity(0.9))
                                 .frame(minWidth: 100, alignment: .center)
                                 .id(selectedDate) // Forces animation on change
                                 .transition(.opacity)
@@ -133,7 +134,7 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 40)
                 .padding(.bottom, 20)
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(currentTheme.textForeground.opacity(0.6))
                 .opacity(isFlowState ? 0 : 1)
                 .animation(.easeInOut, value: isFlowState)
             }
@@ -188,14 +189,14 @@ struct ContentView: View {
                 .frame(height: 20)
                 
             // Clock
-            ClockView(now: now, tasks: currentTasksBinding, isFlowState: $isFlowState, is24HourClock: is24HourClock)
+            ClockView(now: now, tasks: currentTasksBinding, isFlowState: $isFlowState, is24HourClock: is24HourClock, theme: currentTheme)
                 .frame(width: 280, height: 280)
                 .scaleEffect(isFlowState ? 1.15 : 1.0)
                 
             // Daily Quote
             Text(timeQuote(for: selectedDate))
                 .font(.system(size: 13, weight: .light, design: .serif))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(currentTheme.textForeground.opacity(0.4))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
                 .padding(.top, 24)
@@ -213,7 +214,7 @@ struct ContentView: View {
                             .foregroundStyle(goldColor.opacity(0.5))
                         Text("No tasks scheduled")
                             .font(.system(size: 14, weight: .light))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.5))
                     }
                 } else {
                     List {
@@ -330,6 +331,7 @@ struct ContentView: View {
 }
 
 struct AddTaskView: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     @Environment(\.dismiss) var dismiss
     @Binding var tasks: [ClockTask]
     
@@ -343,11 +345,11 @@ struct AddTaskView: View {
     @State private var showingNewCategory = false
     @State private var newCategoryName = ""
     
-    private let bgColor = Color(red: 0.18, green: 0.23, blue: 0.18) // Muted Sage Green
-    private let fieldBgColor = Color(red: 0.15, green: 0.20, blue: 0.15)
-    private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
-    private let shadowLight = Color(red: 0.22, green: 0.28, blue: 0.22)
-    private let shadowDark = Color(red: 0.12, green: 0.16, blue: 0.12)
+    private var bgColor: Color { currentTheme.bg }
+    private var fieldBgColor: Color { currentTheme.fieldBg }
+    private var goldColor: Color { currentTheme.accent }
+    private var shadowLight: Color { currentTheme.shadowLight }
+    private var shadowDark: Color { currentTheme.shadowDark }
     
     private let themeRGBs: [RGB] = [
         RGB(r: 0.85, g: 0.78, b: 0.58), // Gold
@@ -385,7 +387,7 @@ struct AddTaskView: View {
                                                     .foregroundStyle(cat.color)
                                                 Text(cat.name)
                                                     .font(.system(size: 12, weight: .medium))
-                                                    .foregroundStyle(.white.opacity(0.8))
+                                                    .foregroundStyle(currentTheme.textForeground.opacity(0.8))
                                             }
                                             .frame(width: 100, height: 100)
                                             .background(
@@ -412,7 +414,7 @@ struct AddTaskView: View {
                                                 .foregroundStyle(goldColor)
                                             Text("New")
                                                 .font(.system(size: 12, weight: .medium))
-                                                .foregroundStyle(.white.opacity(0.8))
+                                                .foregroundStyle(currentTheme.textForeground.opacity(0.8))
                                         }
                                         .frame(width: 100, height: 100)
                                         .background(
@@ -438,7 +440,7 @@ struct AddTaskView: View {
                             
                             TextField("Enter title...", text: $title)
                                 .font(.system(size: 16, weight: .regular))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(currentTheme.textForeground)
                                 .padding()
                                 .background(
                                     RoundedRectangle(cornerRadius: 12)
@@ -458,7 +460,7 @@ struct AddTaskView: View {
                             VStack(spacing: 0) {
                                 DatePicker("Start", selection: $startTime, displayedComponents: .hourAndMinute)
                                     .padding()
-                                    .foregroundStyle(.white.opacity(0.9))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.9))
                                 
                                 Rectangle()
                                     .fill(Color.white.opacity(0.1))
@@ -467,7 +469,7 @@ struct AddTaskView: View {
                                 
                                 DatePicker("End", selection: $endTime, displayedComponents: .hourAndMinute)
                                     .padding()
-                                    .foregroundStyle(.white.opacity(0.9))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.9))
                             }
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
@@ -533,7 +535,7 @@ struct AddTaskView: View {
         if let id = selectedCategoryId, let cat = categoryManager.categories.first(where: { $0.id == id }) {
             colorToUse = cat.color
         } else {
-            colorToUse = themeRGBs[tasks.count % themeRGBs.count].color
+            colorToUse = currentTheme.accent
         }
         
         let newTask = ClockTask(
@@ -549,6 +551,7 @@ struct AddTaskView: View {
 }
 
 struct TaskRow: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     var time: String
     var title: String
     var color: Color
@@ -562,17 +565,17 @@ struct TaskRow: View {
                 if parts.count == 2 {
                     Text(parts[0])
                         .font(.system(size: 14, weight: .light))
-                        .foregroundStyle(.white.opacity(isCompleted ? 0.3 : 0.8))
-                        .strikethrough(isCompleted, color: .white.opacity(0.3))
+                        .foregroundStyle(currentTheme.textForeground.opacity(isCompleted ? 0.3 : 0.8))
+                        .strikethrough(isCompleted, color: currentTheme.textForeground.opacity(0.3))
                     Text(parts[1])
                         .font(.system(size: 12, weight: .light))
-                        .foregroundStyle(.white.opacity(isCompleted ? 0.2 : 0.5))
-                        .strikethrough(isCompleted, color: .white.opacity(0.2))
+                        .foregroundStyle(currentTheme.textForeground.opacity(isCompleted ? 0.2 : 0.5))
+                        .strikethrough(isCompleted, color: currentTheme.textForeground.opacity(0.2))
                 } else {
                     Text(time)
                         .font(.system(size: 14, weight: .light))
-                        .foregroundStyle(.white.opacity(isCompleted ? 0.3 : 0.8))
-                        .strikethrough(isCompleted, color: .white.opacity(0.3))
+                        .foregroundStyle(currentTheme.textForeground.opacity(isCompleted ? 0.3 : 0.8))
+                        .strikethrough(isCompleted, color: currentTheme.textForeground.opacity(0.3))
                 }
             }
             .frame(width: 70, alignment: .leading)
@@ -590,8 +593,8 @@ struct TaskRow: View {
             
             Text(title)
                 .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(.white.opacity(isCompleted ? 0.4 : 0.9))
-                .strikethrough(isCompleted, color: .white.opacity(0.4))
+                .foregroundStyle(currentTheme.textForeground.opacity(isCompleted ? 0.4 : 0.9))
+                .strikethrough(isCompleted, color: currentTheme.textForeground.opacity(0.4))
             
             Spacer()
             
@@ -607,6 +610,7 @@ struct TaskRow: View {
 }
 
 struct TabBarButton: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     var icon: String
     var text: String
     var isSelected: Bool
@@ -628,15 +632,16 @@ struct TabBarButton: View {
 }
 
 struct ProfileAnalyticsView: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     var tasksByDate: [Date: [ClockTask]]
     
     @StateObject private var categoryManager = CategoryManager()
     
-    private let bgColor = Color(red: 0.18, green: 0.23, blue: 0.18) // Muted Sage Green
-    private let fieldBgColor = Color(red: 0.15, green: 0.20, blue: 0.15)
-    private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
-    private let shadowLight = Color(red: 0.22, green: 0.28, blue: 0.22)
-    private let shadowDark = Color(red: 0.12, green: 0.16, blue: 0.12)
+    private var bgColor: Color { currentTheme.bg }
+    private var fieldBgColor: Color { currentTheme.fieldBg }
+    private var goldColor: Color { currentTheme.accent }
+    private var shadowLight: Color { currentTheme.shadowLight }
+    private var shadowDark: Color { currentTheme.shadowDark }
 
     struct CategoryStats: Identifiable {
         let id = UUID()
@@ -707,7 +712,7 @@ struct ProfileAnalyticsView: View {
                             .foregroundStyle(goldColor.opacity(0.3))
                         Text("No data to analyze yet.")
                             .font(.system(size: 14, weight: .light))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.5))
                     }
                     .padding(.top, 100)
                 } else {
@@ -725,7 +730,7 @@ struct ProfileAnalyticsView: View {
                     VStack(spacing: 24) {
                         Text("Time Distribution")
                             .font(.system(size: 12, weight: .medium, design: .serif))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.6))
                             .tracking(1)
                         
                         ZStack {
@@ -742,7 +747,7 @@ struct ProfileAnalyticsView: View {
                                     .foregroundStyle(goldColor)
                                 Text("Categories")
                                     .font(.system(size: 12, weight: .light))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.5))
                             }
                         }
                         .frame(width: 200, height: 200)
@@ -768,7 +773,7 @@ struct ProfileAnalyticsView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(stat.name)
                                             .font(.system(size: 16, weight: .medium))
-                                            .foregroundStyle(.white.opacity(0.9))
+                                            .foregroundStyle(currentTheme.textForeground.opacity(0.9))
                                         
                                         // Progress Bar
                                         GeometryReader { proxy in
@@ -791,7 +796,7 @@ struct ProfileAnalyticsView: View {
                                             .foregroundStyle(stat.color)
                                         Text("\(String(format: "%.0f", stat.percentage))%")
                                             .font(.system(size: 12, weight: .light))
-                                            .foregroundStyle(.white.opacity(0.5))
+                                            .foregroundStyle(currentTheme.textForeground.opacity(0.5))
                                     }
                                 }
                                 .padding()
@@ -813,14 +818,15 @@ struct ProfileAnalyticsView: View {
 }
 
 struct StatCard: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     var title: String
     var value: String
     var icon: String
     var color: Color
     
-    private let fieldBgColor = Color(red: 0.15, green: 0.20, blue: 0.15)
-    private let shadowLight = Color(red: 0.22, green: 0.28, blue: 0.22)
-    private let shadowDark = Color(red: 0.12, green: 0.16, blue: 0.12)
+    private var fieldBgColor: Color { currentTheme.fieldBg }
+    private var shadowLight: Color { currentTheme.shadowLight }
+    private var shadowDark: Color { currentTheme.shadowDark }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -834,13 +840,13 @@ struct StatCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(value)
                     .font(.system(size: 20, weight: .medium, design: .serif))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(currentTheme.textForeground.opacity(0.9))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                 
                 Text(title)
                     .font(.system(size: 12, weight: .light))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(currentTheme.textForeground.opacity(0.5))
             }
         }
         .padding(16)
@@ -855,6 +861,7 @@ struct StatCard: View {
 }
 
 struct DonutChart: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     var stats: [ProfileAnalyticsView.CategoryStats]
     
     var body: some View {
@@ -887,42 +894,141 @@ struct DonutChart: View {
 }
 
 struct ProfileSettingsView: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     @Binding var is24HourClock: Bool
     
-    private let bgColor = Color(red: 0.18, green: 0.23, blue: 0.18) // Muted Sage Green
-    private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
+    private var bgColor: Color { currentTheme.bg }
+    private var goldColor: Color { currentTheme.accent }
 
     var body: some View {
-        VStack(spacing: 40) {
-            Text("SETTINGS")
-                .font(.system(size: 14, weight: .regular, design: .serif))
-                .foregroundStyle(goldColor)
-                .tracking(2)
-            
-            Toggle("24-Hour Clock", isOn: $is24HourClock)
-                .font(.system(size: 16, weight: .medium, design: .serif))
-                .foregroundStyle(.white.opacity(0.9))
-                .padding()
-                .tint(goldColor)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(red: 0.15, green: 0.20, blue: 0.15))
-                        .shadow(color: Color(red: 0.12, green: 0.16, blue: 0.12), radius: 5, x: 4, y: 4)
-                        .shadow(color: Color(red: 0.22, green: 0.28, blue: 0.22), radius: 5, x: -4, y: -4)
-                )
+        ScrollView {
+            VStack(spacing: 40) {
+                Text("SETTINGS")
+                    .font(.system(size: 14, weight: .regular, design: .serif))
+                    .foregroundStyle(goldColor)
+                    .tracking(2)
+                    .padding(.top, 40)
+
+                VStack(spacing: 20) {
+                    Toggle("24-Hour Clock", isOn: $is24HourClock)
+                        .font(.system(size: 16, weight: .medium, design: .serif))
+                        .foregroundStyle(currentTheme.textForeground.opacity(0.9))
+                        .padding()
+                        .tint(goldColor)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(currentTheme.fieldBg)
+                                .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
+                                .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
+                        )
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("THEME")
+                            .font(.system(size: 12, weight: .regular, design: .serif))
+                            .foregroundStyle(goldColor)
+                            .tracking(1)
+                            .padding(.horizontal, 4)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(AppTheme.allCases) { theme in
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            currentTheme = theme
+                                        }
+                                    }) {
+                                        VStack(spacing: 8) {
+                                            ZStack {
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(theme.bg)
+                                                
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(theme.fieldBg)
+                                                    .frame(width: 24, height: 24)
+                                                    .shadow(color: theme.shadowDark, radius: 2, x: 1, y: 1)
+                                                    .shadow(color: theme.shadowLight, radius: 2, x: -1, y: -1)
+                                            }
+                                            .frame(width: 48, height: 48)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(currentTheme == theme ? currentTheme.accent : Color.clear, lineWidth: 2)
+                                            )
+                                            .shadow(color: currentTheme.shadowDark, radius: currentTheme == theme ? 4 : 1, x: 1, y: 1)
+                                            .scaleEffect(currentTheme == theme ? 1.05 : 1.0)
+                                            
+                                            Text(theme.name)
+                                                .font(.system(size: 10, weight: currentTheme == theme ? .semibold : .regular, design: .serif))
+                                                .foregroundStyle(currentTheme.textForeground.opacity(currentTheme == theme ? 0.9 : 0.5))
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 4)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("CALENDARS")
+                            .font(.system(size: 12, weight: .regular, design: .serif))
+                            .foregroundStyle(goldColor)
+                            .tracking(1)
+                            .padding(.horizontal, 4)
+
+                        Button(action: { /* mock connect */ }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "calendar")
+                                    .foregroundStyle(goldColor)
+                                Text("Connect Google Calendar")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.9))
+                                Spacer()
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(currentTheme.fieldBg)
+                                    .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
+                                    .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: { /* mock connect */ }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "calendar")
+                                    .foregroundStyle(goldColor)
+                                Text("Connect Microsoft Calendar")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.9))
+                                Spacer()
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(currentTheme.fieldBg)
+                                    .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
+                                    .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
                 .padding(.horizontal, 40)
+            }
         }
-    }
-}
+    }}
 
 
 struct TodoView: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     @StateObject private var brainDumpManager = BrainDumpManager()
     @State private var newTaskTitle: String = ""
     @FocusState private var isFocused: Bool
     
-    private let bgColor = Color(red: 0.18, green: 0.23, blue: 0.18) // Muted Sage Green
-    private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
+    private var bgColor: Color { currentTheme.bg }
+    private var goldColor: Color { currentTheme.accent }
 
     var body: some View {
         VStack(spacing: 20) {
@@ -936,7 +1042,7 @@ struct TodoView: View {
             HStack {
                 TextField("Quick task...", text: $newTaskTitle)
                     .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(currentTheme.textForeground)
                     .tint(goldColor)
                     .focused($isFocused)
                     .submitLabel(.done)
@@ -954,7 +1060,7 @@ struct TodoView: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(red: 0.15, green: 0.20, blue: 0.15))
+                    .fill(currentTheme.fieldBg)
             )
             .padding(.horizontal, 40)
             
@@ -966,7 +1072,7 @@ struct TodoView: View {
                         .foregroundStyle(goldColor.opacity(0.5))
                     Text("Clear your mind")
                         .font(.system(size: 14, weight: .light))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(currentTheme.textForeground.opacity(0.5))
                 }
                 Spacer()
             } else {
@@ -1017,6 +1123,7 @@ struct TodoView: View {
 }
 
 struct BrainDumpRow: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     var title: String
     var isCompleted: Bool
     var onToggle: () -> Void
@@ -1026,13 +1133,13 @@ struct BrainDumpRow: View {
             Button(action: onToggle) {
                 Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22, weight: .light))
-                    .foregroundStyle(isCompleted ? .white.opacity(0.3) : Color(red: 0.85, green: 0.78, blue: 0.58))
+                    .foregroundStyle(isCompleted ? .white.opacity(0.3) : currentTheme.accent)
             }
 
             Text(title)
                 .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(.white.opacity(isCompleted ? 0.4 : 0.9))
-                .strikethrough(isCompleted, color: .white.opacity(0.4))
+                .foregroundStyle(currentTheme.textForeground.opacity(isCompleted ? 0.4 : 0.9))
+                .strikethrough(isCompleted, color: currentTheme.textForeground.opacity(0.4))
 
             Spacer()
         }

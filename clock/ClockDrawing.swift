@@ -5,26 +5,18 @@ struct ClockView: View {
     @Binding var tasks: [ClockTask]
     @Binding var isFlowState: Bool
     var is24HourClock: Bool = false
+    var theme: AppTheme = .sage
 
-    // Palette matching the Haiku image
-    private let clockFaceColor = Color(red: 0.18, green: 0.23, blue: 0.18)
-    private let shadowLight = Color(red: 0.22, green: 0.28, blue: 0.22)
-    private let shadowDark = Color(red: 0.12, green: 0.16, blue: 0.12)
-    private let goldColor = Color(red: 0.85, green: 0.78, blue: 0.58)
-    private let taskTrackColor = Color(red: 0.15, green: 0.20, blue: 0.15)
-    
-    // For task creation coloring
-    private let themeColors: [Color] = [
-        Color(red: 0.85, green: 0.78, blue: 0.58),
-        Color(red: 0.75, green: 0.55, blue: 0.45),
-        Color(red: 0.45, green: 0.50, blue: 0.35),
-        Color(red: 0.80, green: 0.72, blue: 0.60),
-        Color(red: 0.35, green: 0.42, blue: 0.35)
-    ]
-    
+    // Themed Palette
+    private var clockFaceColor: Color { theme.bg }
+    private var shadowLight: Color { theme.shadowLight }
+    private var shadowDark: Color { theme.shadowDark }
+    private var goldColor: Color { theme.accent }
+    private var taskTrackColor: Color { theme.taskTrack }
+    private var textForeground: Color { theme.textForeground }
+
     @State private var activeDrag: DragInfo?
     @State private var pulseState: Bool = false
-
     struct DragInfo {
         var taskId: UUID
         var mode: Mode
@@ -161,7 +153,7 @@ struct ClockView: View {
                                 let angleDeg = is24HourClock ? (midMinute * 0.25 - 90) : (midMinute * 0.5 - 90)
                                 let angle = Angle.degrees(angleDeg)
 
-                                CurvedText(text: task.title, radius: r, midAngle: angle, center: center)
+                                CurvedText(text: task.title, radius: r, midAngle: angle, center: center, textColor: textForeground)
                                     .allowsHitTesting(false)
                                     .opacity(opacity)
                             }
@@ -639,6 +631,7 @@ struct CurvedText: View {
     var radius: CGFloat
     var midAngle: Angle
     var center: CGPoint
+    var textColor: Color = Color(red: 0.15, green: 0.15, blue: 0.15) // Default dark grey
 
     var body: some View {
         let chars = Array(text)
@@ -680,7 +673,7 @@ struct CurvedText: View {
 
                 Text(charStr)
                     .font(.system(size: 32, weight: .semibold, design: .serif))
-                    .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.15)) // Dark grey
+                    .foregroundStyle(textColor)
                     .scaleEffect(0.25)
                     .rotationEffect(Angle(radians: currentAngle + rotationAdjustment))
                     .position(
