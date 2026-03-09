@@ -43,6 +43,7 @@ struct ContentView: View {
     @State private var showingAddTask = false
     @State private var showingDatePicker = false
     @AppStorage("is24HourClock") private var is24HourClock = false
+    @AppStorage("spamNotifications") private var spamNotifications = false
 
     var body: some View {
         ZStack {
@@ -205,9 +206,16 @@ struct ContentView: View {
         }
         .onAppear {
             syncCalendar(for: selectedDate)
+            NotificationManager.shared.scheduleSpamNotifications(tasksByDate: tasksByDate, isEnabled: spamNotifications)
         }
         .onChange(of: selectedDate) { newDate in
             syncCalendar(for: newDate)
+        }
+        .onChange(of: tasksByDate) { _ in
+            NotificationManager.shared.scheduleSpamNotifications(tasksByDate: tasksByDate, isEnabled: spamNotifications)
+        }
+        .onChange(of: spamNotifications) { _ in
+            NotificationManager.shared.scheduleSpamNotifications(tasksByDate: tasksByDate, isEnabled: spamNotifications)
         }
     }
 
@@ -944,8 +952,9 @@ struct DonutChart: View {
 
 struct ProfileSettingsView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
+    @AppStorage("spamNotifications") private var spamNotifications = false
     @Binding var is24HourClock: Bool
-    
+
     private var bgColor: Color { currentTheme.bg }
     private var goldColor: Color { currentTheme.accent }
 
@@ -971,6 +980,22 @@ struct ProfileSettingsView: View {
                                 .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
                         )
 
+                    Toggle("Task Alarm Spam", isOn: $spamNotifications)
+                        .font(.system(size: 16, weight: .medium, design: .serif))
+                        .foregroundStyle(currentTheme.textForeground.opacity(0.9))
+                        .padding()
+                        .tint(goldColor)
+                        .onChange(of: spamNotifications) { newValue in
+                            if newValue {
+                                NotificationManager.shared.requestAuthorization()
+                            }
+                        }
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(currentTheme.fieldBg)
+                                .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
+                                .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
+                        )
                     VStack(alignment: .leading, spacing: 12) {
                         Text("THEME")
                             .font(.system(size: 12, weight: .regular, design: .serif))
