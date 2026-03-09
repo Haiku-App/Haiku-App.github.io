@@ -82,7 +82,7 @@ struct ClockView: View {
                     .shadow(color: shadowDark, radius: 10, x: 8, y: 8)
                     .shadow(color: shadowLight, radius: 10, x: -8, y: -8)
                     .overlay(
-                        Circle().stroke(Color.white.opacity(0.05), lineWidth: 1)
+                        Circle().stroke(textForeground.opacity(0.05), lineWidth: 1)
                     )
                     .allowsHitTesting(false)
                 
@@ -251,7 +251,7 @@ struct ClockView: View {
                 } else {
                     Text(formatTime(now))
                         .font(.system(size: 12, weight: .light))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(textForeground.opacity(0.5))
                         .position(x: center.x, y: center.y + faceRadius - 40)
                         .allowsHitTesting(false)
                 }

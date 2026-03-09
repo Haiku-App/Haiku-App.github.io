@@ -463,7 +463,7 @@ struct AddTaskView: View {
                                     .foregroundStyle(currentTheme.textForeground.opacity(0.9))
                                 
                                 Rectangle()
-                                    .fill(Color.white.opacity(0.1))
+                                    .fill(currentTheme.textForeground.opacity(0.1))
                                     .frame(height: 1)
                                     .padding(.horizontal)
                                 
@@ -582,7 +582,7 @@ struct TaskRow: View {
             
             // Vertical separator
             Rectangle()
-                .fill(.white.opacity(isCompleted ? 0.1 : 0.3))
+                .fill(currentTheme.textForeground.opacity(isCompleted ? 0.1 : 0.3))
                 .frame(width: 1)
                 .frame(minHeight: 30)
             
@@ -621,10 +621,10 @@ struct TabBarButton: View {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.5))
+                    .foregroundStyle(isSelected ? currentTheme.textForeground : currentTheme.textForeground.opacity(0.5))
                 Text(text)
                     .font(.system(size: 10))
-                    .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.5))
+                    .foregroundStyle(isSelected ? currentTheme.textForeground : currentTheme.textForeground.opacity(0.5))
             }
         }
         .buttonStyle(.plain)
@@ -1053,7 +1053,7 @@ struct TodoView: View {
                 Button(action: addTask) {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 24))
-                        .foregroundStyle(newTaskTitle.isEmpty ? .white.opacity(0.3) : goldColor)
+                        .foregroundStyle(newTaskTitle.isEmpty ? currentTheme.textForeground.opacity(0.3) : goldColor)
                 }
                 .disabled(newTaskTitle.isEmpty)
             }
@@ -1133,7 +1133,7 @@ struct BrainDumpRow: View {
             Button(action: onToggle) {
                 Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22, weight: .light))
-                    .foregroundStyle(isCompleted ? .white.opacity(0.3) : currentTheme.accent)
+                    .foregroundStyle(isCompleted ? currentTheme.textForeground.opacity(0.3) : currentTheme.accent)
             }
 
             Text(title)
