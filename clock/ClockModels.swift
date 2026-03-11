@@ -107,6 +107,38 @@ enum AppTheme: String, CaseIterable, Identifiable {
     }
 }
 
+let aestheticColors: [RGB] = [
+    // Earthy & Nature
+    RGB(r: 0.85, g: 0.78, b: 0.58), // Gold
+    RGB(r: 0.75, g: 0.55, b: 0.45), // Muted Terracotta
+    RGB(r: 0.45, g: 0.50, b: 0.35), // Olive
+    RGB(r: 0.80, g: 0.72, b: 0.60), // Soft Sand
+    RGB(r: 0.35, g: 0.42, b: 0.35), // Pale Mint
+    RGB(r: 0.55, g: 0.62, b: 0.55), // Sage Green
+    
+    // Cool & Calm
+    RGB(r: 0.40, g: 0.60, b: 0.70), // Slate Blue
+    RGB(r: 0.65, g: 0.82, b: 0.95), // Soft Navy
+    RGB(r: 0.30, g: 0.50, b: 0.70), // Deep Steel
+    RGB(r: 0.45, g: 0.65, b: 0.85), // Faded Denim
+    RGB(r: 0.50, g: 0.70, b: 0.90), // Pastel Blue
+    RGB(r: 0.35, g: 0.45, b: 0.55), // Muted Ocean
+
+    // Warm & Soft
+    RGB(r: 0.70, g: 0.40, b: 0.45), // Dusty Rose
+    RGB(r: 0.88, g: 0.68, b: 0.72), // Blush
+    RGB(r: 0.55, g: 0.50, b: 0.65), // Muted Purple
+    RGB(r: 0.85, g: 0.45, b: 0.55), // Faded Sakura
+    RGB(r: 0.60, g: 0.30, b: 0.35), // Deep Rose
+    RGB(r: 0.75, g: 0.65, b: 0.85), // Soft Lavender
+
+    // Neutrals
+    RGB(r: 0.60, g: 0.60, b: 0.60), // Mid Grey
+    RGB(r: 0.45, g: 0.45, b: 0.45), // Dark Grey
+    RGB(r: 0.70, g: 0.70, b: 0.70), // Light Grey
+    RGB(r: 0.50, g: 0.50, b: 0.55)  // Cool Grey
+]
+
 struct BrainDumpTask: Identifiable, Codable {
     var id = UUID()
     var title: String

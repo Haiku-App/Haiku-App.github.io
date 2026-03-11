@@ -47,8 +47,8 @@ class NotificationManager {
                             content.body = "Your task '\(task.title)' starts in 1 minute!"
                             content.sound = .default
                             
-                            // Stagger slightly by a fraction of a second to ensure they all get processed uniquely
-                            let specificTime = notificationTime.addingTimeInterval(TimeInterval(Double(i) * 0.1))
+                            // Stagger by 1 second to ensure they trigger reliably
+                            let specificTime = notificationTime.addingTimeInterval(TimeInterval(i))
                             let triggerDate = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: specificTime)
                             let trigger = UNCalendarNotificationTrigger(dateMatching: triggerDate, repeats: false)
                             

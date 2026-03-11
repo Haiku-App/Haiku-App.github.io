@@ -7,15 +7,6 @@ class CalendarManager: ObservableObject {
     private lazy var eventStore: EKEventStore = {
         return EKEventStore()
     }()
-    
-    // Convert EKEvent to ClockTask
-    private let themeColors: [Color] = [
-        Color(red: 0.85, green: 0.78, blue: 0.58), // Gold
-        Color(red: 0.75, green: 0.55, blue: 0.45), // Muted Terracotta
-        Color(red: 0.45, green: 0.50, blue: 0.35), // Olive
-        Color(red: 0.80, green: 0.72, blue: 0.60), // Soft Sand
-        Color(red: 0.35, green: 0.42, blue: 0.35)  // Pale Mint
-    ]
 
     func requestAccess(completion: @escaping (Bool) -> Void) {
         if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
@@ -38,7 +29,7 @@ class CalendarManager: ObservableObject {
         }
     }
 
-    func fetchEvents(for date: Date) -> [ClockTask] {
+    func fetchEvents(for date: Date, theme: AppTheme) -> [ClockTask] {
         if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
             return [] // Return dummy or empty data for preview
         }
@@ -60,7 +51,7 @@ class CalendarManager: ObservableObject {
             let sMin = (sComps.hour ?? 0) * 60 + (sComps.minute ?? 0)
             let eMin = (eComps.hour ?? 0) * 60 + (eComps.minute ?? 0)
             
-            let color = themeColors[index % themeColors.count]
+            let color = aestheticColors[index % aestheticColors.count].color
             
             // Try to extract a URL from the event's URL property or notes
             var meetingUrl: URL? = event.url

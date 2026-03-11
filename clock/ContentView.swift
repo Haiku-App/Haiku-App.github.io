@@ -52,7 +52,7 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 // Header
                 VStack(spacing: 8) {
-                    Text("ATTENT")
+                    Text("HAIKU")
                         .font(.system(size: 26, weight: .regular, design: .serif))
                         .foregroundStyle(goldColor)
                         .tracking(2)
@@ -129,7 +129,7 @@ struct ContentView: View {
                         selectedTab = .clock
                     }
                     Spacer()
-                    TabBarButton(icon: "calendar", text: "Yearly", isSelected: selectedTab == .yearly) {
+                    TabBarButton(icon: "calendar", text: "Monthly", isSelected: selectedTab == .yearly) {
                         selectedTab = .yearly
                     }
                     Spacer()
@@ -231,7 +231,7 @@ struct ContentView: View {
     private func syncCalendar(for date: Date) {
         calendarManager.requestAccess { granted in
             if granted {
-                let fetched = calendarManager.fetchEvents(for: date)
+                let fetched = calendarManager.fetchEvents(for: date, theme: currentTheme)
                 if !fetched.isEmpty {
                     DispatchQueue.main.async {
                         var current = tasksByDate[date, default: []]
@@ -411,19 +411,13 @@ struct AddTaskView: View {
     @State private var showingNewCategory = false
     @State private var newCategoryName = ""
     
+    @State private var selectedColorIndex: Int = Int.random(in: 0..<aestheticColors.count)
+    
     private var bgColor: Color { currentTheme.bg }
     private var fieldBgColor: Color { currentTheme.fieldBg }
     private var goldColor: Color { currentTheme.accent }
     private var shadowLight: Color { currentTheme.shadowLight }
     private var shadowDark: Color { currentTheme.shadowDark }
-    
-    private let themeRGBs: [RGB] = [
-        RGB(r: 0.85, g: 0.78, b: 0.58), // Gold
-        RGB(r: 0.75, g: 0.55, b: 0.45), // Muted Terracotta
-        RGB(r: 0.45, g: 0.50, b: 0.35), // Olive
-        RGB(r: 0.80, g: 0.72, b: 0.60), // Soft Sand
-        RGB(r: 0.35, g: 0.42, b: 0.35)  // Pale Mint
-    ]
 
     var body: some View {
         NavigationStack {
@@ -446,6 +440,9 @@ struct AddTaskView: View {
                                     ForEach(categoryManager.categories) { cat in
                                         Button(action: {
                                             selectedCategoryId = cat.id
+                                            if let idx = aestheticColors.firstIndex(where: { $0 == cat.rgb }) {
+                                                selectedColorIndex = idx
+                                            }
                                         }) {
                                             VStack(spacing: 12) {
                                                 Image(systemName: cat.icon)
@@ -468,6 +465,18 @@ struct AddTaskView: View {
                                             )
                                         }
                                         .buttonStyle(.plain)
+                                        .contextMenu {
+                                            Button(role: .destructive, action: {
+                                                if let index = categoryManager.categories.firstIndex(where: { $0.id == cat.id }) {
+                                                    categoryManager.categories.remove(at: index)
+                                                    if selectedCategoryId == cat.id {
+                                                        selectedCategoryId = nil
+                                                    }
+                                                }
+                                            }) {
+                                                Label("Delete Category", systemImage: "trash")
+                                            }
+                                        }
                                     }
                                     
                                     // Add new category button
@@ -491,6 +500,38 @@ struct AddTaskView: View {
                                         )
                                     }
                                     .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 8)
+                            }
+                        }
+                        
+                        // Color Selection
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("TASK COLOR")
+                                .font(.system(size: 12, weight: .regular, design: .serif))
+                                .foregroundStyle(goldColor)
+                                .tracking(1)
+                                .padding(.horizontal, 4)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(0..<aestheticColors.count, id: \.self) { index in
+                                        Button(action: {
+                                            selectedColorIndex = index
+                                            selectedCategoryId = nil
+                                        }) {
+                                            Circle()
+                                                .fill(aestheticColors[index].color)
+                                                .frame(width: 44, height: 44)
+                                                .overlay(
+                                                    Circle()
+                                                        .stroke(selectedColorIndex == index ? currentTheme.textForeground : Color.clear, lineWidth: 3)
+                                                )
+                                                .shadow(color: shadowDark, radius: 3, x: 2, y: 2)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 8)
@@ -574,17 +615,8 @@ struct AddTaskView: View {
                         .foregroundStyle(goldColor)
                 }
             }
-            .alert("New Category", isPresented: $showingNewCategory) {
-                TextField("Category Name", text: $newCategoryName)
-                Button("Cancel", role: .cancel) { newCategoryName = "" }
-                Button("Save") {
-                    guard !newCategoryName.isEmpty else { return }
-                    let rgb = themeRGBs[categoryManager.categories.count % themeRGBs.count]
-                    let newCat = Category(name: newCategoryName, icon: "folder.fill", rgb: rgb)
-                    categoryManager.categories.append(newCat)
-                    selectedCategoryId = newCat.id
-                    newCategoryName = ""
-                }
+            .sheet(isPresented: $showingNewCategory) {
+                NewCategoryView(categoryManager: categoryManager, selectedCategoryId: $selectedCategoryId, theme: currentTheme)
             }
         }
         .preferredColorScheme(.dark)
@@ -601,7 +633,7 @@ struct AddTaskView: View {
         if let id = selectedCategoryId, let cat = categoryManager.categories.first(where: { $0.id == id }) {
             colorToUse = cat.color
         } else {
-            colorToUse = currentTheme.accent
+            colorToUse = aestheticColors[selectedColorIndex].color
         }
         
         let newTask = ClockTask(
@@ -672,6 +704,175 @@ struct TaskRow: View {
             }
             .buttonStyle(.plain)
         }
+    }
+}
+
+struct NewCategoryView: View {
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject var categoryManager: CategoryManager
+    @Binding var selectedCategoryId: UUID?
+    var theme: AppTheme
+    
+    @State private var name = ""
+    @State private var selectedIcon = "folder.fill"
+    @State private var selectedColorIndex = 0
+    
+    let icons = [
+        "folder.fill", "briefcase.fill", "doc.text.fill", "book.fill", "graduationcap.fill",
+        "pencil.and.outline", "paintbrush.fill", "scissors", "hammer.fill", "wrench.and.screwdriver.fill",
+        "car.fill", "airplane", "bus.fill", "tram.fill", "bicycle",
+        "cart.fill", "bag.fill", "creditcard.fill", "gift.fill", "tag.fill",
+        "house.fill", "building.2.fill", "tent.fill", "tree.fill", "leaf.fill",
+        "pawprint.fill", "sun.max.fill", "moon.fill", "cloud.fill", "sparkles",
+        "heart.fill", "star.fill", "bolt.fill", "flame.fill", "drop.fill",
+        "person.fill", "person.2.fill", "figure.walk", "figure.run", "figure.dance",
+        "headphones", "tv.fill", "display", "gamecontroller.fill", "music.note"
+    ]
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                theme.bg.ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 32) {
+                        
+                        // Preview
+                        VStack(spacing: 12) {
+                            Image(systemName: selectedIcon)
+                                .font(.system(size: 40))
+                                .foregroundStyle(aestheticColors[selectedColorIndex].color)
+                            
+                            Text(name.isEmpty ? "New Category" : name)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(theme.textForeground.opacity(0.8))
+                        }
+                        .frame(width: 140, height: 140)
+                        .background(
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(theme.fieldBg)
+                                .shadow(color: theme.shadowDark, radius: 8, x: 4, y: 4)
+                                .shadow(color: theme.shadowLight, radius: 8, x: -4, y: -4)
+                        )
+                        .padding(.top, 20)
+                        
+                        // Name Input
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("CATEGORY NAME")
+                                .font(.system(size: 12, weight: .regular, design: .serif))
+                                .foregroundStyle(theme.accent)
+                                .tracking(1)
+                            
+                            TextField("Enter name...", text: $name)
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(theme.textForeground)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(theme.fieldBg)
+                                        .shadow(color: theme.shadowDark, radius: 5, x: 4, y: 4)
+                                        .shadow(color: theme.shadowLight, radius: 5, x: -4, y: -4)
+                                )
+                        }
+                        
+                        // Color Selection
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("COLOR")
+                                .font(.system(size: 12, weight: .regular, design: .serif))
+                                .foregroundStyle(theme.accent)
+                                .tracking(1)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(0..<aestheticColors.count, id: \.self) { index in
+                                        Button(action: {
+                                            selectedColorIndex = index
+                                        }) {
+                                            Circle()
+                                                .fill(aestheticColors[index].color)
+                                                .frame(width: 44, height: 44)
+                                                .overlay(
+                                                    Circle()
+                                                        .stroke(selectedColorIndex == index ? theme.textForeground : Color.clear, lineWidth: 3)
+                                                )
+                                                .shadow(color: theme.shadowDark, radius: 3, x: 2, y: 2)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 8)
+                            }
+                        }
+                        
+                        // Icon Selection
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("ICON")
+                                .font(.system(size: 12, weight: .regular, design: .serif))
+                                .foregroundStyle(theme.accent)
+                                .tracking(1)
+                            
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 50))], spacing: 20) {
+                                ForEach(icons, id: \.self) { icon in
+                                    Button(action: {
+                                        selectedIcon = icon
+                                    }) {
+                                        Image(systemName: icon)
+                                            .font(.system(size: 24))
+                                            .foregroundStyle(selectedIcon == icon ? aestheticColors[selectedColorIndex].color : theme.textForeground.opacity(0.4))
+                                            .frame(width: 50, height: 50)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(selectedIcon == icon ? theme.fieldBg : Color.clear)
+                                                    .shadow(color: selectedIcon == icon ? theme.shadowDark : Color.clear, radius: 3, x: 2, y: 2)
+                                                    .shadow(color: selectedIcon == icon ? theme.shadowLight : Color.clear, radius: 3, x: -2, y: -2)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        
+                        // Add Button
+                        Button(action: {
+                            guard !name.isEmpty else { return }
+                            let newCat = Category(name: name, icon: selectedIcon, rgb: aestheticColors[selectedColorIndex])
+                            categoryManager.categories.append(newCat)
+                            selectedCategoryId = newCat.id
+                            dismiss()
+                        }) {
+                            Text("Create Category")
+                                .font(.system(size: 16, weight: .medium, design: .serif))
+                                .foregroundStyle(theme.bg)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(theme.accent)
+                                        .shadow(color: .black.opacity(0.3), radius: 5, x: 2, y: 4)
+                                )
+                                .opacity(name.isEmpty ? 0.5 : 1.0)
+                        }
+                        .disabled(name.isEmpty)
+                        .padding(.top, 16)
+                        .padding(.bottom, 40)
+                    }
+                    .padding(32)
+                }
+            }
+            .navigationTitle("New Category")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(theme.bg, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .font(.system(size: 16, design: .serif))
+                        .foregroundStyle(theme.accent)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -1059,43 +1260,39 @@ struct ProfileSettingsView: View {
                             .tracking(1)
                             .padding(.horizontal, 4)
 
-                        Button(action: { /* mock connect */ }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "calendar")
-                                    .foregroundStyle(goldColor)
-                                Text("Connect Google Calendar")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(currentTheme.textForeground.opacity(0.9))
-                                Spacer()
+                        VStack(spacing: 8) {
+                            Button(action: {
+                                // Attempt to jump directly to Calendar Settings via Apple's internal URL scheme
+                                if let url = URL(string: "App-Prefs:root=CALENDAR"), UIApplication.shared.canOpenURL(url) {
+                                    UIApplication.shared.open(url)
+                                } else if let url = URL(string: UIApplication.openSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
+                            }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "calendar")
+                                        .foregroundStyle(goldColor)
+                                    Text("Open Calendar Settings")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundStyle(currentTheme.textForeground.opacity(0.9))
+                                    Spacer()
+                                }
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(currentTheme.fieldBg)
+                                        .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
+                                        .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
+                                )
                             }
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(currentTheme.fieldBg)
-                                    .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
-                                    .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
-                            )
+                            .buttonStyle(.plain)
+                            
+                            Text("Go to Settings > Apps > Calendar > Calendar Accounts to connect Google, Microsoft, or iCloud.")
+                                .font(.system(size: 11, weight: .regular))
+                                .foregroundStyle(currentTheme.textForeground.opacity(0.6))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 8)
                         }
-                        .buttonStyle(.plain)
-
-                        Button(action: { /* mock connect */ }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "calendar")
-                                    .foregroundStyle(goldColor)
-                                Text("Connect Microsoft Calendar")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(currentTheme.textForeground.opacity(0.9))
-                                Spacer()
-                            }
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(currentTheme.fieldBg)
-                                    .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
-                                    .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
-                            )
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 40)
