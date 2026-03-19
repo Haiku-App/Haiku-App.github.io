@@ -275,7 +275,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showingAddTask) {
-            AddTaskView(tasks: currentTasksBinding)
+            AddTaskView(tasksByDate: $tasksByDate, selectedDate: $selectedDate)
         }
         .sheet(isPresented: $showingDatePicker) {
             NavigationStack {
@@ -521,8 +521,10 @@ struct ContentView: View {
 struct AddTaskView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     @Environment(\.dismiss) var dismiss
-    @Binding var tasks: [ClockTask]
+    @Binding var tasksByDate: [Date: [ClockTask]]
+    @Binding var selectedDate: Date
     
+    @State private var taskDate: Date
     @State private var title = ""
     @State private var startTime = Date()
     @State private var endTime = Date().addingTimeInterval(3600)
@@ -534,6 +536,12 @@ struct AddTaskView: View {
     @State private var newCategoryName = ""
     
     @State private var selectedColorIndex: Int = Int.random(in: 0..<aestheticColors.count)
+    
+    init(tasksByDate: Binding<[Date: [ClockTask]]>, selectedDate: Binding<Date>) {
+        self._tasksByDate = tasksByDate
+        self._selectedDate = selectedDate
+        self._taskDate = State(initialValue: selectedDate.wrappedValue)
+    }
     
     private var bgColor: Color { currentTheme.bg }
     private var fieldBgColor: Color { currentTheme.fieldBg }
@@ -679,6 +687,23 @@ struct AddTaskView: View {
                                 )
                         }
                         
+                        // Date Selection
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("DATE")
+                                .font(.system(size: 12, weight: .regular, design: .serif))
+                                .foregroundStyle(goldColor)
+                                .tracking(1)
+                            
+                            DatePicker("Date", selection: $taskDate, displayedComponents: .date)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(fieldBgColor)
+                                        .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
+                                        .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
+                                )
+                        }
+
                         // Time Selection
                         VStack(alignment: .leading, spacing: 8) {
                             Text("SCHEDULE")
@@ -749,7 +774,9 @@ struct AddTaskView: View {
     
     private func pickDistinctColor() {
         // Get all currently used colors in the day
-        let usedColors = Set(tasks.map { $0.color })
+        let day = Calendar.current.startOfDay(for: taskDate)
+        let dayTasks = tasksByDate[day, default: []]
+        let usedColors = Set(dayTasks.map { $0.color })
         
         // Find indices of colors not yet used
         let availableIndices = aestheticColors.indices.filter { idx in
@@ -783,8 +810,18 @@ struct AddTaskView: View {
             endMinutes: eMin,
             color: colorToUse
         )
-        tasks.append(newTask)
-        tasks.sort { $0.startMinutes < $1.startMinutes }
+        
+        let day = cal.startOfDay(for: taskDate)
+        var dayTasks = tasksByDate[day, default: []]
+        dayTasks.append(newTask)
+        dayTasks.sort { $0.startMinutes < $1.startMinutes }
+        tasksByDate[day] = dayTasks
+        
+        // Update selected date so user sees the new task
+        withAnimation {
+            selectedDate = day
+        }
+        
         dismiss()
     }
 }
