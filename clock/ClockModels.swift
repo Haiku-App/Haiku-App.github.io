@@ -134,6 +134,7 @@ struct BrainDumpTask: Identifiable, Codable {
     var id = UUID()
     var title: String
     var isCompleted: Bool = false
+    var scheduledDate: Date? = nil
 }
 
 class BrainDumpManager: ObservableObject {

@@ -49,6 +49,7 @@ struct ContentView: View {
     @State private var showingCustomOffsetAlert = false
     @State private var customOffsetString = ""
     @State private var prefilledTaskTitle: String? = nil
+    @State private var prefilledTaskId: UUID? = nil
     @AppStorage("is24HourClock") private var is24HourClock = false
     @AppStorage("notificationOffsetsData") private var notificationOffsetsData = ""
 
@@ -127,8 +128,9 @@ struct ContentView: View {
                     } else if selectedTab == .weekly {
                         WeeklyView(tasksByDate: tasksByDate, selectedDate: $selectedDate, selectedTab: $selectedTab)
                     } else if selectedTab == .todo {
-                        TodoView(onSchedule: { title in
+                        TodoView(onSchedule: { title, id in
                             prefilledTaskTitle = title
+                            prefilledTaskId = id
                             showingAddTask = true
                         })
                     } else if selectedTab == .analytics {
@@ -282,7 +284,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showingAddTask) {
-            AddTaskView(tasksByDate: $tasksByDate, selectedDate: $selectedDate, prefilledTitle: prefilledTaskTitle)
+            AddTaskView(tasksByDate: $tasksByDate, selectedDate: $selectedDate, prefilledTitle: prefilledTaskTitle, brainDumpTaskId: prefilledTaskId)
         }
         .sheet(isPresented: $showingDatePicker) {
             NavigationStack {
@@ -532,6 +534,7 @@ struct AddTaskView: View {
     @Binding var selectedDate: Date
     
     var prefilledTitle: String?
+    var brainDumpTaskId: UUID?
     
     @State private var taskDate: Date
     @State private var title = ""
@@ -539,6 +542,7 @@ struct AddTaskView: View {
     @State private var endTime = Date().addingTimeInterval(3600)
     
     @StateObject private var categoryManager = CategoryManager()
+    @ObservedObject private var brainDumpManager = BrainDumpManager()
     @State private var selectedCategoryId: UUID? = nil
     
     @State private var showingNewCategory = false
@@ -546,10 +550,11 @@ struct AddTaskView: View {
     
     @State private var selectedColorIndex: Int = Int.random(in: 0..<aestheticColors.count)
     
-    init(tasksByDate: Binding<[Date: [ClockTask]]>, selectedDate: Binding<Date>, prefilledTitle: String? = nil) {
+    init(tasksByDate: Binding<[Date: [ClockTask]]>, selectedDate: Binding<Date>, prefilledTitle: String? = nil, brainDumpTaskId: UUID? = nil) {
         self._tasksByDate = tasksByDate
         self._selectedDate = selectedDate
         self.prefilledTitle = prefilledTitle
+        self.brainDumpTaskId = brainDumpTaskId
         self._taskDate = State(initialValue: selectedDate.wrappedValue)
         self._title = State(initialValue: prefilledTitle ?? "")
     }
@@ -827,6 +832,13 @@ struct AddTaskView: View {
         dayTasks.append(newTask)
         dayTasks.sort { $0.startMinutes < $1.startMinutes }
         tasksByDate[day] = dayTasks
+        
+        // Update BrainDumpTask if needed
+        if let bdtid = brainDumpTaskId {
+            if let index = brainDumpManager.tasks.firstIndex(where: { $0.id == bdtid }) {
+                brainDumpManager.tasks[index].scheduledDate = day
+            }
+        }
         
         // Update selected date so user sees the new task
         withAnimation {
@@ -1566,7 +1578,7 @@ struct TodoView: View {
     @State private var isSelectionMode = false
     @State private var selectedTaskIds = Set<UUID>()
     
-    var onSchedule: (String) -> Void
+    var onSchedule: (String, UUID) -> Void
     
     private var bgColor: Color { currentTheme.bg }
     private var goldColor: Color { currentTheme.accent }
@@ -1651,6 +1663,7 @@ struct TodoView: View {
                             BrainDumpRow(
                                 title: task.title,
                                 isCompleted: task.isCompleted,
+                                scheduledDate: task.scheduledDate,
                                 isSelected: selectedTaskIds.contains(task.id),
                                 isSelectionMode: isSelectionMode,
                                 onToggle: {
@@ -1693,7 +1706,7 @@ struct TodoView: View {
                         Button(action: {
                             if let firstId = selectedTaskIds.first,
                                let task = brainDumpManager.tasks.first(where: { $0.id == firstId }) {
-                                onSchedule(task.title)
+                                onSchedule(task.title, task.id)
                                 // We don't remove it yet because AddTaskView might be cancelled
                                 // But the user asked for it to open up.
                                 withAnimation {
@@ -1739,9 +1752,17 @@ struct BrainDumpRow: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     var title: String
     var isCompleted: Bool
+    var scheduledDate: Date? = nil
     var isSelected: Bool = false
     var isSelectionMode: Bool = false
     var onToggle: () -> Void
+
+    private func formatScheduledDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        // Friday on March 19
+        formatter.dateFormat = "EEEE 'on' MMMM d"
+        return formatter.string(from: date)
+    }
 
     var body: some View {
         Button(action: onToggle) {
@@ -1756,10 +1777,18 @@ struct BrainDumpRow: View {
                         .foregroundStyle(isCompleted ? currentTheme.textForeground.opacity(0.3) : currentTheme.accent)
                 }
 
-                Text(title)
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(currentTheme.textForeground.opacity(isCompleted ? 0.4 : 0.9))
-                    .strikethrough(isCompleted && !isSelectionMode, color: currentTheme.textForeground.opacity(0.4))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(currentTheme.textForeground.opacity(isCompleted ? 0.4 : 0.9))
+                        .strikethrough(isCompleted && !isSelectionMode, color: currentTheme.textForeground.opacity(0.4))
+                    
+                    if let scheduledDate = scheduledDate {
+                        Text("\(formatScheduledDate(scheduledDate))")
+                            .font(.system(size: 12, weight: .light))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.5))
+                    }
+                }
 
                 Spacer()
             }
