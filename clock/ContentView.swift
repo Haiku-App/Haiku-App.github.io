@@ -1512,6 +1512,7 @@ struct TodoView: View {
     @StateObject private var brainDumpManager = BrainDumpManager()
     @State private var newTaskTitle: String = ""
     @FocusState private var isFocused: Bool
+    @State private var showingBulkImport = false
     
     private var bgColor: Color { currentTheme.bg }
     private var goldColor: Color { currentTheme.accent }
@@ -1525,7 +1526,7 @@ struct TodoView: View {
                 .padding(.top, 40)
             
             // Quick Add Input
-            HStack {
+            HStack(spacing: 12) {
                 TextField("Quick task...", text: $newTaskTitle)
                     .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(currentTheme.textForeground)
@@ -1536,6 +1537,12 @@ struct TodoView: View {
                         addTask()
                     }
                 
+                Button(action: { showingBulkImport = true }) {
+                    Image(systemName: "text.badge.plus")
+                        .font(.system(size: 22))
+                        .foregroundStyle(goldColor)
+                }
+
                 Button(action: addTask) {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 24))
@@ -1595,6 +1602,9 @@ struct TodoView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
             }
+        }
+        .sheet(isPresented: $showingBulkImport) {
+            BulkImportView(isPresented: $showingBulkImport, manager: brainDumpManager)
         }
     }
     
