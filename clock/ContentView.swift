@@ -106,11 +106,11 @@ struct ContentView: View {
                     }
                 }
                 .padding(.top, 20)
-                .opacity(isFlowState || selectedTab == .weekly ? 0 : 1)
-                .frame(height: selectedTab == .weekly ? 0 : nil)
+                .opacity(selectedTab == .clock && !isFlowState ? 1 : 0)
+                .frame(height: selectedTab == .clock && !isFlowState ? nil : 0)
                 .clipped()
-                .animation(.easeInOut, value: isFlowState)
-                .animation(.easeInOut, value: selectedTab)
+                .animation(nil, value: selectedTab)
+                .animation(nil, value: isFlowState)
 
                 Spacer()
 
