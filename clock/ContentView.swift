@@ -837,6 +837,7 @@ struct AddTaskView: View {
         if let bdtid = brainDumpTaskId {
             if let index = brainDumpManager.tasks.firstIndex(where: { $0.id == bdtid }) {
                 brainDumpManager.tasks[index].scheduledDate = day
+                brainDumpManager.sortTasks()
             }
         }
         
@@ -1584,80 +1585,61 @@ struct TodoView: View {
     private var goldColor: Color { currentTheme.accent }
 
     var body: some View {
-        VStack(spacing: 20) {
-            ZStack {
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 20) {
                 Text("BRAIN DUMP")
                     .font(.system(size: 14, weight: .regular, design: .serif))
                     .foregroundStyle(goldColor)
                     .tracking(2)
+                    .padding(.top, 40)
                 
-                HStack {
-                    Spacer()
-                    Button(action: { 
-                        withAnimation {
-                            isSelectionMode.toggle()
-                            if !isSelectionMode {
-                                selectedTaskIds.removeAll()
+                if !isSelectionMode {
+                    // Quick Add Input
+                    HStack(spacing: 12) {
+                        TextField("Quick task...", text: $newTaskTitle)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(currentTheme.textForeground)
+                            .tint(goldColor)
+                            .focused($isFocused)
+                            .submitLabel(.done)
+                            .onSubmit {
+                                addTask()
                             }
+                        
+                        Button(action: { showingBulkImport = true }) {
+                            Image(systemName: "text.badge.plus")
+                                .font(.system(size: 22))
+                                .foregroundStyle(goldColor)
                         }
-                    }) {
-                        Image(systemName: isSelectionMode ? "xmark.circle" : "calendar.badge.plus")
-                            .font(.system(size: 20))
-                            .foregroundStyle(goldColor)
-                    }
-                    .padding(.trailing, 40)
-                }
-            }
-            .padding(.top, 40)
-            
-            if !isSelectionMode {
-                // Quick Add Input
-                HStack(spacing: 12) {
-                    TextField("Quick task...", text: $newTaskTitle)
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(currentTheme.textForeground)
-                        .tint(goldColor)
-                        .focused($isFocused)
-                        .submitLabel(.done)
-                        .onSubmit {
-                            addTask()
-                        }
-                    
-                    Button(action: { showingBulkImport = true }) {
-                        Image(systemName: "text.badge.plus")
-                            .font(.system(size: 22))
-                            .foregroundStyle(goldColor)
-                    }
 
-                    Button(action: addTask) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(newTaskTitle.isEmpty ? currentTheme.textForeground.opacity(0.3) : goldColor)
+                        Button(action: addTask) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundStyle(newTaskTitle.isEmpty ? currentTheme.textForeground.opacity(0.3) : goldColor)
+                        }
+                        .disabled(newTaskTitle.isEmpty)
                     }
-                    .disabled(newTaskTitle.isEmpty)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(currentTheme.fieldBg)
+                    )
+                    .padding(.horizontal, 40)
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(currentTheme.fieldBg)
-                )
-                .padding(.horizontal, 40)
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
-            
-            if brainDumpManager.tasks.isEmpty {
-                Spacer()
-                VStack(spacing: 12) {
-                    Image(systemName: "brain.head.profile")
-                        .font(.system(size: 32))
-                        .foregroundStyle(goldColor.opacity(0.5))
-                    Text("Clear your mind")
-                        .font(.system(size: 14, weight: .light))
-                        .foregroundStyle(currentTheme.textForeground.opacity(0.5))
-                }
-                Spacer()
-            } else {
-                ZStack(alignment: .bottom) {
+                
+                if brainDumpManager.tasks.isEmpty {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 32))
+                            .foregroundStyle(goldColor.opacity(0.5))
+                        Text("Clear your mind")
+                            .font(.system(size: 14, weight: .light))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.5))
+                    }
+                    Spacer()
+                } else {
                     List {
                         ForEach(brainDumpManager.tasks) { task in
                             BrainDumpRow(
@@ -1698,40 +1680,66 @@ struct TodoView: View {
                                 }
                             }
                         }
+                        .onMove(perform: moveTask)
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
-
-                    if isSelectionMode && !selectedTaskIds.isEmpty {
-                        Button(action: {
-                            if let firstId = selectedTaskIds.first,
-                               let task = brainDumpManager.tasks.first(where: { $0.id == firstId }) {
-                                onSchedule(task.title, task.id)
-                                // We don't remove it yet because AddTaskView might be cancelled
-                                // But the user asked for it to open up.
-                                withAnimation {
-                                    isSelectionMode = false
-                                    selectedTaskIds.removeAll()
-                                }
-                            }
-                        }) {
-                            Text("Schedule Selected")
-                                .font(.system(size: 16, weight: .medium, design: .serif))
-                                .foregroundStyle(currentTheme.bg)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(goldColor)
-                                        .shadow(color: .black.opacity(0.3), radius: 5, x: 2, y: 4)
-                                )
-                                .padding(.horizontal, 40)
-                                .padding(.bottom, 20)
-                        }
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
                 }
             }
+
+            // Bottom Action Bar
+            HStack(alignment: .bottom, spacing: 16) {
+                if isSelectionMode && !selectedTaskIds.isEmpty {
+                    Button(action: {
+                        if let firstId = selectedTaskIds.first,
+                           let task = brainDumpManager.tasks.first(where: { $0.id == firstId }) {
+                            onSchedule(task.title, task.id)
+                            withAnimation {
+                                isSelectionMode = false
+                                selectedTaskIds.removeAll()
+                            }
+                        }
+                    }) {
+                        Text("Schedule Selected")
+                            .font(.system(size: 16, weight: .medium, design: .serif))
+                            .foregroundStyle(currentTheme.bg)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 18)
+                            .background(
+                                RoundedRectangle(cornerRadius: 35)
+                                    .fill(goldColor)
+                                    .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+                            )
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else {
+                    Spacer()
+                }
+
+                // Floating Action Button (Toggle)
+                Button(action: { 
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        isSelectionMode.toggle()
+                        if !isSelectionMode {
+                            selectedTaskIds.removeAll()
+                        }
+                    }
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(goldColor)
+                            .frame(width: 70, height: 70)
+                            .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+                        
+                        Image(systemName: isSelectionMode ? "xmark" : "calendar.badge.plus")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(currentTheme.bg)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
         }
         .sheet(isPresented: $showingBulkImport) {
             BulkImportView(isPresented: $showingBulkImport, manager: brainDumpManager)
@@ -1745,6 +1753,10 @@ struct TodoView: View {
         }
         newTaskTitle = ""
         isFocused = true
+    }
+    
+    private func moveTask(from source: IndexSet, to destination: Int) {
+        brainDumpManager.tasks.move(fromOffsets: source, toOffset: destination)
     }
 }
 

@@ -151,6 +151,28 @@ class BrainDumpManager: ObservableObject {
            let decoded = try? JSONDecoder().decode([BrainDumpTask].self, from: data) {
             self.tasks = decoded
         }
+        sortTasks()
+    }
+
+    func sortTasks() {
+        tasks.sort { (t1, t2) -> Bool in
+            switch (t1.scheduledDate, t2.scheduledDate) {
+            case (let d1?, let d2?):
+                return d1 < d2
+            case (.some, nil):
+                return true
+            case (nil, .some):
+                return false
+            case (nil, nil):
+                return false
+            }
+        }
+    }
+
+    func save() {
+        if let data = try? JSONEncoder().encode(tasks) {
+            UserDefaults.standard.set(data, forKey: "brainDumpTasks")
+        }
+        sortTasks()
     }
 }
-
