@@ -42,24 +42,116 @@ struct SimpleEntry: TimelineEntry {
 }
 
 struct clockWidgetEntryView : View {
+    @Environment(\.widgetFamily) var family
     var entry: Provider.Entry
+    var showLegend: Bool = true // Added parameter to control legend
     
     var theme: AppTheme {
         return SharedTaskManager.shared.loadTheme()
     }
 
     var body: some View {
-        // Reusing your highly aesthetic clock!
-        StaticClockView(
-            now: entry.date,
-            tasks: fetchWidgetTasks(),
-            is24HourClock: fetchIs24HourClock(),
-            theme: theme,
-            showHands: true,
-            showText: true, // Show the numbers around the clock
-            showCenterText: false // Hide the digital time and focus time in the middle for the widget
-        )
-        .padding(12)
+        let tasks = fetchWidgetTasks()
+        
+        if family == .systemSmall {
+            // Small square: just the clock
+            StaticClockView(
+                now: entry.date,
+                tasks: tasks,
+                is24HourClock: fetchIs24HourClock(),
+                theme: theme,
+                showHands: true,
+                showText: true,
+                showCenterText: false
+            )
+            .padding(12)
+        } else if !showLegend {
+            // Big size but explicit 'no legend' -> just a big clock
+            StaticClockView(
+                now: entry.date,
+                tasks: tasks,
+                is24HourClock: fetchIs24HourClock(),
+                theme: theme,
+                showHands: true,
+                showText: true,
+                showCenterText: false
+            )
+            .padding(16)
+        } else {
+            // Medium/Large with Legend
+            GeometryReader { geo in
+                HStack(spacing: 20) {
+                    // The clock on the left - takes up ~55% of the space
+                    StaticClockView(
+                        now: entry.date,
+                        tasks: tasks,
+                        is24HourClock: fetchIs24HourClock(),
+                        theme: theme,
+                        showHands: true,
+                        showText: true,
+                        showCenterText: false
+                    )
+                    .frame(width: geo.size.width * 0.55)
+                    
+                    // The legend on the right
+                    if tasks.isEmpty {
+                        VStack {
+                            Image(systemName: "cup.and.saucer")
+                                .font(.system(size: 24))
+                                .foregroundStyle(theme.accent.opacity(0.5))
+                                .padding(.bottom, 4)
+                            Text("No tasks")
+                                .font(.system(size: 12, weight: .light))
+                                .foregroundStyle(theme.textForeground.opacity(0.5))
+                        }
+                        .frame(width: geo.size.width * 0.45 - 20, alignment: .center)
+                    } else {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(tasks.prefix(6)) { task in
+                                HStack(spacing: 8) {
+                                    Circle()
+                                        .fill(task.color)
+                                        .frame(width: 8, height: 8)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(task.title)
+                                            .font(.system(size: 12, weight: .medium, design: .serif))
+                                            .foregroundStyle(theme.textForeground)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                        
+                                        Text("\(formatTime(minutes: task.startMinutes)) - \(formatTime(minutes: task.endMinutes))")
+                                            .font(.system(size: 10, weight: .regular))
+                                            .foregroundStyle(theme.textForeground.opacity(0.6))
+                                    }
+                                }
+                            }
+                            
+                            if tasks.count > 6 {
+                                Text("+\(tasks.count - 6) more")
+                                    .font(.system(size: 10, weight: .medium, design: .serif))
+                                    .foregroundStyle(theme.accent)
+                                    .padding(.top, 2)
+                            }
+                        }
+                        .frame(width: geo.size.width * 0.45 - 20, alignment: .leading)
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .center)
+            }
+            .padding(16)
+        }
+    }
+
+    private func formatTime(minutes: Int) -> String {
+        let is24Hour = fetchIs24HourClock()
+        let h = minutes / 60
+        let m = minutes % 60
+        
+        let date = Calendar.current.date(from: DateComponents(hour: h, minute: m)) ?? Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = is24Hour ? "HH:mm" : "h:mm a"
+        return formatter.string(from: date)
     }
 
     private func fetchIs24HourClock() -> Bool {
@@ -92,17 +184,38 @@ struct clockWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             if #available(iOS 17.0, *) {
-                clockWidgetEntryView(entry: entry)
+                clockWidgetEntryView(entry: entry, showLegend: true)
                     .containerBackground(for: .widget) {
                         SharedTaskManager.shared.loadTheme().bg
                     }
             } else {
-                clockWidgetEntryView(entry: entry)
+                clockWidgetEntryView(entry: entry, showLegend: true)
                     .background(SharedTaskManager.shared.loadTheme().bg)
             }
         }
-        .configurationDisplayName("Aesthetic Clock")
-        .description("Your beautifully minimal clock, right on your home screen.")
-        .supportedFamilies([.systemSmall, .systemLarge])
+        .configurationDisplayName("Clock with Tasks")
+        .description("Your beautifully minimal clock with your agenda.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    }
+}
+
+struct largeClockWidget: Widget {
+    let kind: String = "largeClockWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+            if #available(iOS 17.0, *) {
+                clockWidgetEntryView(entry: entry, showLegend: false)
+                    .containerBackground(for: .widget) {
+                        SharedTaskManager.shared.loadTheme().bg
+                    }
+            } else {
+                clockWidgetEntryView(entry: entry, showLegend: false)
+                    .background(SharedTaskManager.shared.loadTheme().bg)
+            }
+        }
+        .configurationDisplayName("Large Aesthetic Clock")
+        .description("A larger view of just the minimal clock face.")
+        .supportedFamilies([.systemLarge])
     }
 }
