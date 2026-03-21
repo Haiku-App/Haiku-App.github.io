@@ -98,6 +98,30 @@ struct ClockView: View {
                         .foregroundStyle(goldColor.opacity(0.3))
                         .position(x: center.x, y: center.y - pmRingRadius)
                         .allowsHitTesting(false)
+
+                    // Sun at 12, Moon at 24/0
+                    HStack(spacing: 8) {
+                        Text("24")
+                            .font(.system(size: 14, weight: .light, design: .serif))
+                            .foregroundStyle(goldColor)
+                        Image(systemName: "moon.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.gray)
+                    }
+                    .position(x: center.x + 15, y: center.y - faceRadius + 20)
+                    .allowsHitTesting(false)
+
+                    HStack(spacing: 8) {
+                        Text("12")
+                            .font(.system(size: 14, weight: .light, design: .serif))
+                            .foregroundStyle(goldColor)
+                        Image(systemName: "sun.max.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.yellow)
+                    }
+                    .position(x: center.x + 15, y: center.y + faceRadius - 20)
+                    .allowsHitTesting(false)
+
                 } else {
                     // Empty AM Track (Inner)
                     Circle()
@@ -112,16 +136,27 @@ struct ClockView: View {
                         .allowsHitTesting(false)
 
                     // Track Indicators
-                    Text("AM")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(goldColor.opacity(0.3))
-                        .position(x: center.x, y: center.y - amRingRadius)
-                        .allowsHitTesting(false)
-                    Text("PM")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(goldColor.opacity(0.3))
-                        .position(x: center.x, y: center.y - pmRingRadius)
-                        .allowsHitTesting(false)
+                    HStack(spacing: 4) {
+                        Text("AM")
+                            .foregroundStyle(goldColor.opacity(0.3))
+                        Image(systemName: "sun.max.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.yellow.opacity(0.8))
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .position(x: center.x, y: center.y - amRingRadius)
+                    .allowsHitTesting(false)
+
+                    HStack(spacing: 4) {
+                        Text("PM")
+                            .foregroundStyle(goldColor.opacity(0.3))
+                        Image(systemName: "moon.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.gray.opacity(0.8))
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .position(x: center.x, y: center.y - pmRingRadius)
+                    .allowsHitTesting(false)
                 }
                 
                 // Scheduled Tasks
@@ -161,13 +196,12 @@ struct ClockView: View {
                     let y = sin(CGFloat(angle.radians)) * dotDistance
                     
                     if is24HourClock {
-                        if i % 6 == 0 { // 24, 6, 12, 18
-                            let hourNumber = i == 0 ? 24 : i
-                            Text("\(hourNumber)")
+                        if i == 6 || i == 18 { // Only 6 and 18, skip 12 and 24
+                            Text("\(i)")
                                 .font(.system(size: 14, weight: .light, design: .serif))
                                 .foregroundStyle(goldColor)
                                 .position(x: center.x + x, y: center.y + y)
-                        } else if i % 2 == 0 {
+                        } else if i % 2 == 0 && i != 0 && i != 12 {
                             Circle()
                                 .fill(goldColor.opacity(0.6))
                                 .frame(width: 3, height: 3)

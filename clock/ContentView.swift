@@ -1,14 +1,17 @@
 import SwiftUI
 internal import Combine
 import WidgetKit
+import StoreKit
 
 struct ContentView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
-    @AppStorage("isPro") private var isPro = false
+    @StateObject private var storeManager = StoreManager()
+    private var isPro: Bool { storeManager.isPro }
+    
     @State private var now = Date()
     // Slow down timer in Canvas to prevent update loop crashes
     private let timer = Timer.publish(
-        every: ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" ? 1.0 : 0.05, 
+        every: 1.0, 
         on: .main, 
         in: .common
     ).autoconnect()
@@ -22,13 +25,7 @@ struct ContentView: View {
         if let saved = SharedTaskManager.shared.load() {
             return saved
         }
-        let today = Calendar.current.startOfDay(for: Date())
-        return [
-            today: [
-                ClockTask(title: "Matcha Tasting", startMinutes: 14*60, endMinutes: 15*60, color: AppTheme.sage.accent), // Gold
-                ClockTask(title: "Garden Walk", startMinutes: 16*60, endMinutes: 17*60 + 30, color: Color(red: 0.75, green: 0.55, blue: 0.45)) // Muted Terracotta
-            ]
-        ]
+        return [:]
     }()
 
     private var currentTasksBinding: Binding<[ClockTask]> {
@@ -175,6 +172,7 @@ struct ContentView: View {
                 .opacity(isFlowState ? 0 : 1)
                 .animation(.easeInOut, value: isFlowState)
             }
+            .environmentObject(storeManager)
             .blur(radius: showingCustomOffsetAlert ? 4 : 0)
             .disabled(showingCustomOffsetAlert)
 
@@ -1178,7 +1176,10 @@ struct TabBarButton: View {
 
 struct ProfileAnalyticsView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
-    @AppStorage("isPro") private var isPro = false
+    @EnvironmentObject var storeManager: StoreManager
+    private var isPro: Bool { storeManager.isPro }
+    
+    @AppStorage("is24HourClock") private var is24HourClock = false
     var tasksByDate: [Date: [ClockTask]]
     
     @StateObject private var categoryManager = CategoryManager()
@@ -1262,7 +1263,8 @@ struct ProfileAnalyticsView: View {
             for task in tasks {
                 let startHour = task.startMinutes / 60
                 let endHour = task.endMinutes / 60
-                for h in startHour...endHour {
+                // Use exclusive range for endHour to be more accurate (a 1h task doesn't span 2 hours)
+                for h in startHour..<max(startHour + 1, endHour) {
                     if h < 24 { counts[h, default: 0] += 1 }
                 }
             }
@@ -1299,6 +1301,16 @@ struct ProfileAnalyticsView: View {
             return "\(h)h \(m)m"
         }
         return "\(m)m"
+    }
+    
+    private func formatHour(_ hour: Int) -> String {
+        if is24HourClock {
+            return String(format: "%02d:00", hour)
+        } else {
+            let h = hour % 12
+            let period = hour < 12 ? "AM" : "PM"
+            return "\(h == 0 ? 12 : h) \(period)"
+        }
     }
 
     var body: some View {
@@ -1342,7 +1354,7 @@ struct ProfileAnalyticsView: View {
                                     .tracking(1)
                                 
                                 if isPro {
-                                    Text("Your rhythm peaks at \(peakHour):00")
+                                    Text("Your rhythm peaks at \(formatHour(peakHour))")
                                         .font(.system(size: 16, weight: .bold, design: .serif))
                                         .foregroundStyle(currentTheme.textForeground)
                                 }
@@ -1716,7 +1728,9 @@ struct MomentumChart: View {
 struct ProfileSettingsView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     @AppStorage("notificationOffsetsData") private var notificationOffsetsData = ""
-    @AppStorage("isPro") private var isPro = false
+    @EnvironmentObject var storeManager: StoreManager
+    private var isPro: Bool { storeManager.isPro }
+    
     @Binding var is24HourClock: Bool
     @Binding var showingCustomOffsetAlert: Bool
     @State private var showingPaywall = false
@@ -1943,6 +1957,53 @@ struct ProfileSettingsView: View {
                         }
                         .opacity(isPro ? 1.0 : 0.6)
                     }
+
+                    // Legal Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("LEGAL")
+                            .font(.system(size: 12, weight: .regular, design: .serif))
+                            .foregroundStyle(goldColor)
+                            .tracking(1)
+                            .padding(.horizontal, 4)
+
+                        Link(destination: URL(string: "https://yourwebsite.com/privacy")!) {
+                            HStack {
+                                Text("Privacy Policy")
+                                    .font(.system(size: 16, weight: .medium, design: .serif))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.9))
+                                Spacer()
+                                Image(systemName: "safari")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(goldColor)
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(currentTheme.fieldBg)
+                                    .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
+                                    .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    // App Info
+                    VStack(spacing: 8) {
+                        Text("HAIKU")
+                            .font(.system(size: 16, weight: .medium, design: .serif))
+                            .foregroundStyle(goldColor)
+                        Text("Version 1.0.0")
+                            .font(.system(size: 10, weight: .light))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.4))
+                        
+                        if !isPro {
+                            Text("Note: Use StoreKit for production billing.")
+                                .font(.system(size: 10, weight: .regular, design: .serif))
+                                .foregroundStyle(Color.red.opacity(0.5))
+                                .padding(.top, 4)
+                        }
+                    }
+                    .padding(.top, 20)
                 }
                 .padding(.horizontal, 40)
                 .padding(.bottom, 40)
@@ -2203,8 +2264,9 @@ struct BrainDumpRow: View {
 
 struct HaikuProView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
-    @AppStorage("isPro") private var isPro = false
+    @EnvironmentObject var storeManager: StoreManager
     @Environment(\.dismiss) var dismiss
+    @State private var isPurchasing = false
     
     var body: some View {
         ZStack {
@@ -2239,30 +2301,40 @@ struct HaikuProView: View {
                     }
                     .padding(.horizontal, 40)
                     
-                    // Pricing Tiers
+                    // Pricing Tiers (Dynamic from StoreKit)
                     VStack(spacing: 16) {
-                        PricingButton(title: "Monthly", price: "$3.99", subtitle: "Flexible focus", theme: currentTheme) {
-                            unlockPro()
+                        if let proProduct = storeManager.products.first(where: { $0.id == storeManager.proID }) {
+                            PricingButton(
+                                title: proProduct.displayName,
+                                price: proProduct.displayPrice,
+                                subtitle: proProduct.description,
+                                theme: currentTheme
+                            ) {
+                                buyPro()
+                            }
+                            .disabled(isPurchasing)
+                        } else {
+                            // Fallback if products haven't loaded yet
+                            ProgressView()
+                                .tint(currentTheme.accent)
+                                .onAppear {
+                                    Task { await storeManager.refresh() }
+                                }
                         }
                         
-                        PricingButton(title: "Yearly", price: "$19.99", subtitle: "Best value • $1.66/mo", theme: currentTheme) {
-                            unlockPro()
+                        Button(action: {
+                            Task {
+                                await storeManager.restore()
+                                if storeManager.isPro {
+                                    dismiss()
+                                }
+                            }
+                        }) {
+                            Text("Restore Purchases")
+                                .font(.system(size: 12, weight: .medium, design: .serif))
+                                .foregroundStyle(currentTheme.accent.opacity(0.8))
                         }
-                        .overlay(
-                            Text("POPULAR")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(currentTheme.bg)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(currentTheme.accent)
-                                .clipShape(Capsule())
-                                .offset(y: -48),
-                            alignment: .top
-                        )
-                        
-                        PricingButton(title: "Lifetime", price: "$49.99", subtitle: "One-time purchase", theme: currentTheme) {
-                            unlockPro()
-                        }
+                        .padding(.top, 8)
                     }
                     .padding(.horizontal, 40)
                     .padding(.top, 20)
@@ -2273,6 +2345,16 @@ struct HaikuProView: View {
                             .foregroundStyle(currentTheme.textForeground.opacity(0.5))
                     }
                     .padding(.bottom, 60)
+                }
+            }
+            .overlay {
+                if isPurchasing {
+                    ZStack {
+                        Color.black.opacity(0.3).ignoresSafeArea()
+                        ProgressView("Contacting App Store...")
+                            .padding()
+                            .background(RoundedRectangle(cornerRadius: 12).fill(currentTheme.fieldBg))
+                    }
                 }
             }
             
@@ -2290,12 +2372,20 @@ struct HaikuProView: View {
                 Spacer()
             }
         }
+        .onChange(of: storeManager.isPro) { newValue in
+            if newValue { dismiss() }
+        }
     }
     
-    private func unlockPro() {
-        withAnimation {
-            isPro = true
-            dismiss()
+    private func buyPro() {
+        isPurchasing = true
+        Task {
+            do {
+                try await storeManager.purchase()
+            } catch {
+                print("Purchase failed: \(error)")
+            }
+            isPurchasing = false
         }
     }
 }
