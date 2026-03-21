@@ -20,31 +20,41 @@ struct OnboardingView: View {
                         theme: currentTheme
                     )
                     .tag(0)
-                    
+
                     OnboardingStepView(
-                        title: "Visual Flow",
-                        subtitle: "See your tasks.",
-                        description: "Your schedule is laid out on a 24-hour clock, giving you a natural sense of time.",
-                        imageName: "calendar",
+                        title: "A Circle to Live In",
+                        subtitle: "Find your center.",
+                        description: "Time isn’t just a list of boxes to check. It’s a circle to live in. By visualizing your day as a flow, you find more space for what matters.",
+                        imageName: "leaf.fill",
                         step: 1,
                         theme: currentTheme
                     )
                     .tag(1)
                     
                     OnboardingStepView(
-                        title: "Gentle Reminders",
-                        subtitle: "Stay in your rhythm.",
-                        description: "Get subtle notifications before your next task, so you never have to rush.",
-                        imageName: "bell",
+                        title: "Visual Flow",
+                        subtitle: "See your tasks.",
+                        description: "Your schedule is laid out on a 24-hour clock, giving you a natural sense of time.",
+                        imageName: "calendar",
                         step: 2,
                         theme: currentTheme
                     )
                     .tag(2)
+                    
+                    OnboardingStepView(
+                        title: "Gentle Reminders",
+                        subtitle: "Stay in your rhythm.",
+                        description: "Get subtle notifications before your next task, so you never have to rush.",
+                        imageName: "bell",
+                        step: 3,
+                        theme: currentTheme
+                    )
+                    .tag(3)
                 }
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
                 
                 VStack(spacing: 20) {
-                    if currentPage == 2 {
+                    if currentPage == 3 {
                         Button(action: {
                             withAnimation(.spring()) {
                                 hasCompletedOnboarding = true
@@ -140,7 +150,34 @@ struct OnboardingStepView: View {
                         }
                     }
                 } else if step == 1 {
-                    // Step 1: Animated Task Timeline
+                    // Step 1: Zen Ripple Animation
+                    ZStack {
+                        ForEach(0..<4) { i in
+                            Circle()
+                                .stroke(theme.accent.opacity(0.3), lineWidth: 1)
+                                .frame(width: 100, height: 100)
+                                .scaleEffect(isAnimating ? 3.0 : 1.0)
+                                .opacity(isAnimating ? 0.0 : 1.0)
+                                .animation(
+                                    .easeOut(duration: 3.0)
+                                    .repeatForever(autoreverses: false)
+                                    .delay(Double(i) * 0.7),
+                                    value: isAnimating
+                                )
+                        }
+                        
+                        Image(systemName: "leaf.fill")
+                            .font(.system(size: 60))
+                            .foregroundStyle(theme.accent)
+                            .shadow(color: theme.accent.opacity(0.3), radius: 10)
+                            .scaleEffect(isAnimating ? 1.05 : 0.95)
+                            .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isAnimating)
+                    }
+                    .onAppear {
+                        isAnimating = true
+                    }
+                } else if step == 2 {
+                    // Step 2: Animated Task Timeline
                     VStack(alignment: .leading, spacing: 15) {
                         ForEach(0..<3) { i in
                             HStack(spacing: 12) {
@@ -167,7 +204,7 @@ struct OnboardingStepView: View {
                     }
                     .onAppear { isAnimating = true }
                 } else {
-                    // Step 2: Beautiful Pulsing Bell
+                    // Step 3: Beautiful Pulsing Bell
                     ZStack {
                         Circle()
                             .fill(theme.accent.opacity(0.1))
@@ -195,16 +232,18 @@ struct OnboardingStepView: View {
             
             VStack(spacing: 16) {
                 Text(title)
-                    .font(.system(size: 32, weight: .bold, design: .serif))
+                    .font(.system(size: 28, weight: .bold, design: .serif))
                     .foregroundStyle(theme.accent)
                     .tracking(4)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
                 
                 Text(subtitle)
-                    .font(.system(size: 20, weight: .medium, design: .serif))
+                    .font(.system(size: 18, weight: .medium, design: .serif))
                     .foregroundStyle(theme.textForeground.opacity(0.9))
                 
                 Text(description)
-                    .font(.system(size: 16, design: .serif))
+                    .font(.system(size: 15, design: .serif))
                     .foregroundStyle(theme.textForeground.opacity(0.7))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
