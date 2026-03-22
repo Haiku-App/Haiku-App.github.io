@@ -12,6 +12,7 @@ class GoogleCalendarManager: ObservableObject {
     @Published var eventsDidChange: Bool = false
 
     private let calendarEndpoint = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+    private let calendarScope = "https://www.googleapis.com/auth/calendar.events"
     
     init() {
         checkStatus()
@@ -20,24 +21,66 @@ class GoogleCalendarManager: ObservableObject {
     func checkStatus() {
         GIDSignIn.sharedInstance.restorePreviousSignIn { user, error in
             DispatchQueue.main.async {
-                self.isSignedIn = (user != nil)
+                self.updateSignInStatus(user: user)
             }
         }
     }
     
-    func signIn(presenting viewController: UIViewController) {
-        // Request the Calendar events scope
-        let scopes = ["https://www.googleapis.com/auth/calendar.events"]
+    private func updateSignInStatus(user: GIDGoogleUser?) {
+        guard let user = user else {
+            self.isSignedIn = false
+            return
+        }
         
+        // Check if the user has granted the calendar scope
+        let grantedScopes = user.grantedScopes ?? []
+        // Use a more robust check for scopes (ignoring case/trailing slashes)
+        let hasScope = grantedScopes.contains { $0.lowercased().hasPrefix(calendarScope.lowercased()) }
+        
+        self.isSignedIn = hasScope
+        
+        if hasScope {
+            print("Google Sign-In: User is signed in with required scopes.")
+            self.eventsDidChange.toggle()
+        } else {
+            print("Google Sign-In: User is signed in but missing calendar scope.")
+        }
+    }
+    
+    func signIn(presenting viewController: UIViewController) {
+        let scopes = [calendarScope]
+        
+        print("Google Sign-In: Starting sign-in flow...")
+        
+        // If we already have a user but missing scopes, use addScopes
+        if let currentUser = GIDSignIn.sharedInstance.currentUser {
+            print("Google Sign-In: User already signed in, adding scopes...")
+            currentUser.addScopes(scopes, presenting: viewController) { result, error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        print("Google Add Scopes Error: \(error.localizedDescription)")
+                        // If addScopes fails, try a fresh sign-in
+                        self.freshSignIn(presenting: viewController, scopes: scopes)
+                        return
+                    }
+                    self.updateSignInStatus(user: result?.user)
+                }
+            }
+        } else {
+            freshSignIn(presenting: viewController, scopes: scopes)
+        }
+    }
+    
+    private func freshSignIn(presenting viewController: UIViewController, scopes: [String]) {
         GIDSignIn.sharedInstance.signIn(withPresenting: viewController, hint: nil, additionalScopes: scopes) { result, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("Google Sign in error: \(error.localizedDescription)")
+                    print("Google Sign-In Error: \(error.localizedDescription)")
                     self.isSignedIn = false
                     return
                 }
-                self.isSignedIn = true
-                self.eventsDidChange.toggle()
+                print("Google Sign-In Success.")
+                self.updateSignInStatus(user: result?.user)
             }
         }
     }
@@ -62,6 +105,108 @@ class GoogleCalendarManager: ObservableObject {
                 return
             }
             completion(user?.accessToken.tokenString)
+        }
+    }
+
+    func fetchEvents(from startDate: Date, to endDate: Date, theme: AppTheme, completion: @escaping ([Date: [ClockTask]]) -> Void) {
+        guard isSignedIn else {
+            completion([:])
+            return
+        }
+        
+        getValidToken { token in
+            guard let token = token else {
+                completion([:])
+                return
+            }
+            
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            
+            let timeMin = formatter.string(from: startDate)
+            let timeMax = formatter.string(from: endDate)
+            
+            guard var components = URLComponents(string: self.calendarEndpoint) else { return }
+            components.queryItems = [
+                URLQueryItem(name: "timeMin", value: timeMin),
+                URLQueryItem(name: "timeMax", value: timeMax),
+                URLQueryItem(name: "singleEvents", value: "true"),
+                URLQueryItem(name: "orderBy", value: "startTime")
+            ]
+            
+            guard let url = components.url else { return }
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("Google API Network Error: \(error.localizedDescription)")
+                    completion([:])
+                    return
+                }
+                
+                guard let data = data else {
+                    print("Google API Error: No data received")
+                    completion([:])
+                    return
+                }
+                
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                       let items = json["items"] as? [[String: Any]] {
+                        
+                        let cal = Calendar.current
+                        var result: [Date: [ClockTask]] = [:]
+                        
+                        for (index, item) in items.enumerated() {
+                            guard let id = item["id"] as? String,
+                                  let startObj = item["start"] as? [String: Any],
+                                  let endObj = item["end"] as? [String: Any],
+                                  let startStr = startObj["dateTime"] as? String,
+                                  let endStr = endObj["dateTime"] as? String else {
+                                continue
+                            }
+                            
+                            let title = item["summary"] as? String ?? "Google Event"
+                            
+                            guard let sDate = formatter.date(from: startStr),
+                                  let eDate = formatter.date(from: endStr) else { continue }
+                            
+                            let eventDate = cal.startOfDay(for: sDate)
+                            let sComps = cal.dateComponents([.hour, .minute], from: sDate)
+                            let eComps = cal.dateComponents([.hour, .minute], from: eDate)
+                            
+                            let sMin = (sComps.hour ?? 0) * 60 + (sComps.minute ?? 0)
+                            var eMin = (eComps.hour ?? 0) * 60 + (eComps.minute ?? 0)
+                            
+                            let days = cal.dateComponents([.day], from: cal.startOfDay(for: sDate), to: cal.startOfDay(for: eDate)).day ?? 0
+                            if days > 0 { eMin += days * 1440 }
+                            if eMin <= sMin { eMin = sMin + 60 }
+                            
+                            let color = aestheticColors[index % aestheticColors.count].color
+                            
+                            let task = ClockTask(
+                                title: title,
+                                startMinutes: sMin,
+                                endMinutes: eMin,
+                                color: color,
+                                url: URL(string: item["htmlLink"] as? String ?? ""),
+                                externalEventId: "google_" + id
+                            )
+                            result[eventDate, default: []].append(task)
+                        }
+                        
+                        DispatchQueue.main.async {
+                            completion(result)
+                        }
+                    } else {
+                        completion([:])
+                    }
+                } catch {
+                    print("Error parsing google events: \(error)")
+                    completion([:])
+                }
+            }.resume()
         }
     }
 
@@ -103,8 +248,21 @@ class GoogleCalendarManager: ObservableObject {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             
             URLSession.shared.dataTask(with: request) { data, response, error in
-                guard let data = data, error == nil else {
-                    print("Error fetching google events: \(String(describing: error))")
+                if let error = error {
+                    print("Google API Network Error: \(error.localizedDescription)")
+                    completion([])
+                    return
+                }
+                
+                guard let data = data else {
+                    print("Google API Error: No data received")
+                    completion([])
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+                    let body = String(data: data, encoding: .utf8) ?? "no body"
+                    print("Google API Error: HTTP \(httpResponse.statusCode). Body: \(body)")
                     completion([])
                     return
                 }
@@ -113,6 +271,7 @@ class GoogleCalendarManager: ObservableObject {
                     if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
                        let items = json["items"] as? [[String: Any]] {
                         
+                        print("Google API Success: Fetched \(items.count) items")
                         var tasks: [ClockTask] = []
                         for (index, item) in items.enumerated() {
                             guard let id = item["id"] as? String,
@@ -145,8 +304,8 @@ class GoogleCalendarManager: ObservableObject {
                                 meetingUrl = URL(string: location)
                             }
                             
-                            // To match aesthetics, you might want to map colors or just use random aesthetic color
-                            let color = Color.red // You can inject your aestheticColors[index % count] here
+                            // Use aesthetic colors to match the app's theme
+                            let color = aestheticColors[index % aestheticColors.count].color
                             
                             let task = ClockTask(
                                 title: title,

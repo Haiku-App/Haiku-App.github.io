@@ -18,6 +18,7 @@ struct ContentView: View {
 
     @State private var selectedDate = Calendar.current.startOfDay(for: Date())
     @StateObject private var calendarManager = CalendarManager()
+    @ObservedObject private var googleCalendarManager = GoogleCalendarManager.shared
     @State private var saveDebounceTask: Task<Void, Never>? = nil
 
     @State private var isFlowState = false
@@ -50,6 +51,7 @@ struct ContentView: View {
     @State private var prefilledTaskTitle: String? = nil
     @State private var prefilledTaskId: UUID? = nil
     @State private var taskToEdit: ClockTask? = nil
+    @State private var deletedExternalIds = Set<String>()
     @AppStorage("is24HourClock") private var is24HourClock = false
     @AppStorage("notificationOffsetsData") private var notificationOffsetsData = ""
 
@@ -88,7 +90,7 @@ struct ContentView: View {
                                     .transition(.opacity)
                             }
 
-                            Button(action: { showingDatePicker = true }) {
+                            Button(action: { changeDate(by: 1) }) {
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(goldColor.opacity(0.8))
@@ -127,9 +129,20 @@ struct ContentView: View {
                             .id(selectedDate) // Animate view transition when date changes
                             .transition(.asymmetric(insertion: .opacity, removal: .opacity))
                     } else if selectedTab == .weekly {
-                        WeeklyView(tasksByDate: tasksByDate, selectedDate: $selectedDate, selectedTab: $selectedTab)
-                    } else if selectedTab == .todo {
-                        TodoView(onSchedule: { title, id in
+                        WeeklyView(
+                            tasksByDate: tasksByDate,
+                            selectedDate: $selectedDate,
+                            selectedTab: $selectedTab,
+                            onAppear: { weekStart in
+                                let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
+                                syncCalendarRange(from: weekStart, to: weekEnd)
+                            },
+                            onWeekChanged: { weekStart in
+                                let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
+                                syncCalendarRange(from: weekStart, to: weekEnd)
+                            }
+                        )
+                    } else if selectedTab == .todo {                        TodoView(onSchedule: { title, id in
                             prefilledTaskTitle = title
                             prefilledTaskId = id
                             taskToEdit = nil
@@ -372,62 +385,132 @@ struct ContentView: View {
         .onChange(of: GoogleCalendarManager.shared.eventsDidChange) { _ in
             syncCalendar(for: selectedDate)
         }
+        .onChange(of: googleCalendarManager.isSignedIn) { newValue in
+            if newValue {
+                syncCalendar(for: selectedDate)
+            }
+        }
     }
 
     private func syncCalendar(for date: Date) {
+        syncCalendarRange(from: date, to: Calendar.current.date(byAdding: .day, value: 1, to: date) ?? date)
+    }
+
+    private func syncCalendarRange(from startDate: Date, to endDate: Date) {
         // 2-way calendar sync is a Pro feature
-        if isPro {
-            calendarManager.requestAccess { granted in
-                if granted {
-                    let appleFetched = calendarManager.fetchEvents(for: date, theme: currentTheme)
+        guard isPro else { return }
 
-                    func processFetchedEvents(_ fetched: [ClockTask]) {
-                        DispatchQueue.main.async {
-                            var current = self.tasksByDate[date, default: []]
+        var combinedFetched: [Date: [ClockTask]] = [:]
+        let dispatchGroup = DispatchGroup()
 
-                            for fetchedTask in fetched {
-                                if let index = current.firstIndex(where: { $0.externalEventId == fetchedTask.externalEventId }) {
-                                    // Update existing task if properties changed
-                                    if current[index].title != fetchedTask.title ||
-                                       current[index].startMinutes != fetchedTask.startMinutes ||
-                                       current[index].endMinutes != fetchedTask.endMinutes {
-                                        current[index].title = fetchedTask.title
-                                        current[index].startMinutes = fetchedTask.startMinutes
-                                        current[index].endMinutes = fetchedTask.endMinutes
-                                    }
-                                } else {
-                                    // Add new task from external calendar
-                                    current.append(fetchedTask)
-                                }
-                            }
+        // 1. Fetch from Apple Calendar
+        dispatchGroup.enter()
+        calendarManager.requestAccess { granted in
+            if granted {
+                let appleEvents = self.calendarManager.fetchEvents(from: startDate, to: endDate, theme: self.currentTheme)
+                for (date, tasks) in appleEvents {
+                    combinedFetched[date, default: []].append(contentsOf: tasks)
+                }
+            }
+            dispatchGroup.leave()
+        }
 
-                            // Remove tasks that no longer exist in external calendars but have an external ID
-                            let fetchedIds = Set(fetched.compactMap { $0.externalEventId })
-                            current.removeAll { task in
-                                if let extId = task.externalEventId {
-                                    // Only remove if it belongs to the calendar we just fetched
-                                    // e.g. if we fetched Google, only remove missing Google events
-                                    if extId.hasPrefix("google_") {
-                                        return fetched.first(where: { $0.externalEventId?.hasPrefix("google_") == true }) != nil && !fetchedIds.contains(extId)
-                                    } else {
-                                        return fetched.first(where: { $0.externalEventId?.hasPrefix("google_") == false }) != nil && !fetchedIds.contains(extId)
-                                    }
-                                }
-                                return false
-                            }
+        // 2. Fetch from Google Calendar
+        dispatchGroup.enter()
+        GoogleCalendarManager.shared.fetchEvents(from: startDate, to: endDate, theme: currentTheme) { googleEvents in
+            for (date, tasks) in googleEvents {
+                combinedFetched[date, default: []].append(contentsOf: tasks)
+            }
+            dispatchGroup.leave()
+        }
 
-                            current.sort { $0.startMinutes < $1.startMinutes }
-                            self.tasksByDate[date] = current
-                        }
-                    }
+        // 3. Process results when both are done
+        dispatchGroup.notify(queue: .main) {
+            self.processSyncedEventsRange(combinedFetched, from: startDate, to: endDate)
+        }
+    }
 
-                    GoogleCalendarManager.shared.fetchEvents(for: date, theme: currentTheme) { googleFetched in
-                        let combined = appleFetched + googleFetched
-                        processFetchedEvents(combined)
-                    }
+    private func processSyncedEventsRange(_ fetchedByDate: [Date: [ClockTask]], from startDate: Date, to endDate: Date) {
+        let cal = Calendar.current
+        var currentDate = startDate
+        
+        while currentDate < endDate {
+            let day = cal.startOfDay(for: currentDate)
+            let fetchedForDay = fetchedByDate[day, default: []]
+            processSyncedEvents(fetchedForDay, for: day)
+            
+            guard let nextDate = cal.date(byAdding: .day, value: 1, to: currentDate) else { break }
+            currentDate = nextDate
+        }
+    }
+
+    private func processSyncedEvents(_ fetched: [ClockTask], for date: Date) {
+        var current = self.tasksByDate[date, default: []]
+        
+        // Filter out events the user just deleted in this session
+        let filteredFetched = fetched.filter { event in
+            guard let extId = event.externalEventId else { return true }
+            return !deletedExternalIds.contains(extId)
+        }
+        
+        // Clean up deletedExternalIds: if an ID we tracked as deleted is no longer in the fetch, 
+        // it means the remote calendar has processed the deletion, and we can stop tracking it.
+        let fetchedIds = Set(fetched.compactMap { $0.externalEventId })
+        deletedExternalIds.formIntersection(fetchedIds)
+
+        // Deduplicate by content (Title + Start + End)
+        var uniqueFetched: [ClockTask] = []
+        for event in filteredFetched {
+            let isDuplicate = uniqueFetched.contains { 
+                $0.title == event.title && 
+                $0.startMinutes == event.startMinutes && 
+                $0.endMinutes == event.endMinutes 
+            }
+            if !isDuplicate {
+                uniqueFetched.append(event)
+            } else if let extId = event.externalEventId, extId.hasPrefix("google_") {
+                // Prefer Google API version if duplicate found
+                if let idx = uniqueFetched.firstIndex(where: { 
+                    $0.title == event.title && 
+                    $0.startMinutes == event.startMinutes && 
+                    $0.endMinutes == event.endMinutes 
+                }) {
+                    uniqueFetched[idx] = event
                 }
             }
         }
+
+        // Update existing or add new
+        for fetchedTask in uniqueFetched {
+            if let index = current.firstIndex(where: { $0.externalEventId == fetchedTask.externalEventId }) {
+                if current[index].title != fetchedTask.title ||
+                   current[index].startMinutes != fetchedTask.startMinutes ||
+                   current[index].endMinutes != fetchedTask.endMinutes {
+                    current[index].title = fetchedTask.title
+                    current[index].startMinutes = fetchedTask.startMinutes
+                    current[index].endMinutes = fetchedTask.endMinutes
+                }
+            } else {
+                current.append(fetchedTask)
+            }
+        }
+
+        // Cleanup removed tasks
+        let finalFetchedIds = Set(uniqueFetched.compactMap { $0.externalEventId })
+        current.removeAll { task in
+            guard let extId = task.externalEventId else { return false }
+            
+            if extId.hasPrefix("google_") {
+                let didFetchGoogle = uniqueFetched.contains { $0.externalEventId?.hasPrefix("google_") == true }
+                return didFetchGoogle && !finalFetchedIds.contains(extId)
+            } else {
+                let didFetchApple = uniqueFetched.contains { $0.externalEventId?.hasPrefix("google_") == false }
+                return didFetchApple && !finalFetchedIds.contains(extId)
+            }
+        }
+
+        current.sort { $0.startMinutes < $1.startMinutes }
+        self.tasksByDate[date] = current
     }
     @ViewBuilder
     private func clockContentView() -> some View {
@@ -501,6 +584,7 @@ struct ContentView: View {
                                 Button(role: .destructive) {
                                     if let index = tasksByDate[selectedDate]?.firstIndex(where: { $0.id == task.id }) {
                                         if isPro, let extId = task.externalEventId {
+                                            deletedExternalIds.insert(extId)
                                             if extId.hasPrefix("google_") {
                                                 GoogleCalendarManager.shared.deleteTask(externalId: extId)
                                             } else {

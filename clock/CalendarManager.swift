@@ -31,6 +31,12 @@ class CalendarManager: ObservableObject {
             return
         }
         
+        let status = EKEventStore.authorizationStatus(for: .event)
+        if status == .denied || status == .restricted {
+            completion(false)
+            return
+        }
+        
         if #available(iOS 17.0, *) {
             eventStore.requestFullAccessToEvents { granted, error in
                 DispatchQueue.main.async {
@@ -44,6 +50,69 @@ class CalendarManager: ObservableObject {
                 }
             }
         }
+    }
+
+    func fetchEvents(from startDate: Date, to endDate: Date, theme: AppTheme) -> [Date: [ClockTask]] {
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            return [:]
+        }
+        
+        let cal = Calendar.current
+        let predicate = eventStore.predicateForEvents(withStart: startDate, end: endDate, calendars: nil)
+        let events = eventStore.events(matching: predicate)
+        
+        var result: [Date: [ClockTask]] = [:]
+        
+        let nonAllDayEvents = events.filter { !$0.isAllDay }
+        
+        for (index, event) in nonAllDayEvents.enumerated() {
+            let eventDate = cal.startOfDay(for: event.startDate)
+            let sComps = cal.dateComponents([.hour, .minute], from: event.startDate)
+            let eComps = cal.dateComponents([.hour, .minute], from: event.endDate)
+            
+            let sMin = (sComps.hour ?? 0) * 60 + (sComps.minute ?? 0)
+            var eMin = (eComps.hour ?? 0) * 60 + (eComps.minute ?? 0)
+            
+            let days = cal.dateComponents([.day], from: cal.startOfDay(for: event.startDate), to: cal.startOfDay(for: event.endDate)).day ?? 0
+            if days > 0 {
+                eMin += days * 1440
+            }
+            
+            if eMin <= sMin {
+                eMin = sMin + 60
+            }
+            
+            let color = aestheticColors[index % aestheticColors.count].color
+            
+            var meetingUrl: URL? = event.url
+            if meetingUrl == nil, let notes = event.notes {
+                let types: NSTextCheckingResult.CheckingType = .link
+                do {
+                    let detector = try NSDataDetector(types: types.rawValue)
+                    let matches = detector.matches(in: notes, options: [], range: NSRange(location: 0, length: notes.utf16.count))
+                    if let match = matches.first, let matchUrl = match.url {
+                        meetingUrl = matchUrl
+                    }
+                } catch {}
+            }
+            
+            let task = ClockTask(
+                title: event.title ?? "Event",
+                startMinutes: sMin,
+                endMinutes: eMin,
+                color: color,
+                url: meetingUrl,
+                externalEventId: event.eventIdentifier
+            )
+            
+            result[eventDate, default: []].append(task)
+        }
+        
+        for date in result.keys {
+            result[date]?.sort { $0.startMinutes < $1.startMinutes }
+        }
+        
+        return result
     }
 
     func fetchEvents(for date: Date, theme: AppTheme) -> [ClockTask] {

@@ -8,6 +8,8 @@ struct WeeklyView: View {
     var tasksByDate: [Date: [ClockTask]]
     @Binding var selectedDate: Date
     @Binding var selectedTab: ContentView.Tab
+    var onAppear: ((Date) -> Void)? = nil
+    var onWeekChanged: ((Date) -> Void)? = nil
     
     @State private var displayWeek: Date = {
         let cal = Calendar.current
@@ -169,12 +171,16 @@ struct WeeklyView: View {
             }
         }
         .id(displayWeek)
+        .onAppear {
+            onAppear?(displayWeek)
+        }
     }
     
     private func changeWeek(by days: Int) {
         withAnimation(.easeInOut(duration: 0.3)) {
             if let newWeek = Calendar.current.date(byAdding: .day, value: days, to: displayWeek) {
                 displayWeek = newWeek
+                onWeekChanged?(newWeek)
             }
         }
     }

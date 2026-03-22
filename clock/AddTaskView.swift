@@ -19,6 +19,7 @@ struct AddTaskView: View {
     @StateObject private var categoryManager = CategoryManager()
     @ObservedObject private var brainDumpManager = BrainDumpManager()
     @StateObject private var calendarManager = CalendarManager()
+    @ObservedObject private var googleCalendarManager = GoogleCalendarManager.shared
     @State private var selectedCategoryId: UUID? = nil
     
     @State private var showingNewCategory = false
@@ -365,10 +366,22 @@ struct AddTaskView: View {
                 color: colorToUse
             )
             
-            // Push to Apple Calendar if Pro
+            // Push to external calendars if Pro
             if isPro {
-                if let extId = calendarManager.saveTask(newTask, date: day) {
-                    newTask.externalEventId = extId
+                if googleCalendarManager.isSignedIn {
+                    googleCalendarManager.saveTask(newTask, date: day) { extId in
+                        if let extId = extId {
+                            DispatchQueue.main.async {
+                                if let idx = tasksByDate[day]?.firstIndex(where: { $0.id == newTask.id }) {
+                                    tasksByDate[day]?[idx].externalEventId = extId
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if let extId = calendarManager.saveTask(newTask, date: day) {
+                        newTask.externalEventId = extId
+                    }
                 }
             }
             
