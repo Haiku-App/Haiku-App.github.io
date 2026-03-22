@@ -5,7 +5,7 @@ import StoreKit
 
 struct ContentView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
-    @StateObject private var storeManager = StoreManager()
+    @EnvironmentObject private var storeManager: StoreManager
     private var isPro: Bool { storeManager.isPro }
     
     @State private var now = Date()
@@ -362,7 +362,7 @@ struct ContentView: View {
     }
 
     private func syncCalendar(for date: Date) {
-        // Multi-calendar sync is a Pro feature
+        // 2-way calendar sync is a Pro feature
         if isPro {
             calendarManager.requestAccess { granted in
                 if granted {
@@ -2136,7 +2136,7 @@ struct TodoView: View {
             }
 
             // Bottom Action Bar
-            HStack(alignment: .bottom, spacing: 16) {
+            ZStack(alignment: .bottomTrailing) {
                 if isSelectionMode && !selectedTaskIds.isEmpty {
                     Button(action: {
                         if let firstId = selectedTaskIds.first,
@@ -2159,13 +2159,13 @@ struct TodoView: View {
                                     .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
                             )
                     }
+                    .padding(.trailing, 86) // Avoid overlapping the FAB
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-                } else {
-                    Spacer()
                 }
 
                 // Floating Action Button (Toggle)
                 Button(action: { 
+                    if !isSelectionMode && brainDumpManager.tasks.isEmpty { return }
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                         isSelectionMode.toggle()
                         if !isSelectionMode {
@@ -2185,6 +2185,8 @@ struct TodoView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .disabled(!isSelectionMode && brainDumpManager.tasks.isEmpty)
+                .opacity((!isSelectionMode && brainDumpManager.tasks.isEmpty) ? 0.4 : 1.0)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
@@ -2260,6 +2262,7 @@ struct BrainDumpRow: View {
 
 #Preview {
     ContentView()
+        .environmentObject(StoreManager())
 }
 
 struct HaikuProView: View {
@@ -2296,28 +2299,59 @@ struct HaikuProView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         ProFeatureRow(icon: "chart.bar.fill", title: "Advanced Analytics", description: "Deep dive into how you spend your time with category breakdowns.")
                         ProFeatureRow(icon: "bell.badge.fill", title: "Custom Notifications", description: "Set unlimited custom reminder offsets for your tasks.")
-                        ProFeatureRow(icon: "calendar.badge.plus", title: "Multi-Calendar Sync", description: "Connect all your Google, iCloud, and Outlook calendars.")
+                        ProFeatureRow(icon: "calendar.badge.plus", title: "2-Way Calendar Sync", description: "Keep your Haiku and system calendars perfectly in sync both ways.")
+                        ProFeatureRow(icon: "square.grid.2x2.fill", title: "Aesthetic Widgets", description: "Track your schedule directly from your home screen.")
                         ProFeatureRow(icon: "sparkles", title: "Future Updates", description: "Get early access to all new premium features.")
                     }
                     .padding(.horizontal, 40)
                     
                     // Pricing Tiers (Dynamic from StoreKit)
                     VStack(spacing: 16) {
-                        if let proProduct = storeManager.products.first(where: { $0.id == storeManager.proID }) {
-                            PricingButton(
-                                title: proProduct.displayName,
-                                price: proProduct.displayPrice,
-                                subtitle: proProduct.description,
-                                theme: currentTheme
-                            ) {
-                                buyPro()
+                        if !storeManager.products.isEmpty {
+                            // Monthly
+                            if let monthly = storeManager.products.first(where: { $0.id == storeManager.proMonthlyID }) {
+                                PricingButton(
+                                    title: "Monthly",
+                                    price: monthly.displayPrice,
+                                    subtitle: "Full access, billed monthly.",
+                                    theme: currentTheme
+                                ) {
+                                    buyPro(monthly)
+                                }
+                                .disabled(isPurchasing)
                             }
-                            .disabled(isPurchasing)
+                            
+                            // Annual
+                            if let annual = storeManager.products.first(where: { $0.id == storeManager.proAnnualID }) {
+                                PricingButton(
+                                    title: "Annual",
+                                    price: annual.displayPrice,
+                                    subtitle: "Save with yearly billing.",
+                                    theme: currentTheme
+                                ) {
+                                    buyPro(annual)
+                                }
+                                .disabled(isPurchasing)
+                            }
+                            
+                            // Lifetime
+                            if let lifetime = storeManager.products.first(where: { $0.id == storeManager.proLifetimeID }) {
+                                PricingButton(
+                                    title: "Lifetime",
+                                    price: lifetime.displayPrice,
+                                    subtitle: "One-time payment forever.",
+                                    theme: currentTheme
+                                ) {
+                                    buyPro(lifetime)
+                                }
+                                .disabled(isPurchasing)
+                            }
                         } else {
                             // Fallback if products haven't loaded yet
                             ProgressView()
                                 .tint(currentTheme.accent)
                                 .onAppear {
+                                    print("HaikuProView: Products empty, calling refresh...")
                                     Task { await storeManager.refresh() }
                                 }
                         }
@@ -2377,11 +2411,11 @@ struct HaikuProView: View {
         }
     }
     
-    private func buyPro() {
+    private func buyPro(_ product: Product) {
         isPurchasing = true
         Task {
             do {
-                try await storeManager.purchase()
+                try await storeManager.purchase(product: product)
             } catch {
                 print("Purchase failed: \(error)")
             }
@@ -2454,3 +2488,4 @@ struct PricingButton: View {
         .buttonStyle(.plain)
     }
 }
+

@@ -191,6 +191,7 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
+				ORGANIZATIONNAME = Reswin;
 				TargetAttributes = {
 					486924912F5CABE3000B0E65 = {
 						CreatedOnToolsVersion = 26.0.1;
@@ -395,6 +396,7 @@
 				DEVELOPMENT_TEAM = L8UXLKRL78;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Haiku;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Haiku needs access to your calendar to sync your meetings.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Haiku needs access to your calendar to sync your meetings.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -407,7 +409,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = reswin.clock;
+				PRODUCT_BUNDLE_IDENTIFIER = reswin.Haiku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -430,6 +432,7 @@
 				DEVELOPMENT_TEAM = L8UXLKRL78;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Haiku;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Haiku needs access to your calendar to sync your meetings.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Haiku needs access to your calendar to sync your meetings.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -442,7 +445,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = reswin.clock;
+				PRODUCT_BUNDLE_IDENTIFIER = reswin.Haiku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -465,7 +468,7 @@
 				DEVELOPMENT_TEAM = L8UXLKRL78;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = clockWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = clockWidget;
+				INFOPLIST_KEY_CFBundleDisplayName = "Haiku Widget";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -473,7 +476,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = reswin.clock.clockWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = reswin.Haiku.clockWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -496,7 +499,7 @@
 				DEVELOPMENT_TEAM = L8UXLKRL78;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = clockWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = clockWidget;
+				INFOPLIST_KEY_CFBundleDisplayName = "Haiku Widget";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -504,7 +507,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = reswin.clock.clockWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = reswin.Haiku.clockWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

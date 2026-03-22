@@ -51,95 +51,114 @@ struct clockWidgetEntryView : View {
     }
 
     var body: some View {
-        let tasks = fetchWidgetTasks()
+        let isPro = SharedTaskManager.shared.loadIsPro()
         
-        if family == .systemSmall {
-            // Small square: just the clock
-            StaticClockView(
-                now: entry.date,
-                tasks: tasks,
-                is24HourClock: fetchIs24HourClock(),
-                theme: theme,
-                showHands: true,
-                showText: true,
-                showCenterText: false
-            )
-            .padding(12)
-        } else if !showLegend {
-            // Big size but explicit 'no legend' -> just a big clock
-            StaticClockView(
-                now: entry.date,
-                tasks: tasks,
-                is24HourClock: fetchIs24HourClock(),
-                theme: theme,
-                showHands: true,
-                showText: true,
-                showCenterText: false
-            )
-            .padding(16)
+        if !isPro {
+            VStack(spacing: 8) {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(theme.accent)
+                Text("Haiku Pro")
+                    .font(.system(size: 14, weight: .bold, design: .serif))
+                    .foregroundStyle(theme.textForeground)
+                Text("Widget is a Pro feature")
+                    .font(.system(size: 10))
+                    .foregroundStyle(theme.textForeground.opacity(0.7))
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
         } else {
-            // Medium/Large with Legend
-            GeometryReader { geo in
-                HStack(spacing: 20) {
-                    // The clock on the left - takes up ~55% of the space
-                    StaticClockView(
-                        now: entry.date,
-                        tasks: tasks,
-                        is24HourClock: fetchIs24HourClock(),
-                        theme: theme,
-                        showHands: true,
-                        showText: true,
-                        showCenterText: false
-                    )
-                    .frame(width: geo.size.width * 0.55)
-                    
-                    // The legend on the right
-                    if tasks.isEmpty {
-                        VStack {
-                            Image(systemName: "cup.and.saucer")
-                                .font(.system(size: 24))
-                                .foregroundStyle(theme.accent.opacity(0.5))
-                                .padding(.bottom, 4)
-                            Text("No tasks")
-                                .font(.system(size: 12, weight: .light))
-                                .foregroundStyle(theme.textForeground.opacity(0.5))
-                        }
-                        .frame(width: geo.size.width * 0.45 - 20, alignment: .center)
-                    } else {
-                        VStack(alignment: .leading, spacing: 12) {
-                            ForEach(tasks.prefix(6)) { task in
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(task.color)
-                                        .frame(width: 8, height: 8)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(task.title)
-                                            .font(.system(size: 12, weight: .medium, design: .serif))
-                                            .foregroundStyle(theme.textForeground)
-                                            .lineLimit(1)
-                                            .truncationMode(.tail)
+            let tasks = fetchWidgetTasks()
+            
+            if family == .systemSmall {
+                // Small square: just the clock
+                StaticClockView(
+                    now: entry.date,
+                    tasks: tasks,
+                    is24HourClock: fetchIs24HourClock(),
+                    theme: theme,
+                    showHands: true,
+                    showText: true,
+                    showCenterText: false
+                )
+                .padding(12)
+            } else if !showLegend {
+                // Big size but explicit 'no legend' -> just a big clock
+                StaticClockView(
+                    now: entry.date,
+                    tasks: tasks,
+                    is24HourClock: fetchIs24HourClock(),
+                    theme: theme,
+                    showHands: true,
+                    showText: true,
+                    showCenterText: false
+                )
+                .padding(16)
+            } else {
+                // Medium/Large with Legend
+                GeometryReader { geo in
+                    HStack(spacing: 20) {
+                        // The clock on the left - takes up ~55% of the space
+                        StaticClockView(
+                            now: entry.date,
+                            tasks: tasks,
+                            is24HourClock: fetchIs24HourClock(),
+                            theme: theme,
+                            showHands: true,
+                            showText: true,
+                            showCenterText: false
+                        )
+                        .frame(width: geo.size.width * 0.55)
+                        
+                        // The legend on the right
+                        if tasks.isEmpty {
+                            VStack {
+                                Image(systemName: "cup.and.saucer")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(theme.accent.opacity(0.5))
+                                    .padding(.bottom, 4)
+                                Text("No tasks")
+                                    .font(.system(size: 12, weight: .light))
+                                    .foregroundStyle(theme.textForeground.opacity(0.5))
+                            }
+                            .frame(width: geo.size.width * 0.45 - 20, alignment: .center)
+                        } else {
+                            VStack(alignment: .leading, spacing: 12) {
+                                ForEach(tasks.prefix(6)) { task in
+                                    HStack(spacing: 8) {
+                                        Circle()
+                                            .fill(task.color)
+                                            .frame(width: 8, height: 8)
                                         
-                                        Text("\(formatTime(minutes: task.startMinutes)) - \(formatTime(minutes: task.endMinutes))")
-                                            .font(.system(size: 10, weight: .regular))
-                                            .foregroundStyle(theme.textForeground.opacity(0.6))
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(task.title)
+                                                .font(.system(size: 12, weight: .medium, design: .serif))
+                                                .foregroundStyle(theme.textForeground)
+                                                .lineLimit(1)
+                                                .truncationMode(.tail)
+                                            
+                                            Text("\(formatTime(minutes: task.startMinutes)) - \(formatTime(minutes: task.endMinutes))")
+                                                .font(.system(size: 10, weight: .regular))
+                                                .foregroundStyle(theme.textForeground.opacity(0.6))
+                                        }
                                     }
                                 }
+                                
+                                if tasks.count > 6 {
+                                    Text("+\(tasks.count - 6) more")
+                                        .font(.system(size: 10, weight: .medium, design: .serif))
+                                        .foregroundStyle(theme.accent)
+                                        .padding(.top, 2)
+                                }
                             }
-                            
-                            if tasks.count > 6 {
-                                Text("+\(tasks.count - 6) more")
-                                    .font(.system(size: 10, weight: .medium, design: .serif))
-                                    .foregroundStyle(theme.accent)
-                                    .padding(.top, 2)
-                            }
+                            .frame(width: geo.size.width * 0.45 - 20, alignment: .leading)
                         }
-                        .frame(width: geo.size.width * 0.45 - 20, alignment: .leading)
                     }
+                    .frame(maxHeight: .infinity, alignment: .center)
                 }
-                .frame(maxHeight: .infinity, alignment: .center)
+                .padding(16)
             }
-            .padding(16)
         }
     }
 

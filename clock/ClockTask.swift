@@ -88,13 +88,21 @@ class SharedTaskManager {
     let userDefaults: UserDefaults
     private let key = "savedTasksByDate"
     private let is24HourKey = "is24HourClockSetting"
-    
+    private let isProKey = "isProSetting"
+
     init() {
         self.userDefaults = UserDefaults(suiteName: "group.reswin.clock") ?? UserDefaults.standard
     }
-    
-    func save(tasksByDate: [Date: [ClockTask]]) {
-        let groups = tasksByDate.map { TaskGroup(date: $0.key, tasks: $0.value) }
+
+    func save(isPro: Bool) {
+        userDefaults.set(isPro, forKey: isProKey)
+    }
+
+    func loadIsPro() -> Bool {
+        return userDefaults.bool(forKey: isProKey)
+    }
+
+    func save(tasksByDate: [Date: [ClockTask]]) {        let groups = tasksByDate.map { TaskGroup(date: $0.key, tasks: $0.value) }
         if let data = try? JSONEncoder().encode(groups) {
             userDefaults.set(data, forKey: key)
         }

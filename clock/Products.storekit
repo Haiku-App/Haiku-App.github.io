@@ -5,7 +5,7 @@
   ],
   "products" : [
     {
-      "displayPrice" : "9.99",
+      "displayPrice" : "49.99",
       "familyShareable" : false,
       "internalID" : "HAIKU_PRO_LIFETIME",
       "localizations" : [
@@ -15,7 +15,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.haiku.pro.lifetime",
+      "productID" : "reswin.clock.pro.lifetime",
       "referenceName" : "Haiku Pro",
       "type" : "NonConsumable"
     }
@@ -72,7 +72,65 @@
     ]
   },
   "subscriptionGroups" : [
+    {
+      "id" : "7E8F9B6D",
+      "localizations" : [
 
+      ],
+      "name" : "Haiku Pro Subscriptions",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "3.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "HAIKU_PRO_MONTHLY",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlock all charts, custom alerts, and themes.",
+              "displayName" : "Haiku Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "reswin.clock.pro.monthly",
+          "recurrencePeriod" : "P1M",
+          "referenceName" : "Monthly Subscription",
+          "subscriptionGroupID" : "7E8F9B6D",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "19.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "HAIKU_PRO_ANNUAL",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlock all charts, custom alerts, and themes annually.",
+              "displayName" : "Haiku Pro Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "reswin.clock.pro.annual",
+          "recurrencePeriod" : "P1Y",
+          "referenceName" : "Annual Subscription",
+          "subscriptionGroupID" : "7E8F9B6D",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
   ],
   "version" : {
     "major" : 3,

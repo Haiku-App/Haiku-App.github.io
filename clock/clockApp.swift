@@ -10,14 +10,33 @@ import SwiftUI
 @main
 struct clockApp: App {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage("isPro") private var isPro = false
+    @StateObject private var storeManager = StoreManager()
+    @State private var showingPaywall = false
     
     var body: some Scene {
         WindowGroup {
-            if hasCompletedOnboarding {
-                ContentView()
-            } else {
-                OnboardingView()
+            Group {
+                if hasCompletedOnboarding {
+                    ContentView()
+                        .sheet(isPresented: $showingPaywall) {
+                            HaikuProView()
+                                .environmentObject(storeManager)
+                        }
+                } else {
+                    OnboardingView()
+                }
+            }
+            .environmentObject(storeManager)
+            .task {
+                await storeManager.refresh()
+            }
+            .onChange(of: hasCompletedOnboarding) { newValue in
+                if newValue {
+                    // Show paywall 1.5s after onboarding completes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        showingPaywall = true
+                    }
+                }
             }
         }
     }
