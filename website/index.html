@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haiku - Visual Time Management</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg: #2E3B2E; 
+            --field-bg: #263326;
+            --text-main: #FFFFFF;
+            --text-muted: rgba(255, 255, 255, 0.6);
+            --accent: #D9C794; 
+            --shadow-dark: #1E291E;
+            --shadow-light: #384738;
+            --font-serif: 'Playfair Display', Georgia, serif;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* Reset & Base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            cursor: none; /* Hide default cursor for custom cursor */
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Custom Cursor */
+        .cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: var(--accent);
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s, background-color 0.3s, mix-blend-mode 0.3s;
+            mix-blend-mode: difference;
+        }
+
+        .cursor.hover-active {
+            width: 60px;
+            height: 60px;
+            background-color: #fff;
+            mix-blend-mode: difference;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2rem 5%;
+            z-index: 100;
+            mix-blend-mode: difference;
+        }
+
+        .logo {
+            font-family: var(--font-serif);
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #fff;
+            text-transform: uppercase;
+            text-decoration: none;
+            letter-spacing: 0.1em;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 3rem;
+        }
+
+        .nav-links a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background-color: #fff;
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .nav-links a:hover::after {
+            transform: translateX(0);
+        }
+
+        /* Hero Section */
+        .hero {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 0 5%;
+            position: relative;
+        }
+
+        .hero-title {
+            font-family: var(--font-sans);
+            font-size: clamp(4rem, 12vw, 12rem);
+            font-weight: 800;
+            line-height: 0.9;
+            text-transform: uppercase;
+            letter-spacing: -0.02em;
+            color: var(--accent);
+            overflow: hidden; /* For reveal animation */
+        }
+        
+        .hero-title .char {
+            display: inline-block;
+            transform: translateY(100%);
+        }
+
+        .hero-subtitle {
+            font-family: var(--font-serif);
+            font-size: clamp(1.5rem, 3vw, 2.5rem);
+            color: var(--text-muted);
+            margin-top: 2rem;
+            font-style: italic;
+            overflow: hidden;
+        }
+        
+        .hero-subtitle span {
+            display: inline-block;
+            transform: translateY(100%);
+        }
+
+        /* Abstract Floating Background Elements */
+        .circle {
+            position: absolute;
+            border-radius: 50%;
+            background: var(--bg);
+            box-shadow: inset 20px 20px 60px var(--shadow-dark), 
+                       inset -20px -20px 60px var(--shadow-light);
+            z-index: -1;
+            filter: blur(40px);
+        }
+
+        .circle-1 { width: 50vw; height: 50vw; top: -10vh; left: -10vw; opacity: 0.5; }
+        .circle-2 { width: 40vw; height: 40vw; bottom: -10vh; right: -5vw; opacity: 0.4; }
+
+        /* Content Sections (Alternating Grid) */
+        .section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15vh 5%;
+            max-width: 1400px;
+            margin: 0 auto;
+            min-height: 100vh;
+        }
+
+        .section:nth-child(even) {
+            flex-direction: row-reverse;
+        }
+
+        .text-block {
+            flex: 0 0 45%;
+        }
+
+        .mockup-block {
+            flex: 0 0 45%;
+            display: flex;
+            justify-content: center;
+            position: relative;
+            perspective: 1000px; /* For 3D tilt */
+        }
+
+        .mockup-img {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 45px;
+            box-shadow: 30px 30px 60px var(--shadow-dark), 
+                       -30px -30px 60px var(--shadow-light);
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+
+        .step-num {
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--accent);
+            letter-spacing: 0.2em;
+            margin-bottom: 1rem;
+            display: block;
+            text-transform: uppercase;
+        }
+
+        h2 {
+            font-family: var(--font-serif);
+            font-size: clamp(2.5rem, 5vw, 4.5rem);
+            line-height: 1.1;
+            margin-bottom: 2rem;
+            color: var(--text-main);
+        }
+
+        p {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 3rem;
+            max-width: 90%;
+        }
+
+        /* Magnetic Button */
+        .btn-wrapper {
+            display: inline-block;
+            padding: 20px; /* Padding for magnetic area */
+            margin: -20px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.2rem 2.5rem;
+            border-radius: 40px;
+            background: var(--accent);
+            color: var(--bg);
+            text-decoration: none;
+            font-family: var(--font-sans);
+            font-weight: 600;
+            font-size: 1rem;
+            letter-spacing: 0.05em;
+            transition: background 0.3s ease, color 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--text-main);
+            transition: top 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 1;
+        }
+        
+        .btn:hover::before {
+            top: 0;
+        }
+        
+        .btn span {
+            position: relative;
+            z-index: 2;
+        }
+        
+        .btn:hover {
+            color: var(--bg);
+        }
+
+        /* Footer */
+        footer {
+            padding: 5vh 5%;
+            text-align: center;
+            border-top: 1px solid var(--shadow-light);
+            margin-top: 10vh;
+        }
+
+        .footer-text {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+        }
+
+        /* Mobile */
+        @media (max-width: 900px) {
+            .section, .section:nth-child(even) {
+                flex-direction: column;
+                text-align: center;
+                gap: 5rem;
+                padding: 10vh 5%;
+            }
+
+            .text-block, .mockup-block {
+                flex: 1 1 100%;
+                max-width: 100%;
+            }
+            
+            p { margin: 0 auto 3rem auto; }
+
+            .nav-links { display: none; }
+            .cursor { display: none; }
+            * { cursor: auto !important; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Custom Cursor -->
+    <div class="cursor"></div>
+
+    <!-- Navigation -->
+    <nav>
+        <a href="#" class="logo hover-target">Haiku</a>
+        <div class="nav-links">
+            <a href="privacy.html" class="hover-target">Privacy</a>
+            <a href="terms.html" class="hover-target">Terms</a>
+        </div>
+    </nav>
+
+    <!-- Background Elements -->
+    <div class="circle circle-1"></div>
+    <div class="circle circle-2"></div>
+
+    <!-- Main Content wrapper for smooth scrolling -->
+    <main id="smooth-wrapper">
+        <div id="smooth-content">
+
+            <!-- Hero Section -->
+            <section class="hero">
+                <div class="hero-title" aria-label="Find Your Flow">
+                    <span class="char">F</span><span class="char">i</span><span class="char">n</span><span class="char">d</span>
+                    <span class="char">Y</span><span class="char">o</span><span class="char">u</span><span class="char">r</span>
+                    <span class="char">F</span><span class="char">l</span><span class="char">o</span><span class="char">w</span>
+                </div>
+                <div class="hero-subtitle">
+                    <span>Time isn't a list. It's a circle.</span>
+                </div>
+            </section>
+
+            <!-- Section 1 -->
+            <section class="section">
+                <div class="text-block reveal-text">
+                    <span class="step-num">01. The Clock</span>
+                    <h2>A Circle to Live In</h2>
+                    <p>Experience a more mindful way to manage your day. By visualizing your schedule as a continuous 24-hour flow, you naturally find more space for what matters. Simply drag tasks onto the dial.</p>
+                    
+                    <div class="btn-wrapper magnetic">
+                        <a href="#" class="btn hover-target">
+                            <span>Download App</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="mockup-block" data-speed="1.1">
+                    <img src="assets/mockup1.svg" alt="Haiku App Clock Mockup" class="mockup-img tilt-effect">
+                </div>
+            </section>
+
+            <!-- Section 2 -->
+            <section class="section">
+                <div class="text-block reveal-text">
+                    <span class="step-num">02. Insights</span>
+                    <h2>Deep Analytics</h2>
+                    <p>Haiku automatically tracks the energy you assign to different categories. Discover your peak focus hours, monitor weekly momentum, and understand exactly where your time goes without manual logging.</p>
+                    
+                    <div class="btn-wrapper magnetic">
+                        <a href="privacy.html" class="btn hover-target" style="background: transparent; border: 1px solid var(--accent); color: var(--accent);">
+                            <span>Privacy Policy</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="mockup-block" data-speed="1.1">
+                    <img src="assets/mockup2.svg" alt="Haiku App Analytics Mockup" class="mockup-img tilt-effect">
+                </div>
+            </section>
+
+            <footer>
+                <p class="footer-text">© 2026 Haiku. All rights reserved.</p>
+            </footer>
+
+        </div>
+    </main>
+
+    <!-- GSAP & Core Animation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <!-- SplitText for text animations (using a simple custom split to avoid premium plugin requirement) -->
+
+    <script>
+        // Register GSAP plugins
+        gsap.registerPlugin(ScrollTrigger);
+
+        // Custom Cursor Logic
+        const cursor = document.querySelector('.cursor');
+        const hoverTargets = document.querySelectorAll('.hover-target, .magnetic');
+        
+        let mouseX = 0, mouseY = 0;
+        let cursorX = 0, cursorY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // Smooth cursor follow
+        gsap.ticker.add(() => {
+            cursorX += (mouseX - cursorX) * 0.15;
+            cursorY += (mouseY - cursorY) * 0.15;
+            gsap.set(cursor, { x: cursorX, y: cursorY });
+        });
+
+        // Cursor hover states
+        hoverTargets.forEach(target => {
+            target.addEventListener('mouseenter', () => cursor.classList.add('hover-active'));
+            target.addEventListener('mouseleave', () => cursor.classList.remove('hover-active'));
+        });
+
+        // Magnetic Buttons Logic (Cuberto Style)
+        const magnetics = document.querySelectorAll('.magnetic');
+        
+        magnetics.forEach(magnetic => {
+            magnetic.addEventListener('mousemove', (e) => {
+                const rect = magnetic.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                
+                const btn = magnetic.querySelector('.btn');
+                gsap.to(btn, {
+                    x: x * 0.4,
+                    y: y * 0.4,
+                    duration: 0.3,
+                    ease: "power2.out"
+                });
+            });
+
+            magnetic.addEventListener('mouseleave', () => {
+                const btn = magnetic.querySelector('.btn');
+                gsap.to(btn, {
+                    x: 0,
+                    y: 0,
+                    duration: 0.7,
+                    ease: "elastic.out(1, 0.3)"
+                });
+            });
+        });
+
+        // 3D Tilt Effect on Mockups
+        const tiltImages = document.querySelectorAll('.tilt-effect');
+        tiltImages.forEach(img => {
+            const block = img.parentElement;
+            block.addEventListener('mousemove', (e) => {
+                const rect = block.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const xPos = (x / rect.width - 0.5) * 20; // Max rotation 20deg
+                const yPos = (y / rect.height - 0.5) * -20;
+                
+                gsap.to(img, {
+                    rotationY: xPos,
+                    rotationX: yPos,
+                    transformPerspective: 1000,
+                    ease: "power1.out",
+                    duration: 0.5
+                });
+            });
+
+            block.addEventListener('mouseleave', () => {
+                gsap.to(img, {
+                    rotationY: 0,
+                    rotationX: 0,
+                    ease: "power3.out",
+                    duration: 1
+                });
+            });
+        });
+
+        // Initial Hero Animation
+        const tl = gsap.timeline();
+        
+        tl.to('.hero-title .char', {
+            y: "0%",
+            duration: 1,
+            stagger: 0.05,
+            ease: "power4.out",
+            delay: 0.2
+        })
+        .to('.hero-subtitle span', {
+            y: "0%",
+            duration: 0.8,
+            ease: "power3.out"
+        }, "-=0.6");
+
+        // ScrollTrigger Parallax & Reveal Animations
+        
+        // Background circles parallax
+        gsap.to('.circle-1', {
+            yPercent: 30,
+            ease: "none",
+            scrollTrigger: {
+                trigger: "body",
+                scrub: 1
+            }
+        });
+        
+        gsap.to('.circle-2', {
+            yPercent: -40,
+            ease: "none",
+            scrollTrigger: {
+                trigger: "body",
+                scrub: 1
+            }
+        });
+
+        // Mockup Parallax (moves slightly faster than text)
+        gsap.utils.toArray('.mockup-block').forEach(block => {
+            gsap.fromTo(block, 
+                { y: 100 },
+                {
+                    y: -50,
+                    ease: "none",
+                    scrollTrigger: {
+                        trigger: block,
+                        start: "top bottom",
+                        end: "bottom top",
+                        scrub: 1
+                    }
+                }
+            );
+        });
+
+        // Text Reveal on scroll
+        gsap.utils.toArray('.reveal-text').forEach(text => {
+            gsap.from(text.children, {
+                y: 50,
+                opacity: 0,
+                duration: 1,
+                stagger: 0.1,
+                ease: "power3.out",
+                scrollTrigger: {
+                    trigger: text,
+                    start: "top 80%",
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
