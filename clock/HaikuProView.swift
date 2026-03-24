@@ -155,7 +155,7 @@ struct HaikuProView: View {
         .sheet(isPresented: $showingCustomerCenter) {
             CustomerCenterView()
         }
-        .onChange(of: storeManager.isPro) { newValue in
+        .onChange(of: storeManager.isPro) { oldValue, newValue in
             if newValue { dismiss() }
         }
         .onAppear {
@@ -247,3 +247,4 @@ struct PricingButton: View {
         .buttonStyle(.plain)
     }
 }
+

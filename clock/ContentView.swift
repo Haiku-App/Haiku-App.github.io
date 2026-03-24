@@ -117,7 +117,6 @@ struct ContentView: View {
                 .opacity(selectedTab == .clock && !isFlowState ? 1 : 0)
                 .frame(height: selectedTab == .clock && !isFlowState ? nil : 0)
                 .clipped()
-                .animation(nil)
 
                 Spacer()
 
@@ -193,7 +192,7 @@ struct ContentView: View {
                 Color.black.opacity(0.15)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        withAnimation {
+                        withAnimation(.easeInOut) {
                             showingCustomOffsetAlert = false
                             customOffsetString = ""
                         }
@@ -234,7 +233,7 @@ struct ContentView: View {
 
                     HStack(spacing: 16) {
                         Button(action: {
-                            withAnimation {
+                            withAnimation(.easeInOut) {
                                 showingCustomOffsetAlert = false
                                 customOffsetString = ""
                             }
@@ -254,7 +253,7 @@ struct ContentView: View {
                                 notificationOffsetsData = currentSet.sorted().map(String.init).joined(separator: ",")
                                 NotificationManager.shared.requestAuthorization()
                             }
-                            withAnimation {
+                            withAnimation(.easeInOut) {
                                 showingCustomOffsetAlert = false
                                 customOffsetString = ""
                             }
@@ -595,7 +594,7 @@ struct ContentView: View {
                                         }
                                         // PostHog: Track task deletion
                                         PostHogSDK.shared.capture("task_deleted")
-                                        withAnimation {
+                                        _ = withAnimation(.easeInOut) {
                                             tasksByDate[selectedDate]?.remove(at: index)
                                         }
                                     }
