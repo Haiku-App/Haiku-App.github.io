@@ -1,747 +1,254 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
-    <meta name="google-site-verification" content="vDgJahI_PwiGetezDY6M3cqy999QgS6Y5IvBweGX2gI" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Haiku - Visual Time Management</title>
-    <link rel="icon" type="image/png" href="favicon.png">
-    <!-- Fonts -->
+    <title>Haiku — Time isn't a list. It's a circle.</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #2E3B2E; 
-            --field-bg: #263326;
-            --text-main: #FFFFFF;
-            --text-muted: rgba(255, 255, 255, 0.6);
-            --accent: #D9C794; 
-            --shadow-dark: #1E291E;
-            --shadow-light: #384738;
-            --font-serif: 'Playfair Display', Georgia, serif;
-            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-
-        /* Reset & Base */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            cursor: none; /* Hide default cursor */
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         body {
-            background-color: var(--bg);
-            color: var(--text-main);
-            font-family: var(--font-sans);
-            overflow-x: hidden;
+            background-color: #000000;
+            color: #ffffff;
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Custom Cursor */
-        .cursor {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background-color: var(--accent);
-            pointer-events: none;
-            z-index: 9999;
-            transform: translate(-50%, -50%);
-            transition: width 0.3s, height 0.3s, background-color 0.3s, mix-blend-mode 0.3s;
-            mix-blend-mode: difference;
+        /* SF Pro Rounded Approximation */
+        .font-rounded {
+            font-family: 'Inter', sans-serif;
+            letter-spacing: -0.02em;
         }
 
-        .cursor.hover-active {
-            width: 60px;
-            height: 60px;
-            background-color: #fff;
-            mix-blend-mode: difference;
+        /* Infinite Ticker Animations */
+        @keyframes scrollDown {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-50%); }
         }
 
-        /* Ripple Effect */
-        .ripple {
-            position: fixed;
-            border: 1px solid var(--accent);
-            border-radius: 50%;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            z-index: 9997;
-            animation: ripple-out 1s ease-out forwards;
+        @keyframes scrollUp {
+            0% { transform: translateY(-50%); }
+            100% { transform: translateY(0); }
         }
 
-        @keyframes ripple-out {
-            from { width: 0; height: 0; opacity: 0.8; border-width: 2px; }
-            to { width: 300px; height: 300px; opacity: 0; border-width: 0.5px; }
+        .animate-scroll-down {
+            animation: scrollDown 40s linear infinite;
         }
 
-        /* Navigation */
-        nav {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 2rem 5%;
-            z-index: 100;
-            mix-blend-mode: difference;
+        .animate-scroll-up {
+            animation: scrollUp 40s linear infinite;
         }
 
-        .logo {
-            font-family: var(--font-serif);
-            font-size: 1.8rem;
-            font-weight: 600;
-            color: #fff;
-            text-transform: uppercase;
-            text-decoration: none;
-            letter-spacing: 0.1em;
+        /* Gradient Mask for Ticker */
+        .ticker-mask {
+            mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+            -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
         }
 
-        .nav-links { display: flex; gap: 3rem; }
-        .nav-links a {
-            color: #fff;
-            text-decoration: none;
-            font-size: 1rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            position: relative;
+        /* Fade-in-on-scroll */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.2, 0, 0.2, 1);
         }
 
-        /* Hero Section */
-        .hero {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            padding: 8rem 5% 5rem;
-            position: relative;
-        }
-
-        .hero-title {
-            font-family: var(--font-sans);
-            font-size: clamp(2.2rem, 10vw, 12rem);
-            font-weight: 800;
-            line-height: 1.1;
-            text-transform: uppercase;
-            letter-spacing: -0.04em;
-            color: var(--accent);
-            white-space: nowrap;
-            width: 100%;
-            overflow: hidden;
-        }
-        
-        .hero-title .char { display: inline-block; transform: translateY(100%); }
-        .hero-title .space { display: inline-block; width: 0.25em; }
-
-        .hero-subtitle {
-            font-family: var(--font-serif);
-            font-size: clamp(1.2rem, 3vw, 2.5rem);
-            color: var(--text-muted);
-            margin-top: 2rem;
-            font-style: italic;
-            line-height: 1.4;
-            overflow: hidden;
-        }
-        
-        .hero-subtitle span { display: block; transform: translateY(100%); }
-
-        /* Sections */
-        .section {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 15vh 5%;
-            max-width: 1400px;
-            margin: 0 auto;
-            min-height: 100vh;
-        }
-
-        .section:nth-child(even) { flex-direction: row-reverse; }
-
-        .text-block { flex: 0 0 45%; }
-
-        .mockup-block {
-            flex: 0 0 45%;
-            display: flex;
-            justify-content: center;
-            position: relative;
-            perspective: 1000px;
-        }
-
-        .mockup-img {
-            width: 100%;
-            display: block;
-            border-radius: 35px; /* Match inner frame radius */
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
         }
 
         /* iPhone Mockup Frame */
-        .iphone-frame {
-            width: 100%;
-            max-width: 380px;
-            background: #1a1a1a;
-            border-radius: 55px;
-            padding: 12px;
+        .iphone-16-pro {
+            width: 280px;
+            aspect-ratio: 9 / 19.5;
+            background: #121212;
+            border-radius: 48px;
+            padding: 10px;
             position: relative;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.4), 
-                        inset 0 0 2px rgba(255,255,255,0.2);
-            transform-style: preserve-3d;
-            will-change: transform;
-            overflow: hidden;
+            box-shadow: inset 0 0 2px 2px rgba(255,255,255,0.1), 0 20px 50px rgba(0,0,0,0.5);
         }
 
-        /* The actual screen container */
         .iphone-screen {
-            position: relative;
             width: 100%;
-            border-radius: 42px;
+            height: 100%;
+            border-radius: 38px;
             overflow: hidden;
             background: #000;
         }
 
-        /* Light Sweep / Shimmer Effect - Now as a dedicated overlay */
-        .shimmer {
-            position: absolute;
-            top: 0;
-            left: -150%;
+        .iphone-screen img {
             width: 100%;
             height: 100%;
-            background: linear-gradient(
-                to right, 
-                transparent 0%, 
-                rgba(255, 255, 255, 0.05) 40%, 
-                rgba(255, 255, 255, 0.2) 50%, 
-                rgba(255, 255, 255, 0.05) 60%, 
-                transparent 100%
-            );
-            transform: skewX(-25deg);
-            animation: light-sweep 6s infinite ease-in-out;
-            pointer-events: none;
-            z-index: 5;
-            mix-blend-mode: screen;
+            object-fit: cover;
         }
 
-        @keyframes light-sweep {
-            0% { left: -150%; }
-            30% { left: 150%; }
-            100% { left: 150%; }
-        }
-
-        /* Notch / Dynamic Island */
-        .iphone-frame::before {
-            content: '';
+        .dynamic-island {
             position: absolute;
             top: 22px;
             left: 50%;
             transform: translateX(-50%);
-            width: 110px;
-            height: 30px;
+            width: 85px;
+            height: 25px;
             background: #000;
             border-radius: 20px;
             z-index: 10;
         }
-
-        /* Hardware buttons on the side */
-        .iphone-buttons {
-            position: absolute;
-            top: 100px;
-            left: -2px;
-            width: 3px;
-            height: 40px;
-            background: #333;
-            border-radius: 2px 0 0 2px;
-            box-shadow: 0 60px 0 #333, 0 110px 0 #333;
-        }
-
-        .step-num {
-            font-family: var(--font-sans);
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--accent);
-            letter-spacing: 0.2em;
-            margin-bottom: 1rem;
-            display: block;
-            text-transform: uppercase;
-        }
-
-        .haiku-header {
-            font-family: var(--font-serif);
-            margin-bottom: 2rem;
-        }
-
-        .haiku-header span {
-            display: block;
-            font-size: clamp(1.5rem, 3vw, 2.5rem);
-            line-height: 1.2;
-            color: var(--text-main);
-        }
-
-        .haiku-header span:nth-child(2) {
-            color: var(--accent);
-            font-style: italic;
-        }
-
-        p {
-            font-size: 1.2rem;
-            color: var(--text-muted);
-            line-height: 1.6;
-            margin-bottom: 3rem;
-        }
-
-        /* Chaos to Zen Slider */
-        .zen-slider-section {
-            padding: 15vh 5%;
-            text-align: center;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .slider-container {
-            position: relative;
-            width: 100%;
-            height: 750px; /* Increased height for device frame */
-            border-radius: 40px;
-            overflow: hidden;
-            box-shadow: 0 40px 100px rgba(0,0,0,0.3);
-            margin-top: 4rem;
-            background: #1a1a1a;
-        }
-
-        .slider-side {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .side-chaos {
-            background: #111;
-            color: #ff4d4d;
-            font-family: monospace;
-            z-index: 1; /* Move to bottom */
-            text-align: left;
-            padding: 5%;
-        }
-
-        .side-zen {
-            background: var(--bg);
-            z-index: 2; /* Move to top */
-            clip-path: inset(0 50% 0 0); /* Initial state: show half */
-            transition: background-color 1s ease;
-        }
-
-        .slider-divider {
-            position: absolute;
-            top: 0;
-            left: 50%;
-            width: 2px;
-            height: 100%;
-            background: var(--accent);
-            z-index: 10;
-            transform: translateX(-50%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-        }
-
-        .slider-handle {
-            width: 60px;
-            height: 60px;
-            background: var(--accent);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--bg);
-            font-weight: 800;
-            box-shadow: 0 0 30px var(--accent);
-            font-size: 1.5rem;
-        }
-
-        .chaos-list {
-            font-size: clamp(1.2rem, 2vw, 2rem);
-            line-height: 2.2;
-            opacity: 0.6;
-            letter-spacing: -0.02em;
-        }
-
-        .zen-message {
-            position: absolute;
-            top: 8%;
-            left: 5%;
-            text-align: left;
-            font-family: var(--font-serif);
-            font-size: 1.6rem;
-            font-style: italic;
-            color: var(--accent);
-            opacity: 0;
-            transition: opacity 0.8s ease;
-            z-index: 11;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-
-        /* Magnetic Button */
-        .btn-wrapper { display: inline-block; padding: 20px; margin: -20px; }
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1.2rem 2.5rem;
-            border-radius: 40px;
-            background: var(--accent);
-            color: var(--bg);
-            text-decoration: none;
-            font-family: var(--font-sans);
-            font-weight: 600;
-            font-size: 1rem;
-            letter-spacing: 0.05em;
-            transition: background 0.3s ease, color 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        .btn::before {
-            content: ''; position: absolute; top: 100%; left: 0; width: 100%; height: 100%;
-            background: var(--text-main); transition: top 0.4s cubic-bezier(0.25, 1, 0.5, 1); z-index: 1;
-        }
-        .btn:hover::before { top: 0; }
-        .btn span { position: relative; z-index: 2; }
-        .btn:hover { color: var(--bg); }
-
-        footer { padding: 5vh 5%; text-align: center; border-top: 1px solid var(--shadow-light); margin-top: 10vh; }
-        .footer-text { font-size: 0.9rem; color: var(--text-muted); letter-spacing: 0.05em; }
-
-        @media (max-width: 900px) {
-            .section, .section:nth-child(even) { flex-direction: column; text-align: center; gap: 5rem; }
-            .text-block, .mockup-block { flex: 1 1 100%; max-width: 100%; }
-            .nav-links, .cursor { display: none; }
-            * { cursor: auto !important; }
-        }
     </style>
 </head>
 <body>
-    <div class="cursor"></div>
 
-    <nav>
-        <a href="#" class="logo hover-target">Haiku</a>
-        <div class="nav-links">
-            <a href="privacy.html" class="hover-target">Privacy</a>
-            <a href="terms.html" class="hover-target">Terms</a>
+    <!-- Header -->
+    <nav class="fixed top-0 w-full z-50 px-6 py-8 flex justify-between items-center mix-blend-difference">
+        <a href="#" class="text-xl font-bold tracking-tighter hover:opacity-70 transition-opacity">HAIKU</a>
+        <div class="flex gap-8 items-center">
+            <a href="#" class="text-sm font-medium opacity-60 hover:opacity-100 transition-opacity uppercase tracking-widest">Privacy</a>
+            <a href="#" class="bg-white text-black px-5 py-2 rounded-full text-sm font-bold hover:scale-105 transition-transform">GET APP</a>
         </div>
     </nav>
 
-    <div class="circle circle-1" style="position: fixed; border-radius: 50%; background: var(--bg); box-shadow: inset 20px 20px 60px var(--shadow-dark), inset -20px -20px 60px var(--shadow-light); z-index: -1; filter: blur(40px); width: 50vw; height: 50vw; top: -10vh; left: -10vw; opacity: 0.5;"></div>
-    <div class="circle circle-2" style="position: fixed; border-radius: 50%; background: var(--bg); box-shadow: inset 20px 20px 60px var(--shadow-dark), inset -20px -20px 60px var(--shadow-light); z-index: -1; filter: blur(40px); width: 40vw; height: 40vw; bottom: -10vh; right: -5vw; opacity: 0.4;"></div>
-
-    <main id="smooth-wrapper">
-        <div id="smooth-content">
-
-            <section class="hero">
-                <div class="hero-title" aria-label="Find Your Flow">
-                    <span class="char">F</span><span class="char">i</span><span class="char">n</span><span class="char">d</span><span class="space"></span>
-                    <span class="char">Y</span><span class="char">o</span><span class="char">u</span><span class="char">r</span><span class="space"></span>
-                    <span class="char">F</span><span class="char">l</span><span class="char">o</span><span class="char">w</span>
-                </div>
-                <div class="hero-subtitle">
-                    <span>Time is not a list,</span>
-                    <span>It is a golden circle,</span>
-                    <span>Find your inner flow.</span>
-                </div>
-                <a href="#" class="hover-target" style="margin-top: 3rem;">
-                    <img class="app-store-badge" src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83&amp;releaseDate=1314144000&h=7cc520cc6bb000ec05c671f6c315dbbc" alt="Download on the App Store">
-                </a>
-                <div class="mockup-block" style="margin-top: 5vh; transform: scale(0.85);">
-                    <div class="iphone-frame tilt-effect">
-                        <div class="iphone-buttons"></div>
-                        <div class="iphone-screen">
-                            <div class="shimmer"></div>
-                            <img src="assets/clock_real.png" alt="Haiku Hero" class="mockup-img">
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Section 1: The Circle (Clock) -->
-            <section class="section">
-                <div class="text-block reveal-text">
-                    <span class="step-num">01. THE CIRCLE</span>
-                    <div class="haiku-header">
-                        <span>Drag tasks to the ring,</span>
-                        <span>Watch your morning turn to noon,</span>
-                        <span>Time flows in a loop.</span>
-                    </div>
-                    <p>Experience a more mindful way to manage your day. By visualizing your schedule as a continuous 24-hour flow, you naturally find more space for what matters.</p>
-                    
-                    <div class="btn-wrapper magnetic">
-                        <a href="#" class="btn hover-target"><span>Download App</span></a>
-                    </div>
-                </div>
-                <div class="mockup-block" data-speed="1.1">
-                    <div class="iphone-frame tilt-effect">
-                        <div class="iphone-buttons"></div>
-                        <div class="iphone-screen">
-                            <div class="shimmer"></div>
-                            <img src="assets/clock_real.png" alt="Haiku Clock Screen" class="mockup-img">
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Section 2: Brain Dump (To-Do) -->
-            <section class="section">
-                <div class="text-block reveal-text">
-                    <span class="step-num">02. THE MIND</span>
-                    <div class="haiku-header">
-                        <span>Thoughts like falling leaves,</span>
-                        <span>Captured in a simple space,</span>
-                        <span>Clear your mind to act.</span>
-                    </div>
-                    <p>Standard lists are stressful. Haiku's Brain Dump lets you offload your thoughts quickly, keeping your focus on the present moment until you're ready to schedule.</p>
-                </div>
-                <div class="mockup-block" data-speed="1.1">
-                    <div class="iphone-frame tilt-effect">
-                        <div class="iphone-buttons"></div>
-                        <div class="iphone-screen">
-                            <div class="shimmer"></div>
-                            <img src="assets/todo_real.png" alt="Haiku Brain Dump Screen" class="mockup-img">
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Section 3: Insights (Analytics) -->
-            <section class="section">
-                <div class="text-block reveal-text">
-                    <span class="step-num">03. INSIGHTS</span>
-                    <div class="haiku-header">
-                        <span>Data tells a tale,</span>
-                        <span>See the hours where you shine,</span>
-                        <span>Insights for the soul.</span>
-                    </div>
-                    <p>Haiku automatically tracks the energy you assign to different categories. Discover your peak focus hours and monitor your weekly momentum without manual logging.</p>
-                </div>
-                <div class="mockup-block" data-speed="1.1">
-                    <div class="iphone-frame tilt-effect">
-                        <div class="iphone-buttons"></div>
-                        <div class="iphone-screen">
-                            <div class="shimmer"></div>
-                            <img src="assets/insights_real.png" alt="Haiku Insights Screen" class="mockup-img">
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Chaos to Zen Slider -->
-            <section class="zen-slider-section">
-                <div class="reveal-text">
-                    <span class="step-num">THE PHILOSOPHY</span>
-                    <h2>Chaos to Zen</h2>
-                    <p>Standard lists are stressful. Haiku is peaceful. Slide to see the transformation.</p>
-                </div>
-                <div class="slider-container hover-target" id="zen-slider">
-                    <div class="slider-side side-chaos">
-                        <div class="chaos-list">
-                            [ ] Check emails (urgent!!)<br>
-                            [ ] Meeting with boss<br>
-                            [ ] Fix broken code<br>
-                            [ ] Call insurance<br>
-                            [ ] Buy groceries<br>
-                            [ ] Respond to Slack<br>
-                            [ ] Prepare slides<br>
-                            [ ] Gym (maybe?)
-                        </div>
-                    </div>
-                    <div class="slider-side side-zen" id="zen-side">
-                        <div class="iphone-frame" style="transform: scale(0.85);">
-                            <div class="iphone-buttons"></div>
-                            <div class="iphone-screen">
-                                <div class="shimmer"></div>
-                                <svg width="100%" height="100%" viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg" class="mockup-img">
-                                    <rect width="400" height="800" fill="var(--bg)"/>
-                                    
-                                    <g transform="translate(200, 400)">
-                                        <!-- Concentric Background Tracks -->
-                                        <circle r="170" fill="none" stroke="var(--field-bg)" stroke-width="24"/>
-                                        <circle r="142" fill="none" stroke="var(--field-bg)" stroke-width="24" opacity="0.6"/>
-                                        
-                                        <!-- Colorful Arcs (Focus on beauty and flow) -->
-                                        <!-- Rose Arc -->
-                                        <path d="M 0 -170 A 170 170 0 0 1 120 -120" fill="none" stroke="#E0ADB8" stroke-width="24" stroke-linecap="round"/>
-                                        <!-- Blue Arc -->
-                                        <path d="M 120 -120 A 170 170 0 0 1 170 0" fill="none" stroke="#A6D1F2" stroke-width="24" stroke-linecap="round"/>
-                                        <!-- Gold Arc (Accent) -->
-                                        <path d="M -142 0 A 142 142 0 0 1 0 -142" fill="none" stroke="var(--accent)" stroke-width="24" stroke-linecap="round"/>
-                                        <!-- Sage Arc -->
-                                        <path d="M -100 100 A 142 142 0 0 1 -142 0" fill="none" stroke="#A8B5A8" stroke-width="24" stroke-linecap="round" opacity="0.8"/>
-
-                                        <!-- Neumorphic Center Face -->
-                                        <circle r="115" fill="var(--bg)"/>
-                                        <circle r="115" fill="none" stroke="var(--shadow-dark)" stroke-width="4" style="transform: translate(6px, 6px); filter: blur(4px);"/>
-                                        <circle r="115" fill="none" stroke="var(--shadow-light)" stroke-width="4" style="transform: translate(-6px, -6px); filter: blur(4px);"/>
-
-                                        <!-- Minimal Hands -->
-                                        <line x1="0" y1="0" x2="30" y2="-50" stroke="var(--text-main)" stroke-width="4" stroke-linecap="round"/>
-                                        <line x1="0" y1="0" x2="-10" y2="-70" stroke="var(--text-main)" stroke-width="2" stroke-linecap="round"/>
-                                        <circle r="5" fill="var(--accent)"/>
-                                    </g>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="slider-divider" id="slider-divider">
-                        <div class="slider-handle">↔</div>
-                    </div>
-                    <div class="zen-message" id="zen-haiku">
-                        Chaos fades away,<br>
-                        Lists become a simple path,<br>
-                        Peace is found in flow.
-                    </div>
-                </div>
-            </section>
-
-            <footer>
-                <p class="footer-text">© 2026 Haiku. All rights reserved.</p>
-            </footer>
-
+    <!-- Hero Section -->
+    <section class="min-height-[90vh] flex flex-col items-center justify-center text-center px-6 pt-40 pb-20">
+        <h1 class="reveal text-6xl md:text-8xl font-black tracking-tighter mb-6 leading-[0.9]">
+            TIME ISN'T A LIST.<br>IT'S A CIRCLE.
+        </h1>
+        <p class="reveal text-lg md:text-2xl opacity-50 max-w-2xl font-medium leading-relaxed mb-10">
+            Haiku reimagines your schedule as a visual flow. Find your natural rhythm with the first automated calendar built for focus.
+        </p>
+        <div class="reveal">
+            <a href="#" class="bg-white text-black px-10 py-5 rounded-full text-lg font-bold hover:bg-opacity-90 transition-all hover:scale-105 inline-block">
+                Get the app
+            </a>
         </div>
-    </main>
+    </section>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <!-- Vertical Ticker Section -->
+    <section class="h-[120vh] w-full relative overflow-hidden flex items-center justify-center ticker-mask py-20 mb-40">
+        <div class="flex gap-4 md:gap-12 px-4 max-w-7xl mx-auto">
+            <!-- Left Column: Down -->
+            <div class="phone-column flex flex-col gap-6 md:gap-12 animate-scroll-down">
+                <!-- Set 1 -->
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/clock_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/todo_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/insights_real.png"></div></div>
+                <!-- Set 2 (Loop) -->
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/clock_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/todo_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/insights_real.png"></div></div>
+            </div>
+
+            <!-- Middle Column: Up -->
+            <div class="phone-column flex flex-col gap-6 md:gap-12 animate-scroll-up mt-[-200px]">
+                <!-- Set 1 -->
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/todo_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/insights_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/clock_real.png"></div></div>
+                <!-- Set 2 (Loop) -->
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/todo_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/insights_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/clock_real.png"></div></div>
+            </div>
+
+            <!-- Right Column: Down -->
+            <div class="phone-column flex flex-col gap-6 md:gap-12 animate-scroll-down hidden md:flex">
+                <!-- Set 1 -->
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/insights_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/clock_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/todo_real.png"></div></div>
+                <!-- Set 2 (Loop) -->
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/insights_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/clock_real.png"></div></div>
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/todo_real.png"></div></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Editorial Sections -->
+    <div class="container mx-auto px-6 max-w-6xl">
+        <!-- Feature 01 -->
+        <section class="flex flex-col md:flex-row items-center justify-between gap-20 py-40">
+            <div class="reveal flex-1">
+                <span class="text-sm font-bold tracking-[0.3em] opacity-30 mb-6 block">01 / FOCUS</span>
+                <h2 class="text-5xl md:text-6xl font-black tracking-tighter mb-8 uppercase leading-none">THE GOLDEN RING.</h2>
+                <p class="text-xl opacity-50 leading-relaxed font-medium">
+                    Stop looking at endless lists. Haiku maps your day into a continuous loop, helping you visualize the flow of time and protecting your energy.
+                </p>
+            </div>
+            <div class="reveal flex-1 flex justify-center">
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/clock_real.png"></div></div>
+            </div>
+        </section>
+
+        <!-- Feature 02 -->
+        <section class="flex flex-col md:flex-row-reverse items-center justify-between gap-20 py-40 border-t border-white border-opacity-5">
+            <div class="reveal flex-1">
+                <span class="text-sm font-bold tracking-[0.3em] opacity-30 mb-6 block">02 / MOMENTUM</span>
+                <h2 class="text-5xl md:text-6xl font-black tracking-tighter mb-8 uppercase leading-none">DEEP INSIGHTS.</h2>
+                <p class="text-xl opacity-50 leading-relaxed font-medium">
+                    Understand your focus trends with mindful analytics. Haiku automatically categorizes your energy, showing you where your hours truly go.
+                </p>
+            </div>
+            <div class="reveal flex-1 flex justify-center">
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/insights_real.png"></div></div>
+            </div>
+        </section>
+
+        <!-- Feature 03 -->
+        <section class="flex flex-col md:flex-row items-center justify-between gap-20 py-40 border-t border-white border-opacity-5">
+            <div class="reveal flex-1">
+                <span class="text-sm font-bold tracking-[0.3em] opacity-30 mb-6 block">03 / TRUST</span>
+                <h2 class="text-5xl md:text-6xl font-black tracking-tighter mb-8 uppercase leading-none">YOUR DATA IS YOURS.</h2>
+                <p class="text-xl opacity-50 leading-relaxed font-medium">
+                    No cloud servers. No tracking. Haiku works entirely on your iPhone, keeping your personal schedule exactly where it belongs.
+                </p>
+            </div>
+            <div class="reveal flex-1 flex justify-center">
+                <div class="iphone-16-pro"><div class="dynamic-island"></div><div class="iphone-screen"><img src="assets/todo_real.png"></div></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Final CTA -->
+    <section class="py-60 flex flex-col items-center justify-center text-center px-6 border-t border-white border-opacity-5">
+        <h2 class="reveal text-5xl md:text-7xl font-black tracking-tighter mb-10 leading-none">READY TO FIND<br>YOUR FLOW?</h2>
+        <div class="reveal">
+            <a href="#" class="bg-white text-black px-12 py-6 rounded-full text-xl font-bold hover:scale-105 transition-transform inline-block">
+                Download Haiku
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-20 px-6 border-t border-white border-opacity-5">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-10">
+            <p class="text-sm opacity-30 tracking-widest font-bold">© 2026 HAIKU. ALL RIGHTS RESERVED.</p>
+            <div class="flex gap-10">
+                <a href="#" class="text-sm opacity-30 hover:opacity-100 transition-opacity uppercase tracking-widest font-bold">Privacy</a>
+                <a href="#" class="text-sm opacity-30 hover:opacity-100 transition-opacity uppercase tracking-widest font-bold">Terms</a>
+                <a href="#" class="text-sm opacity-30 hover:opacity-100 transition-opacity uppercase tracking-widest font-bold">Twitter</a>
+            </div>
+        </div>
+    </footer>
 
     <script>
-        gsap.registerPlugin(ScrollTrigger);
+        // Intersection Observer for Reveal Animations
+        const observerOptions = {
+            threshold: 0.1
+        };
 
-        // Custom Cursor & Ripple
-        const cursor = document.querySelector('.cursor');
-        document.addEventListener('mousemove', (e) => {
-            gsap.to(cursor, { x: e.clientX, y: e.clientY, duration: 0.15 });
-        });
-
-        document.addEventListener('click', (e) => {
-            const ripple = document.createElement('div');
-            ripple.className = 'ripple';
-            ripple.style.left = e.clientX + 'px';
-            ripple.style.top = e.clientY + 'px';
-            document.body.appendChild(ripple);
-            setTimeout(() => ripple.remove(), 1000);
-        });
-
-        const hoverTargets = document.querySelectorAll('.hover-target, .magnetic, .btn');
-        hoverTargets.forEach(t => {
-            t.addEventListener('mouseenter', () => cursor.classList.add('hover-active'));
-            t.addEventListener('mouseleave', () => cursor.classList.remove('hover-active'));
-        });
-
-        // Magnetic Buttons
-        document.querySelectorAll('.magnetic').forEach(m => {
-            m.addEventListener('mousemove', (e) => {
-                const rect = m.getBoundingClientRect();
-                const x = e.clientX - rect.left - rect.width / 2;
-                const y = e.clientY - rect.top - rect.height / 2;
-                gsap.to(m.querySelector('.btn'), { x: x * 0.4, y: y * 0.4, duration: 0.3 });
-            });
-            m.addEventListener('mouseleave', (e) => {
-                gsap.to(m.querySelector('.btn'), { x: 0, y: 0, duration: 0.7, ease: "elastic.out(1, 0.3)" });
-            });
-        });
-
-        // 3D Tilt
-        document.querySelectorAll('.iphone-frame').forEach(el => {
-            el.addEventListener('mousemove', (e) => {
-                const rect = el.getBoundingClientRect();
-                const x = (e.clientX - rect.left) / rect.width - 0.5;
-                const y = (e.clientY - rect.top) / rect.height - 0.5;
-                gsap.to(el, { rotationY: x * 20, rotationX: -y * 20, transformPerspective: 1000, duration: 0.6 });
-            });
-            el.addEventListener('mouseleave', (e) => {
-                gsap.to(el, { rotationY: 0, rotationX: 0, duration: 1 });
-            });
-        });
-
-        // Chaos to Zen Slider Logic
-        const slider = document.getElementById('zen-slider');
-        const divider = document.getElementById('slider-divider');
-        const sideZen = document.querySelector('.side-zen');
-        const zenHaiku = document.getElementById('zen-haiku');
-
-        slider.addEventListener('mousemove', (e) => {
-            const rect = slider.getBoundingClientRect();
-            const x = ((e.clientX - rect.left) / rect.width) * 100;
-            if (x > 0 && x < 100) {
-                divider.style.left = x + '%';
-                // Reveal the Zen side from the left as we move right
-                sideZen.style.clipPath = `inset(0 ${100 - x}% 0 0)`;
-                // Reveal haiku when phone is mostly visible (high x)
-                zenHaiku.style.opacity = x > 80 ? 1 : 0; 
-            }
-        });
-
-        // Animations
-        gsap.to('.char', { y: 0, stagger: 0.05, delay: 0.2, ease: "power4.out" });
-        gsap.to('.hero-subtitle span', { y: 0, stagger: 0.1, delay: 0.6 });
-        
-        // Levitation (Continuous Floating)
-        gsap.utils.toArray('.iphone-frame').forEach((frame, i) => {
-            gsap.to(frame, {
-                y: "-=20",
-                duration: 2 + (i * 0.5),
-                repeat: -1,
-                yoyo: true,
-                ease: "sine.inOut",
-                delay: i * 0.3
-            });
-        });
-
-        // Parallax Scroll for Mockups
-        gsap.utils.toArray('.mockup-block').forEach(block => {
-            gsap.fromTo(block, 
-                { y: 50 },
-                {
-                    y: -50,
-                    ease: "none",
-                    scrollTrigger: {
-                        trigger: block,
-                        start: "top bottom",
-                        end: "bottom top",
-                        scrub: 1.5
-                    }
-                }
-            );
-        });
-
-        // Entrance Animation for Mockups
-        gsap.utils.toArray('.iphone-frame').forEach(frame => {
-            gsap.from(frame, {
-                scale: 0.8,
-                opacity: 0,
-                duration: 1.5,
-                ease: "expo.out",
-                scrollTrigger: {
-                    trigger: frame,
-                    start: "top 90%"
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
                 }
             });
-        });
+        }, observerOptions);
 
-        gsap.utils.toArray('.reveal-text').forEach(text => {
-            gsap.from(text.children, {
-                y: 50, opacity: 0, duration: 1, stagger: 0.1,
-                scrollTrigger: { trigger: text, start: "top 80%" }
-            });
-        });
-
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
     </script>
 </body>
 </html>

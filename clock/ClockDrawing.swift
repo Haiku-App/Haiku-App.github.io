@@ -80,87 +80,66 @@ struct ClockView: View {
                 // Neumorphic Base
                 let faceRadius = is24HourClock ? (pmRingRadius - (ringWidth/2) - 4) : (amRingRadius - (ringWidth/2) - 4)
                 
+                // Outer Bezel / Depth Ring
                 Circle()
-                    .fill(clockFaceColor)
+                    .stroke(textForeground.opacity(0.1), lineWidth: 1)
                     .frame(width: faceRadius * 2, height: faceRadius * 2)
-                    .shadow(color: shadowDark, radius: 10, x: 8, y: 8)
-                    .shadow(color: shadowLight, radius: 10, x: -8, y: -8)
+                    .allowsHitTesting(false)
+
+                Circle()
+                    .fill(
+                        RadialGradient(colors: [clockFaceColor.opacity(0.8), clockFaceColor], center: .center, startRadius: 0, endRadius: faceRadius)
+                    )
+                    .frame(width: faceRadius * 2, height: faceRadius * 2)
+                    .shadow(color: shadowDark.opacity(0.8), radius: 12, x: 10, y: 10)
+                    .shadow(color: shadowLight.opacity(0.5), radius: 12, x: -10, y: -10)
                     .overlay(
-                        Circle().stroke(textForeground.opacity(0.05), lineWidth: 1)
+                        Circle()
+                            .stroke(
+                                LinearGradient(colors: [textForeground.opacity(0.2), .clear, textForeground.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                lineWidth: 2
+                            )
                     )
                     .allowsHitTesting(false)
                 
                 if is24HourClock {
                     // Empty 24H Track (Outer)
                     Circle()
-                        .stroke(taskTrackColor, lineWidth: ringWidth)
+                        .stroke(taskTrackColor.opacity(0.4), lineWidth: ringWidth)
                         .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
                         .allowsHitTesting(false)
                         
                     Text("24H")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(goldColor.opacity(0.3))
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(goldColor.opacity(0.4))
                         .position(x: center.x, y: center.y - pmRingRadius)
                         .allowsHitTesting(false)
 
-                    // Sun at 12, Moon at 24/0
-                    HStack(spacing: 8) {
-                        Text("24")
-                            .font(.system(size: 14, weight: .light, design: .serif))
-                            .foregroundStyle(goldColor)
-                        Image(systemName: "moon.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.gray)
-                    }
-                    .position(x: center.x + 15, y: center.y - faceRadius + 20)
-                    .allowsHitTesting(false)
-
-                    HStack(spacing: 8) {
-                        Text("12")
-                            .font(.system(size: 14, weight: .light, design: .serif))
-                            .foregroundStyle(goldColor)
+                    // Sun/Moon indicators
+                    Group {
+                        Image(systemName: "moon.stars.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(goldColor.opacity(0.6))
+                            .position(x: center.x, y: center.y - faceRadius + 25)
+                        
                         Image(systemName: "sun.max.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.yellow)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.yellow.opacity(0.6))
+                            .position(x: center.x, y: center.y + faceRadius - 25)
                     }
-                    .position(x: center.x + 15, y: center.y + faceRadius - 20)
                     .allowsHitTesting(false)
 
                 } else {
-                    // Empty AM Track (Inner)
+                    // Empty AM/PM Tracks
                     Circle()
-                        .stroke(taskTrackColor.opacity(0.7), lineWidth: ringWidth)
+                        .stroke(taskTrackColor.opacity(0.3), lineWidth: ringWidth)
                         .frame(width: amRingRadius * 2, height: amRingRadius * 2)
                         .allowsHitTesting(false)
                     
-                    // Empty PM Track (Outer)
                     Circle()
-                        .stroke(taskTrackColor, lineWidth: ringWidth)
+                        .stroke(taskTrackColor.opacity(0.5), lineWidth: ringWidth)
                         .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
                         .allowsHitTesting(false)
-
-                    // Track Indicators
-                    HStack(spacing: 4) {
-                        Text("AM")
-                            .foregroundStyle(goldColor.opacity(0.3))
-                        Image(systemName: "sun.max.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.yellow.opacity(0.8))
-                    }
-                    .font(.system(size: 10, weight: .bold))
-                    .position(x: center.x, y: center.y - amRingRadius)
-                    .allowsHitTesting(false)
-
-                    HStack(spacing: 4) {
-                        Text("PM")
-                            .foregroundStyle(goldColor.opacity(0.3))
-                        Image(systemName: "moon.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.gray.opacity(0.8))
-                    }
-                    .font(.system(size: 10, weight: .bold))
-                    .position(x: center.x, y: center.y - pmRingRadius)
-                    .allowsHitTesting(false)
                 }
                 
                 // Scheduled Tasks
@@ -171,7 +150,7 @@ struct ClockView: View {
                     
                     let opacity: Double = isPast ? 0.3 : 1.0
                     let glowRadius: CGFloat = (isActive && (pulseState || isFlowState)) ? (isFlowState ? 16 : 8) : (isDragging ? 4 : 0)
-                    let glowColor = task.color.opacity((isActive && (pulseState || isFlowState)) ? (isFlowState ? 0.8 : 0.6) : (isDragging ? 0.8 : 0))
+                    let glowColor = task.color.opacity((isActive && (pulseState || isFlowState)) ? (isFlowState ? 0.6 : 0.4) : (isDragging ? 0.6 : 0))
 
                     let frags = is24HourClock ? [TaskFragment(isAM: false, startMinutes: Double(task.startMinutes), endMinutes: Double(task.endMinutes), task: task)] : getFragments(for: task)
                     ForEach(Array(frags.enumerated()), id: \.offset) { index, frag in
@@ -179,143 +158,132 @@ struct ClockView: View {
 
                         ZStack {
                             TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
-                                .stroke(task.color.opacity(opacity), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
+                                .stroke(
+                                    AngularGradient(
+                                        colors: [task.color.opacity(opacity * 0.8), task.color.opacity(opacity), task.color.opacity(opacity * 0.8)],
+                                        center: .center,
+                                        startAngle: .degrees(is24HourClock ? frag.startMinutes * 0.25 - 90 : frag.startMinutes * 0.5 - 90),
+                                        endAngle: .degrees(is24HourClock ? frag.endMinutes * 0.25 - 90 : frag.endMinutes * 0.5 - 90)
+                                    ),
+                                    style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
+                                )
                                 .frame(width: r * 2, height: r * 2)
                                 .shadow(color: glowColor, radius: glowRadius)
                                 .allowsHitTesting(true)
-                                .animation(.none, value: activeDrag?.taskId)
-                                .animation(isDragging ? .none : .easeInOut(duration: 1.0), value: pulseState)
                         }
                     }
                 }
 
-                // Clock Dots and Numbers
-                let numDots = is24HourClock ? 24 : 12
-                ForEach(0..<numDots, id: \.self) { i in
-                    let angleDeg = is24HourClock ? (Double(i) * 15 - 90) : (Double(i) * 30 - 90)
+                // Premium Ticks (Baton markers)
+                let numTicks = is24HourClock ? 48 : 60
+                ForEach(0..<numTicks, id: \.self) { i in
+                    let isMajor = is24HourClock ? (i % 2 == 0) : (i % 5 == 0)
+                    let isHour = is24HourClock ? (i % 4 == 0) : (i % 5 == 0)
+                    
+                    let angleDeg = Double(i) * (360.0 / Double(numTicks)) - 90
                     let angle = Angle.degrees(angleDeg)
-                    let dotDistance = faceRadius - 20
                     
-                    let x = cos(CGFloat(angle.radians)) * dotDistance
-                    let y = sin(CGFloat(angle.radians)) * dotDistance
+                    let tickStart = faceRadius - (isHour ? 12 : 8)
+                    let tickEnd = faceRadius - 4
                     
-                    if is24HourClock {
-                        if i == 6 || i == 18 { // Only 6 and 18, skip 12 and 24
-                            Text("\(i)")
-                                .font(.system(size: 14, weight: .light, design: .serif))
-                                .foregroundStyle(goldColor)
-                                .position(x: center.x + x, y: center.y + y)
-                        } else if i % 2 == 0 && i != 0 && i != 12 {
-                            Circle()
-                                .fill(goldColor.opacity(0.6))
-                                .frame(width: 3, height: 3)
-                                .position(x: center.x + x, y: center.y + y)
-                        }
-                    } else {
-                        if i % 3 == 0 { // 12, 3, 6, 9
-                            let hourNumber = i == 0 ? 12 : i
-                            Text("\(hourNumber)")
-                                .font(.system(size: 14, weight: .light, design: .serif))
-                                .foregroundStyle(goldColor)
-                                .position(x: center.x + x, y: center.y + y)
-                        } else {
-                            Circle()
-                                .fill(goldColor.opacity(0.6))
-                                .frame(width: 3, height: 3)
-                                .position(x: center.x + x, y: center.y + y)
-                        }
+                    Path { path in
+                        let startX = center.x + cos(CGFloat(angle.radians)) * tickStart
+                        let startY = center.y + sin(CGFloat(angle.radians)) * tickStart
+                        let endX = center.x + cos(CGFloat(angle.radians)) * tickEnd
+                        let endY = center.y + sin(CGFloat(angle.radians)) * tickEnd
+                        path.move(to: CGPoint(x: startX, y: startY))
+                        path.addLine(to: CGPoint(x: endX, y: endY))
                     }
+                    .stroke(goldColor.opacity(isHour ? 0.8 : 0.3), lineWidth: isHour ? 2 : 1)
                 }
                 .allowsHitTesting(false)
+
+                // Hour Numbers (Minimalist)
+                if !is24HourClock {
+                    ForEach([12, 3, 6, 9], id: \.self) { hour in
+                        let angle = Angle.degrees(Double(hour) * 30 - 90)
+                        let dist = faceRadius - 28
+                        let x = cos(CGFloat(angle.radians)) * dist
+                        let y = sin(CGFloat(angle.radians)) * dist
+                        
+                        Text("\(hour)")
+                            .font(.system(size: 16, weight: .medium, design: .serif))
+                            .foregroundStyle(goldColor.opacity(0.9))
+                            .position(x: center.x + x, y: center.y + y)
+                    }
+                }
 
                 // Central Status Text & Flow State Toggle
                 if let active = activeTask {
                     let minsRemaining = active.endMinutes - Int(currentMinute)
                     
                     Button(action: {
-                        withAnimation(.easeInOut(duration: 0.8)) {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
                             isFlowState.toggle()
                         }
                     }) {
                         VStack(spacing: 4) {
                             Text("\(minsRemaining) min left")
-                                .font(.system(size: isFlowState ? 16 : 12, weight: .bold))
+                                .font(.system(size: isFlowState ? 16 : 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(active.color)
                             
                             if isFlowState {
-                                Text(active.title)
-                                    .font(.system(size: 12, weight: .medium, design: .serif))
+                                Text(active.title.uppercased())
+                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .tracking(2)
                                     .foregroundStyle(active.color.opacity(0.8))
-                                    .transition(.opacity)
-                                    
-                                if let url = active.url {
-                                    Link(destination: url) {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "link")
-                                            Text("Join")
-                                        }
-                                        .font(.system(size: 10, weight: .bold))
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(active.color.opacity(0.2))
-                                                .stroke(active.color.opacity(0.5), lineWidth: 1)
-                                        )
-                                        .foregroundStyle(active.color)
-                                    }
-                                    .padding(.top, 8)
-                                    .transition(.scale.combined(with: .opacity))
-                                }
+                                    .transition(.asymmetric(insertion: .opacity.combined(with: .scale), removal: .opacity))
                             }
                         }
-                        .padding(24) // Extra hit area to tap easily
+                        .padding(24)
                         .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .position(x: center.x, y: center.y + faceRadius - (isFlowState ? 45 : 40))
+                    .position(x: center.x, y: center.y + faceRadius - (isFlowState ? 50 : 45))
                     
                 } else {
-                    Text(formatTime(now))
-                        .font(.system(size: 12, weight: .light))
-                        .foregroundStyle(textForeground.opacity(0.5))
-                        .position(x: center.x, y: center.y + faceRadius - 40)
+                    Text(formatTime(now).uppercased())
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .tracking(1)
+                        .foregroundStyle(textForeground.opacity(0.4))
+                        .position(x: center.x, y: center.y + faceRadius - 45)
                         .allowsHitTesting(false)
                 }
 
                 // Hands
-                let hourHandLength = faceRadius * 0.45
-                let minuteHandLength = faceRadius * 0.75
+                let hourHandLength = faceRadius * 0.5
+                let minuteHandLength = faceRadius * 0.8
                 let secondHandLength = faceRadius * 0.85
 
-                TimeHand(now: now, is24HourClock: is24HourClock)
-                    .stroke(goldColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .frame(width: hourHandLength * 2, height: hourHandLength * 2)
-                    .shadow(color: .black.opacity(0.4), radius: 3, x: 1, y: 2)
+                // Hour Hand
+                TaperedHand(now: now, is24HourClock: is24HourClock, length: hourHandLength, width: 6)
+                    .fill(goldColor)
+                    .shadow(color: .black.opacity(0.3), radius: 4, x: 2, y: 3)
                     .allowsHitTesting(false)
 
-                MinuteHand(now: now)
-                    .stroke(goldColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .frame(width: minuteHandLength * 2, height: minuteHandLength * 2)
-                    .shadow(color: .black.opacity(0.4), radius: 3, x: 1, y: 2)
+                // Minute Hand
+                TaperedHand(now: now, is24HourClock: false, length: minuteHandLength, width: 4, isMinute: true)
+                    .fill(goldColor)
+                    .shadow(color: .black.opacity(0.3), radius: 4, x: 2, y: 4)
                     .allowsHitTesting(false)
 
-                SecondHand(now: now)
-                    .stroke(Color(red: 0.85, green: 0.35, blue: 0.25), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-                    .frame(width: secondHandLength * 2, height: secondHandLength * 2)
-                    .shadow(color: .black.opacity(0.3), radius: 2, x: 1, y: 1)
+                // Second Hand (Elegant Sweep Style)
+                ElegantSecondHand(now: now, length: secondHandLength)
+                    .stroke(Color(red: 0.9, green: 0.3, blue: 0.2), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                    .shadow(color: .black.opacity(0.2), radius: 2, x: 1, y: 2)
                     .allowsHitTesting(false)
 
-                // Center dot
+                // Center Cap
                 Circle()
                     .fill(goldColor)
-                    .frame(width: 6, height: 6)
-                    .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 1)
+                    .frame(width: 8, height: 8)
+                    .overlay(Circle().stroke(Color.black.opacity(0.1), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                     .allowsHitTesting(false)
             }
             .position(center)
             .onAppear {
-                withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                withAnimation(Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
                     pulseState = true
                 }
             }
@@ -489,6 +457,87 @@ struct ClockView: View {
 }
 
 // MARK: - Shapes
+
+struct TaperedHand: Shape {
+    var now: Date
+    var is24HourClock: Bool = false
+    var length: CGFloat
+    var width: CGFloat
+    var isMinute: Bool = false
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        
+        let comps = Calendar.current.dateComponents([.hour, .minute, .second], from: now)
+        let hour = Double(comps.hour ?? 0)
+        let minute = Double(comps.minute ?? 0)
+        let second = Double(comps.second ?? 0)
+
+        let angleDeg: Double
+        if isMinute {
+            let totalMinutes = minute + second/60
+            angleDeg = totalMinutes * 6 - 90
+        } else {
+            if is24HourClock {
+                let totalMinutes24h = hour * 60 + minute + second/60
+                angleDeg = totalMinutes24h * 0.25 - 90
+            } else {
+                let totalMinutes12h = (hour.truncatingRemainder(dividingBy: 12)) * 60 + minute + second/60
+                angleDeg = totalMinutes12h * 0.5 - 90
+            }
+        }
+        
+        let angle = Angle.degrees(angleDeg).radians
+        let rotation = CGAffineTransform(rotationAngle: CGFloat(angle))
+        
+        // Create a tapered diamond/sword shape
+        let handPath = Path { path in
+            path.move(to: CGPoint(x: -2, y: 0)) // Counterweight start
+            path.addLine(to: CGPoint(x: -width/2, y: -width/2))
+            path.addLine(to: CGPoint(x: length * 0.9, y: -width/4))
+            path.addLine(to: CGPoint(x: length, y: 0)) // Tip
+            path.addLine(to: CGPoint(x: length * 0.9, y: width/4))
+            path.addLine(to: CGPoint(x: -width/2, y: width/2))
+            path.closeSubpath()
+        }
+        
+        p.addPath(handPath.applying(rotation).applying(CGAffineTransform(translationX: center.x, y: center.y)))
+        return p
+    }
+}
+
+struct ElegantSecondHand: Shape {
+    var now: Date
+    var length: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+
+        let comps = Calendar.current.dateComponents([.second, .nanosecond], from: now)
+        let second = Double(comps.second ?? 0)
+        let nano = Double(comps.nanosecond ?? 0)
+
+        let totalSeconds = second + nano / 1_000_000_000
+        let angleDeg = totalSeconds * 6 - 90
+        let angle = Angle.degrees(angleDeg).radians
+        
+        let cosA = cos(CGFloat(angle))
+        let sinA = sin(CGFloat(angle))
+        
+        // Main line
+        p.move(to: CGPoint(x: center.x - cosA * 15, y: center.y - sinA * 15)) // Counterweight end
+        p.addLine(to: CGPoint(x: center.x + cosA * length, y: center.y + sinA * length))
+        
+        // Small circle at the end for "Premium" look
+        let circleRadius: CGFloat = 3
+        let circleCenter = CGPoint(x: center.x + cosA * (length - 15), y: center.y + sinA * (length - 15))
+        p.addEllipse(in: CGRect(x: circleCenter.x - circleRadius, y: circleCenter.y - circleRadius, width: circleRadius*2, height: circleRadius*2))
+        
+        return p
+    }
+}
 
 struct TimeHand: Shape {
     var now: Date
