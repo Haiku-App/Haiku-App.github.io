@@ -1,0 +1,65 @@
+<svg width="400" height="800" viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="800" fill="var(--bg)" rx="40"/>
+  
+  <!-- Header -->
+  <text x="200" y="100" font-family="var(--font-serif)" font-size="24" fill="var(--accent)" text-anchor="middle" letter-spacing="4">HAIKU</text>
+  <g transform="translate(200, 140)">
+    <text x="0" y="0" font-family="var(--font-serif)" font-size="16" fill="var(--text-main)" text-anchor="middle">March 31</text>
+    <path d="M -60 -5 L -65 0 L -60 5" stroke="var(--accent)" fill="none" stroke-width="2"/>
+    <path d="M 60 -5 L 65 0 L 60 5" stroke="var(--accent)" fill="none" stroke-width="2"/>
+    <text x="110" y="2" font-family="sans-serif" font-size="20" fill="var(--accent)" text-anchor="middle">+</text>
+  </g>
+
+  <!-- Clock Dial -->
+  <g transform="translate(200, 350)">
+    <!-- Outer PM Ring -->
+    <circle r="150" fill="none" stroke="var(--field-bg)" stroke-width="20"/>
+    <path d="M -106 -106 A 150 150 0 0 1 106 -106" fill="none" stroke="var(--accent)" stroke-width="20" stroke-linecap="round" opacity="0.4"/>
+    
+    <!-- Inner AM Ring -->
+    <circle r="125" fill="none" stroke="var(--field-bg)" stroke-width="20" opacity="0.6"/>
+    <path d="M -125 0 A 125 125 0 0 1 0 -125" fill="none" stroke="var(--accent)" stroke-width="20" stroke-linecap="round"/>
+
+    <!-- Neumorphic Center -->
+    <circle r="100" fill="var(--bg)"/>
+    <circle r="100" fill="none" stroke="var(--shadow-dark)" stroke-width="4" style="transform: translate(4px, 4px); filter: blur(4px);"/>
+    <circle r="100" fill="none" stroke="var(--shadow-light)" stroke-width="4" style="transform: translate(-4px, -4px); filter: blur(4px);"/>
+
+    <!-- Clock Markers -->
+    <text x="0" y="-75" font-family="serif" font-size="12" fill="var(--text-muted)" text-anchor="middle">12</text>
+    <text x="75" y="5" font-family="serif" font-size="12" fill="var(--text-muted)" text-anchor="middle">3</text>
+    <text x="0" y="85" font-family="serif" font-size="12" fill="var(--text-muted)" text-anchor="middle">6</text>
+    <text x="-75" y="5" font-family="serif" font-size="12" fill="var(--text-muted)" text-anchor="middle">9</text>
+
+    <!-- Hands -->
+    <line x1="0" y1="0" x2="40" y2="-40" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="0" y2="-60" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="0" y1="0" x2="-20" y2="50" stroke="#ff4d4d" stroke-width="1" stroke-linecap="round"/>
+    <circle r="4" fill="var(--accent)"/>
+
+    <text x="0" y="20" font-family="sans-serif" font-size="14" font-weight="bold" fill="var(--accent)" text-anchor="middle">76 min left</text>
+  </g>
+
+  <!-- Quote -->
+  <text x="200" y="550" font-family="var(--font-serif)" font-size="12" fill="var(--text-muted)" text-anchor="middle" font-style="italic">
+    <tspan x="200" dy="0">"You are what you do, not what you say you'll</tspan>
+    <tspan x="200" dy="18">do." — C.G. Jung</tspan>
+  </text>
+
+  <!-- Task List -->
+  <g transform="translate(40, 620)">
+    <text x="0" y="0" font-family="sans-serif" font-size="12" fill="var(--text-muted)">10:00 AM</text>
+    <text x="0" y="15" font-family="sans-serif" font-size="10" fill="var(--text-muted)" opacity="0.6">11:50 AM</text>
+    <text x="100" y="10" font-family="sans-serif" font-size="14" fill="var(--text-main)" font-weight="500">Physics Lecture</text>
+    <circle cx="80" cy="5" r="8" fill="var(--accent)" opacity="0.2"/>
+    <path d="M 76 5 Q 80 0 84 5 Q 80 10 76 5" fill="var(--accent)"/>
+  </g>
+
+  <g transform="translate(40, 680)">
+    <text x="0" y="0" font-family="sans-serif" font-size="12" fill="var(--text-muted)">4:00 PM</text>
+    <text x="0" y="15" font-family="sans-serif" font-size="10" fill="var(--text-muted)" opacity="0.6">7:15 PM</text>
+    <text x="100" y="10" font-family="sans-serif" font-size="14" fill="var(--text-main)" font-weight="500">Chem 2 Lecture</text>
+    <circle cx="80" cy="5" r="8" fill="var(--accent)" opacity="0.2"/>
+    <path d="M 76 5 Q 80 0 84 5 Q 80 10 76 5" fill="var(--accent)"/>
+  </g>
+</svg>
