@@ -9,132 +9,131 @@ struct HaikuProView: View {
     @Environment(\.dismiss) var dismiss
     @State private var isPurchasing = false
     @State private var showingCustomerCenter = false
+    @State private var appearanceAnimate = false
     
     var body: some View {
         ZStack {
+            // Animated Background Layer
             currentTheme.bg.ignoresSafeArea()
+            
+            // Subtle Moving Blobs for "Zen" feel
+            ZStack {
+                Circle()
+                    .fill(currentTheme.accent.opacity(0.15))
+                    .frame(width: 300)
+                    .blur(radius: 60)
+                    .offset(x: appearanceAnimate ? 100 : -100, y: appearanceAnimate ? -150 : -200)
+                
+                Circle()
+                    .fill(currentTheme.accent.opacity(0.1))
+                    .frame(width: 250)
+                    .blur(radius: 50)
+                    .offset(x: appearanceAnimate ? -120 : 80, y: appearanceAnimate ? 200 : 150)
+            }
+            .animation(.easeInOut(duration: 8).repeatForever(autoreverses: true), value: appearanceAnimate)
 
-            ScrollView {
-                VStack(spacing: 40) {
-                    // Header
-                    VStack(spacing: 12) {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 60))
-                            .foregroundStyle(currentTheme.accent)
-                            .shadow(color: currentTheme.accent.opacity(0.3), radius: 10)
-                        
-                        Text("HAIKU PRO")
-                            .font(.system(size: 32, weight: .bold, design: .serif))
-                            .foregroundStyle(currentTheme.accent)
-                            .tracking(8)
-                        
-                        Text("Elevate your focus.")
-                            .font(.system(size: 18, weight: .light, design: .serif))
-                            .foregroundStyle(currentTheme.textForeground.opacity(0.8))
-                    }
-                    .padding(.top, 60)
+            VStack(spacing: 0) {
+                // Header - Floating and Zen
+                VStack(spacing: 12) {
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(currentTheme.accent)
+                        .shadow(color: currentTheme.accent.opacity(0.3), radius: 10)
+                        .offset(y: appearanceAnimate ? -10 : 0)
+                        .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: appearanceAnimate)
                     
-                    // Features
-                    VStack(alignment: .leading, spacing: 24) {
-                        ProFeatureRow(icon: "chart.bar.fill", title: "Advanced Analytics", description: "Deep dive into how you spend your time with category breakdowns.")
-                        ProFeatureRow(icon: "bell.badge.fill", title: "Custom Notifications", description: "Set unlimited custom reminder offsets for your tasks.")
-                        ProFeatureRow(icon: "calendar.badge.plus", title: "2-Way Calendar Sync", description: "Keep your Haiku and system calendars perfectly in sync both ways.")
-                        ProFeatureRow(icon: "square.grid.2x2.fill", title: "Aesthetic Widgets", description: "Track your schedule directly from your home screen.")
-                        ProFeatureRow(icon: "sparkles", title: "Future Updates", description: "Get early access to all new premium features.")
-                    }
-                    .padding(.horizontal, 40)
+                    Text("HAIKU PRO")
+                        .font(.system(size: 28, weight: .bold, design: .serif))
+                        .foregroundStyle(currentTheme.accent)
+                        .tracking(8)
+                        .opacity(appearanceAnimate ? 1 : 0)
+                        .offset(y: appearanceAnimate ? 0 : 10)
                     
-                    // Pricing Tiers (Dynamic from RevenueCat)
-                    VStack(spacing: 16) {
-                        if let currentOffering = storeManager.offerings?.current {
-                            // Monthly
+                    Text("Elevate your focus.")
+                        .font(.system(size: 16, weight: .light, design: .serif))
+                        .foregroundStyle(currentTheme.textForeground.opacity(0.8))
+                        .opacity(appearanceAnimate ? 1 : 0)
+                        .offset(y: appearanceAnimate ? 0 : 10)
+                }
+                .padding(.top, 40)
+                
+                Spacer(minLength: 20)
+                
+                // Features - Staggered Slide-in
+                VStack(alignment: .leading, spacing: 18) {
+                    ProFeatureRow(icon: "chart.bar.fill", title: "Advanced Analytics", description: "Deep dive into your time.", delay: 0.1, animate: appearanceAnimate)
+                    ProFeatureRow(icon: "bell.badge.fill", title: "Custom Notifications", description: "Unlimited reminder offsets.", delay: 0.2, animate: appearanceAnimate)
+                    ProFeatureRow(icon: "calendar.badge.plus", title: "2-Way Calendar Sync", description: "Perfectly in sync both ways.", delay: 0.3, animate: appearanceAnimate)
+                    ProFeatureRow(icon: "square.grid.2x2.fill", title: "Aesthetic Widgets", description: "Track from your home screen.", delay: 0.4, animate: appearanceAnimate)
+                }
+                .padding(.horizontal, 40)
+                
+                Spacer(minLength: 20)
+                
+                // Pricing - Horizontal and Compact
+                VStack(spacing: 20) {
+                    if let currentOffering = storeManager.offerings?.current {
+                        HStack(spacing: 10) {
                             if let monthly = currentOffering.monthly {
-                                PricingButton(
+                                CompactPricingButton(
                                     title: "Monthly",
                                     price: monthly.localizedPriceString,
-                                    subtitle: "Full access, billed monthly.",
                                     theme: currentTheme
-                                ) {
-                                    buyPro(monthly)
-                                }
-                                .disabled(isPurchasing)
+                                ) { buyPro(monthly) }
                             }
                             
-                            // Annual
                             if let annual = currentOffering.annual {
-                                PricingButton(
+                                CompactPricingButton(
                                     title: "Annual",
                                     price: annual.localizedPriceString,
-                                    subtitle: "Save with yearly billing.",
+                                    isBestValue: true,
                                     theme: currentTheme
-                                ) {
-                                    buyPro(annual)
-                                }
-                                .disabled(isPurchasing)
+                                ) { buyPro(annual) }
                             }
                             
-                            // Lifetime
                             if let lifetime = currentOffering.lifetime {
-                                PricingButton(
+                                CompactPricingButton(
                                     title: "Lifetime",
                                     price: lifetime.localizedPriceString,
-                                    subtitle: "One-time payment forever.",
                                     theme: currentTheme
-                                ) {
-                                    buyPro(lifetime)
-                                }
-                                .disabled(isPurchasing)
-                                }
-                                } else {
-                                // Fallback if offerings haven't loaded yet
-
-                            ProgressView()
-                                .tint(currentTheme.accent)
-                                .onAppear {
-                                    storeManager.refreshOfferings()
-                                }
+                                ) { buyPro(lifetime) }
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .opacity(appearanceAnimate ? 1 : 0)
+                        .scaleEffect(appearanceAnimate ? 1 : 0.95)
+                    } else {
+                        ProgressView()
+                            .tint(currentTheme.accent)
+                            .onAppear { storeManager.refreshOfferings() }
+                    }
+                    
+                    // Footer Links
+                    HStack(spacing: 24) {
+                        Button("Restore") {
+                            Task { await storeManager.restore() }
                         }
                         
-                        HStack(spacing: 20) {
-                            Button(action: {
-                                Task {
-                                    await storeManager.restore()
-                                }
-                            }) {
-                                Text("Restore Purchases")
-                                    .font(.system(size: 12, weight: .medium, design: .serif))
-                                    .foregroundStyle(currentTheme.accent.opacity(0.8))
-                            }
-                            
-                            if storeManager.isPro {
-                                Button(action: { showingCustomerCenter = true }) {
-                                    Text("Manage Subscription")
-                                        .font(.system(size: 12, weight: .medium, design: .serif))
-                                        .foregroundStyle(currentTheme.accent.opacity(0.8))
-                                }
-                            }
+                        if storeManager.isPro {
+                            Button("Manage") { showingCustomerCenter = true }
                         }
-                        .padding(.top, 8)
+                        
+                        Button("Maybe Later") { dismiss() }
                     }
-                    .padding(.horizontal, 40)
-                    .padding(.top, 20)
-                    
-                    Button(action: { dismiss() }) {
-                        Text("Maybe Later")
-                            .font(.system(size: 14, design: .serif))
-                            .foregroundStyle(currentTheme.textForeground.opacity(0.5))
-                    }
-                    .padding(.bottom, 60)
+                    .font(.system(size: 12, weight: .medium, design: .serif))
+                    .foregroundStyle(currentTheme.textForeground.opacity(0.4))
                 }
+                .padding(.bottom, 30)
             }
-            .overlay {
-                if isPurchasing {
-                    ZStack {
-                        Color.black.opacity(0.3).ignoresSafeArea()
-                        ProgressView("Processing...")
-                            .padding()
-                            .background(RoundedRectangle(cornerRadius: 12).fill(currentTheme.fieldBg))
-                    }
+            .padding(.bottom, 10) // Small safety buffer
+            
+            // Processing Overlay
+            if isPurchasing {
+                ZStack {
+                    Color.black.opacity(0.3).ignoresSafeArea()
+                    ProgressView("Processing...")
+                        .padding()
+                        .background(RoundedRectangle(cornerRadius: 12).fill(currentTheme.fieldBg))
                 }
             }
             
@@ -144,8 +143,8 @@ struct HaikuProView: View {
                     Spacer()
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 30))
-                            .foregroundStyle(currentTheme.textForeground.opacity(0.2))
+                            .font(.system(size: 28))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.15))
                     }
                     .padding(20)
                 }
@@ -155,18 +154,17 @@ struct HaikuProView: View {
         .sheet(isPresented: $showingCustomerCenter) {
             CustomerCenterView()
         }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.8)) {
+                appearanceAnimate = true
+            }
+        }
         .onChange(of: storeManager.isPro) { oldValue, newValue in
             if newValue { dismiss() }
         }
-        .onAppear {
-            // Offerings refresh
-            storeManager.refreshOfferings()
-        }
-
     }
 
     private func buyPro(_ package: Package) {
-        // PostHog: Track purchase initiation
         PostHogSDK.shared.capture("purchase_initiated", properties: [
             "package_identifier": package.identifier,
             "price": package.localizedPriceString,
@@ -188,63 +186,75 @@ struct ProFeatureRow: View {
     let icon: String
     let title: String
     let description: String
+    let delay: Double
+    let animate: Bool
     
     var body: some View {
-        HStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(currentTheme.fieldBg)
-                    .frame(width: 44, height: 44)
-                Image(systemName: icon)
-                    .foregroundStyle(currentTheme.accent)
-            }
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundStyle(currentTheme.accent)
+                .frame(width: 24)
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold, design: .serif))
+                    .font(.system(size: 15, weight: .semibold, design: .serif))
                     .foregroundStyle(currentTheme.textForeground)
                 Text(description)
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     .foregroundStyle(currentTheme.textForeground.opacity(0.6))
-                    .lineLimit(2)
             }
         }
+        .opacity(animate ? 1 : 0)
+        .offset(x: animate ? 0 : -20)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(delay), value: animate)
     }
 }
 
-struct PricingButton: View {
+struct CompactPricingButton: View {
     let title: String
     let price: String
-    let subtitle: String
+    var isBestValue: Bool = false
     let theme: AppTheme
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.system(size: 18, weight: .bold, design: .serif))
-                        .foregroundStyle(theme.textForeground)
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(theme.textForeground.opacity(0.6))
-                }
-                
-                Spacer()
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 11, weight: .bold, design: .serif))
+                    .foregroundStyle(theme.textForeground.opacity(0.7))
                 
                 Text(price)
-                    .font(.system(size: 20, weight: .bold, design: .serif))
+                    .font(.system(size: 15, weight: .bold, design: .serif))
                     .foregroundStyle(theme.accent)
+                
+                if isBestValue {
+                    Text("SAVE 40%")
+                        .font(.system(size: 7, weight: .black))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(theme.accent)
+                        .foregroundStyle(theme.bg)
+                        .clipShape(Capsule())
+                } else {
+                    // Empty space to maintain height parity
+                    Text("")
+                        .font(.system(size: 7))
+                        .padding(.vertical, 2)
+                }
             }
-            .padding(20)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(theme.fieldBg)
-                    .shadow(color: theme.shadowDark, radius: 5, x: 2, y: 2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(isBestValue ? theme.accent.opacity(0.4) : Color.clear, lineWidth: 1)
+                    )
             )
         }
         .buttonStyle(.plain)
     }
 }
-
