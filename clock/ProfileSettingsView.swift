@@ -118,8 +118,7 @@ struct ProfileSettingsView: View {
                             // Custom Button
                             Button(action: { 
                                 if isPro {
-                                    let animation = Animation.spring(response: 0.3, dampingFraction: 0.7)
-                                    withAnimation(animation) {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         showingCustomOffsetAlert = true
                                     }
                                 } else {
