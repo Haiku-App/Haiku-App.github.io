@@ -1,0 +1,38 @@
+<svg width="400" height="800" viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="800" fill="var(--bg)" rx="40"/>
+  
+  <text x="200" y="100" font-family="var(--font-serif)" font-size="24" fill="var(--accent)" text-anchor="middle" letter-spacing="4">BRAIN DUMP</text>
+  <g transform="translate(200, 140)">
+    <text x="0" y="0" font-family="var(--font-serif)" font-size="16" fill="var(--text-main)" text-anchor="middle">March 12</text>
+    <path d="M -60 -5 L -65 0 L -60 5" stroke="var(--accent)" fill="none" stroke-width="2"/>
+    <path d="M 60 -5 L 65 0 L 60 5" stroke="var(--accent)" fill="none" stroke-width="2"/>
+    <text x="110" y="2" font-family="sans-serif" font-size="20" fill="var(--accent)" text-anchor="middle">+</text>
+  </g>
+
+  <!-- Input Field -->
+  <rect x="30" y="180" width="340" height="60" rx="15" fill="var(--field-bg)"/>
+  <text x="50" y="215" font-family="sans-serif" font-size="16" fill="var(--text-muted)">Quick task...</text>
+  <circle cx="340" cy="210" r="15" fill="var(--accent)" opacity="0.2"/>
+  <text x="340" y="216" font-family="sans-serif" font-size="20" fill="var(--accent)" text-anchor="middle">+</text>
+
+  <!-- To-Do Items -->
+  <g transform="translate(40, 280)">
+    <circle cx="15" cy="15" r="15" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    <text x="50" y="20" font-family="sans-serif" font-size="16" fill="var(--text-main)">Email coach about practice</text>
+  </g>
+
+  <g transform="translate(40, 340)">
+    <circle cx="15" cy="15" r="15" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    <text x="50" y="20" font-family="sans-serif" font-size="16" fill="var(--text-main)">English essay due at 4pm today</text>
+  </g>
+
+  <g transform="translate(40, 400)">
+    <circle cx="15" cy="15" r="15" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    <text x="50" y="20" font-family="sans-serif" font-size="16" fill="var(--text-main)">8.8 notes due 3/17</text>
+  </g>
+
+  <g transform="translate(40, 460)">
+    <circle cx="15" cy="15" r="15" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    <text x="50" y="20" font-family="sans-serif" font-size="16" fill="var(--text-main)">Physics study for quiz</text>
+  </g>
+</svg>
