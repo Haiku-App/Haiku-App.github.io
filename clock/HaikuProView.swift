@@ -159,8 +159,8 @@ struct HaikuProView: View {
             if newValue { dismiss() }
         }
         .onAppear {
-            // PostHog: Track paywall view
-            PostHogSDK.shared.capture("paywall_viewed")
+            // Offerings refresh
+            storeManager.refreshOfferings()
         }
 
     }

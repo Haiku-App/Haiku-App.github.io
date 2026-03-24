@@ -1,4 +1,5 @@
 import SwiftUI
+import PostHog
 
 struct ProfileSettingsView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
@@ -40,7 +41,10 @@ struct ProfileSettingsView: View {
                     .padding(.top, 40)
 
                 if !isPro {
-                    Button(action: { showingPaywall = true }) {
+                    Button(action: { 
+                        PostHogSDK.shared.capture("upgrade_banner_clicked")
+                        showingPaywall = true 
+                    }) {
                         HStack {
                             Image(systemName: "crown.fill")
                                 .foregroundStyle(goldColor)
@@ -114,10 +118,12 @@ struct ProfileSettingsView: View {
                             // Custom Button
                             Button(action: { 
                                 if isPro {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        showingCustomOffsetAlert = true 
+                                    let animation = Animation.spring(response: 0.3, dampingFraction: 0.7)
+                                    withAnimation(animation) {
+                                        showingCustomOffsetAlert = true
                                     }
                                 } else {
+                                    PostHogSDK.shared.capture("upgrade_custom_notification_clicked")
                                     showingPaywall = true
                                 }
                             }) {
@@ -204,6 +210,7 @@ struct ProfileSettingsView: View {
                                         UIApplication.shared.open(url)
                                     }
                                 } else {
+                                    PostHogSDK.shared.capture("upgrade_calendar_settings_clicked")
                                     showingPaywall = true
                                 }
                             }) {
@@ -237,6 +244,7 @@ struct ProfileSettingsView: View {
                                         }
                                     }
                                 } else {
+                                    PostHogSDK.shared.capture("upgrade_google_signin_clicked")
                                     showingPaywall = true
                                 }
                             }) {
@@ -316,6 +324,12 @@ struct ProfileSettingsView: View {
         }
         .sheet(isPresented: $showingPaywall) {
             HaikuProView()
+        }
+        .onChange(of: currentTheme) { newTheme in
+            PostHogSDK.shared.capture("theme_changed", properties: ["theme_name": newTheme.name])
+        }
+        .onChange(of: is24HourClock) { newValue in
+            PostHogSDK.shared.capture("clock_format_toggled", properties: ["is_24_hour": newValue])
         }
     }
 }

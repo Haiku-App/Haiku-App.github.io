@@ -354,6 +354,9 @@ struct ContentView: View {
             SharedTaskManager.shared.save(theme: currentTheme)
             NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: tasksByDate, offsets: notificationOffsets)
         }
+        .onChange(of: selectedTab) { newTab in
+            PostHogSDK.shared.capture("tab_changed", properties: ["target_tab": "\(newTab)"])
+        }
         .onChange(of: selectedDate) { newDate in
             syncCalendar(for: newDate)
         }

@@ -1,4 +1,5 @@
 import SwiftUI
+import PostHog
 
 struct BulkImportView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
@@ -81,6 +82,7 @@ struct BulkImportView: View {
     
     private func importTasks() {
         let lines = text.components(separatedBy: .newlines)
+        var importedCount = 0
         withAnimation {
             for line in lines.reversed() {
                 var title = line.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -95,9 +97,15 @@ struct BulkImportView: View {
                 
                 if !title.isEmpty {
                     manager.tasks.insert(BrainDumpTask(title: title), at: 0)
+                    importedCount += 1
                 }
             }
         }
+        
+        if importedCount > 0 {
+            PostHogSDK.shared.capture("bulk_import_completed", properties: ["task_count": importedCount])
+        }
+        
         isPresented = false
     }
 }
