@@ -122,17 +122,17 @@ struct ClockView: View {
                         .position(x: center.x, y: center.y - pmRingRadius)
                         .allowsHitTesting(false)
 
-                    // Sun/Moon indicators
+                    // Sun/Moon indicators (Moved inward to avoid numbers)
                     Group {
                         Image(systemName: "moon.stars.fill")
                             .font(.system(size: 12))
                             .foregroundStyle(goldColor.opacity(0.6))
-                            .position(x: center.x, y: center.y - faceRadius + 25)
+                            .position(x: center.x, y: center.y - faceRadius + 55)
                         
                         Image(systemName: "sun.max.fill")
                             .font(.system(size: 12))
                             .foregroundStyle(.yellow.opacity(0.6))
-                            .position(x: center.x, y: center.y + faceRadius - 25)
+                            .position(x: center.x, y: center.y + faceRadius - 55)
                     }
                     .allowsHitTesting(false)
 

@@ -230,7 +230,7 @@ struct CompactPricingButton: View {
                     .foregroundStyle(theme.accent)
                 
                 if isBestValue {
-                    Text("SAVE 40%")
+                    Text("SAVE 58%")
                         .font(.system(size: 7, weight: .black))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
