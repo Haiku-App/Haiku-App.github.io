@@ -10,12 +10,19 @@ struct ProfileAnalyticsView: View {
     
     @StateObject private var categoryManager = CategoryManager()
     @State private var showingPaywall = false
+    @State private var selectedMetricInfo: MetricInfo? = nil
     
     private var bgColor: Color { currentTheme.bg }
     private var fieldBgColor: Color { currentTheme.fieldBg }
     private var goldColor: Color { currentTheme.accent }
     private var shadowLight: Color { currentTheme.shadowLight }
     private var shadowDark: Color { currentTheme.shadowDark }
+
+    struct MetricInfo: Identifiable {
+        let id = UUID()
+        let title: String
+        let description: String
+    }
 
     struct CategoryStats: Identifiable {
         let id = UUID()
@@ -140,264 +147,381 @@ struct ProfileAnalyticsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                Text("INSIGHTS")
-                    .font(.system(size: 14, weight: .regular, design: .serif))
-                    .foregroundStyle(goldColor)
-                    .tracking(2)
-                    .padding(.top, 40)
-                
-                let currentStats = stats
-                if currentStats.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "chart.pie.fill")
-                            .font(.system(size: 48))
-                            .foregroundStyle(goldColor.opacity(0.3))
-                        Text("No data to analyze yet.")
-                            .font(.system(size: 14, weight: .light))
-                            .foregroundStyle(currentTheme.textForeground.opacity(0.5))
-                    }
-                    .padding(.top, 100)
-                } else {
-                    // 1. Basic Stats
-                    HStack(spacing: 16) {
-                        StatCard(title: "Total Time", value: String(format: "%.1fh", totalHours), icon: "clock.fill", color: goldColor)
-                        
-                        if let top = currentStats.first {
-                            StatCard(title: "Top Activity", value: top.name, icon: "trophy.fill", color: top.color)
-                        }
-                    }
-                    .padding(.horizontal, 32)
+        ZStack {
+            ScrollView {
+                VStack(spacing: 32) {
+                    Text("INSIGHTS")
+                        .font(.system(size: 14, weight: .regular, design: .serif))
+                        .foregroundStyle(goldColor)
+                        .tracking(2)
+                        .padding(.top, 40)
                     
-                    // 2. PRO SECTION: Peak Focus Window (VITAL)
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
+                    let currentStats = stats
+                    if currentStats.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "chart.pie.fill")
+                                .font(.system(size: 48))
+                                .foregroundStyle(goldColor.opacity(0.3))
+                            Text("No data to analyze yet.")
+                                .font(.system(size: 14, weight: .light))
+                                .foregroundStyle(currentTheme.textForeground.opacity(0.5))
+                        }
+                        .padding(.top, 100)
+                    } else {
+                        // 1. Basic Stats
+                        HStack(spacing: 16) {
+                            StatCard(title: "Total Time", value: String(format: "%.1fh", totalHours), icon: "clock.fill", color: goldColor)
+                            
+                            if let top = currentStats.first {
+                                StatCard(title: "Top Activity", value: top.name, icon: "trophy.fill", color: top.color)
+                            }
+                        }
+                        .padding(.horizontal, 32)
+                        
+                        // 2. PRO SECTION: Peak Focus Window (VITAL)
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack(spacing: 8) {
                                 Text("PEAK FOCUS WINDOW")
                                     .font(.system(size: 12, weight: .regular, design: .serif))
                                     .foregroundStyle(goldColor)
                                     .tracking(1)
                                 
-                                if isPro {
-                                    Text("Your rhythm peaks at \(formatHour(peakHour))")
-                                        .font(.system(size: 16, weight: .bold, design: .serif))
-                                        .foregroundStyle(currentTheme.textForeground)
+                                Button(action: {
+                                    selectedMetricInfo = MetricInfo(
+                                        title: "Peak Focus Window",
+                                        description: "This identifies your 'Biological Prime Time'. We analyze the density of your scheduled tasks across all days to find the specific hour when you are most consistently active. Scheduling Deep Work during this window can significantly boost productivity."
+                                    )
+                                    AnalyticsManager.shared.capture("analytics_info_clicked", properties: ["metric": "peak_focus"])
+                                }) {
+                                    Image(systemName: "info.circle")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(goldColor.opacity(0.5))
+                                }
+                                
+                                Spacer()
+                                
+                                if !isPro {
+                                    Image(systemName: "crown.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(goldColor)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(goldColor.opacity(0.1))
+                                        .clipShape(Capsule())
                                 }
                             }
+                            .padding(.horizontal, 4)
                             
-                            Spacer()
-                            
-                            if !isPro {
-                                Image(systemName: "crown.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(goldColor)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(goldColor.opacity(0.1))
-                                    .clipShape(Capsule())
+                            if isPro {
+                                Text("Your rhythm peaks at \(formatHour(peakHour))")
+                                    .font(.system(size: 16, weight: .bold, design: .serif))
+                                    .foregroundStyle(currentTheme.textForeground)
+                                    .padding(.horizontal, 4)
                             }
-                        }
-                        .padding(.horizontal, 4)
-                        
-                        ZStack {
-                            PeakFocusChart(density: isPro ? hourlyDensity : [9: 2, 10: 5, 11: 4, 12: 1], theme: currentTheme)
-                                .frame(height: 100)
-                                .blur(radius: isPro ? 0 : 8)
                             
-                            if !isPro {
-                                Button(action: { showingPaywall = true }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "lock.fill")
-                                        Text("Unlock Power Hours")
+                            ZStack {
+                                PeakFocusChart(density: isPro ? hourlyDensity : [9: 2, 10: 5, 11: 4, 12: 1], theme: currentTheme)
+                                    .frame(height: 100)
+                                    .blur(radius: isPro ? 0 : 8)
+                                
+                                if !isPro {
+                                    Button(action: { showingPaywall = true }) {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "lock.fill")
+                                            Text("Unlock Power Hours")
+                                        }
+                                        .font(.system(size: 12, weight: .bold, design: .serif))
+                                        .foregroundStyle(goldColor)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(fieldBgColor)
+                                        .clipShape(Capsule())
+                                        .shadow(radius: 5)
                                     }
-                                    .font(.system(size: 12, weight: .bold, design: .serif))
-                                    .foregroundStyle(goldColor)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(fieldBgColor)
-                                    .clipShape(Capsule())
-                                    .shadow(radius: 5)
                                 }
                             }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(fieldBgColor)
+                                    .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
+                            )
+                            
+                            if isPro {
+                                Text("Insight: You are most productive in the \(peakHour < 12 ? "morning" : "afternoon"). Try scheduling your highest-priority 'Deep Work' during this window.")
+                                    .font(.system(size: 12, design: .serif))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.6))
+                                    .padding(.horizontal, 4)
+                            }
                         }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(fieldBgColor)
-                                .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
-                        )
-                        
-                        if isPro {
-                            Text("Insight: You are most productive in the \(peakHour < 12 ? "morning" : "afternoon"). Try scheduling your highest-priority 'Deep Work' during this window.")
-                                .font(.system(size: 12, design: .serif))
-                                .foregroundStyle(currentTheme.textForeground.opacity(0.6))
-                                .padding(.horizontal, 4)
-                        }
-                    }
-                    .padding(.horizontal, 32)
+                        .padding(.horizontal, 32)
 
-                    // 3. PRO SECTION: Focus Momentum (VITAL)
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Text("FOCUS MOMENTUM")
+                        // 3. PRO SECTION: Focus Momentum (VITAL)
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack(spacing: 8) {
+                                Text("FOCUS MOMENTUM")
+                                    .font(.system(size: 12, weight: .regular, design: .serif))
+                                    .foregroundStyle(goldColor)
+                                    .tracking(1)
+                                
+                                Button(action: {
+                                    selectedMetricInfo = MetricInfo(
+                                        title: "Focus Momentum",
+                                        description: "This compares your total focus hours from the last 7 days against the previous 7 days. It helps you visualize if you are building positive momentum or if you're hitting a slump and need to adjust your workload."
+                                    )
+                                    AnalyticsManager.shared.capture("analytics_info_clicked", properties: ["metric": "focus_momentum"])
+                                }) {
+                                    Image(systemName: "info.circle")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(goldColor.opacity(0.5))
+                                }
+                                
+                                Spacer()
+                                
+                                if !isPro {
+                                    Image(systemName: "crown.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(goldColor)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(goldColor.opacity(0.1))
+                                        .clipShape(Capsule())
+                                }
+                            }
+                            .padding(.horizontal, 4)
+                            
+                            ZStack {
+                                let data = momentumData
+                                MomentumChart(current: isPro ? data.current : [2, 4, 3, 5, 4, 6, 4], 
+                                             previous: isPro ? data.previous : [3, 3, 4, 4, 3, 5, 3], 
+                                             theme: currentTheme)
+                                    .frame(height: 120)
+                                    .blur(radius: isPro ? 0 : 8)
+                                
+                                if !isPro {
+                                    Button(action: { showingPaywall = true }) {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "lock.fill")
+                                            Text("Unlock Momentum")
+                                        }
+                                        .font(.system(size: 12, weight: .bold, design: .serif))
+                                        .foregroundStyle(goldColor)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(fieldBgColor)
+                                        .clipShape(Capsule())
+                                        .shadow(radius: 5)
+                                    }
+                                }
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(fieldBgColor)
+                                    .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
+                            )
+                            
+                            if isPro {
+                                let curTotal = momentumData.current.reduce(0, +)
+                                let prevTotal = momentumData.previous.reduce(0, +)
+                                let diff = curTotal - prevTotal
+                                
+                                HStack {
+                                    Image(systemName: diff >= 0 ? "arrow.up.right.circle.fill" : "arrow.down.right.circle.fill")
+                                        .foregroundStyle(diff >= 0 ? .green : .red)
+                                    Text(diff >= 0 ? "You've focused \(String(format: "%.1f", diff))h more than last week. Great work!" : "Your focus is down by \(String(format: "%.1f", abs(diff)))h this week. Time to reset?")
+                                        .font(.system(size: 12, design: .serif))
+                                        .foregroundStyle(currentTheme.textForeground.opacity(0.6))
+                                }
+                                .padding(.horizontal, 4)
+                            }
+                        }
+                        .padding(.horizontal, 32)
+                        
+                        // 4. Donut Chart
+                        VStack(spacing: 24) {
+                            HStack(spacing: 8) {
+                                Spacer()
+                                Text("TIME DISTRIBUTION")
+                                    .font(.system(size: 12, weight: .medium, design: .serif))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.6))
+                                    .tracking(1)
+                                
+                                Button(action: {
+                                    selectedMetricInfo = MetricInfo(
+                                        title: "Time Distribution",
+                                        description: "A categorical breakdown of how you spend your time. We group tasks by their assigned category and calculate the percentage of your total 'Haiku time' each category occupies. This helps identify if your actions align with your true priorities."
+                                    )
+                                    AnalyticsManager.shared.capture("analytics_info_clicked", properties: ["metric": "time_distribution"])
+                                }) {
+                                    Image(systemName: "info.circle")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(goldColor.opacity(0.5))
+                                }
+                                Spacer()
+                            }
+                            
+                            ZStack {
+                                Circle()
+                                    .stroke(fieldBgColor, lineWidth: 24)
+                                    .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
+                                    .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
+                                
+                                DonutChart(stats: currentStats)
+                                
+                                VStack {
+                                    Text("\(currentStats.count)")
+                                        .font(.system(size: 36, weight: .light, design: .serif))
+                                        .foregroundStyle(goldColor)
+                                    Text("Categories")
+                                        .font(.system(size: 12, weight: .light))
+                                        .foregroundStyle(currentTheme.textForeground.opacity(0.5))
+                                }
+                            }
+                            .frame(width: 200, height: 200)
+                        }
+                        .padding(.vertical, 16)
+                        
+                        // 5. Detailed Breakdown
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("BREAKDOWN")
                                 .font(.system(size: 12, weight: .regular, design: .serif))
                                 .foregroundStyle(goldColor)
                                 .tracking(1)
+                                .padding(.horizontal, 4)
                             
-                            Spacer()
-                            
-                            if !isPro {
-                                Image(systemName: "crown.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(goldColor)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(goldColor.opacity(0.1))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        .padding(.horizontal, 4)
-                        
-                        ZStack {
-                            let data = momentumData
-                            MomentumChart(current: isPro ? data.current : [2, 4, 3, 5, 4, 6, 4], 
-                                         previous: isPro ? data.previous : [3, 3, 4, 4, 3, 5, 3], 
-                                         theme: currentTheme)
-                                .frame(height: 120)
-                                .blur(radius: isPro ? 0 : 8)
-                            
-                            if !isPro {
-                                Button(action: { showingPaywall = true }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "lock.fill")
-                                        Text("Unlock Momentum")
-                                    }
-                                    .font(.system(size: 12, weight: .bold, design: .serif))
-                                    .foregroundStyle(goldColor)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(fieldBgColor)
-                                    .clipShape(Capsule())
-                                    .shadow(radius: 5)
-                                }
-                            }
-                        }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(fieldBgColor)
-                                .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
-                        )
-                        
-                        if isPro {
-                            let curTotal = momentumData.current.reduce(0, +)
-                            let prevTotal = momentumData.previous.reduce(0, +)
-                            let diff = curTotal - prevTotal
-                            
-                            HStack {
-                                Image(systemName: diff >= 0 ? "arrow.up.right.circle.fill" : "arrow.down.right.circle.fill")
-                                    .foregroundStyle(diff >= 0 ? .green : .red)
-                                Text(diff >= 0 ? "You've focused \(String(format: "%.1f", diff))h more than last week. Great work!" : "Your focus is down by \(String(format: "%.1f", abs(diff)))h this week. Time to reset?")
-                                    .font(.system(size: 12, design: .serif))
-                                    .foregroundStyle(currentTheme.textForeground.opacity(0.6))
-                            }
-                            .padding(.horizontal, 4)
-                        }
-                    }
-                    .padding(.horizontal, 32)
-                    
-                    // 4. Donut Chart
-                    VStack(spacing: 24) {
-                        Text("TIME DISTRIBUTION")
-                            .font(.system(size: 12, weight: .medium, design: .serif))
-                            .foregroundStyle(currentTheme.textForeground.opacity(0.6))
-                            .tracking(1)
-                        
-                        ZStack {
-                            Circle()
-                                .stroke(fieldBgColor, lineWidth: 24)
-                                .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
-                                .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
-                            
-                            DonutChart(stats: currentStats)
-                            
-                            VStack {
-                                Text("\(currentStats.count)")
-                                    .font(.system(size: 36, weight: .light, design: .serif))
-                                    .foregroundStyle(goldColor)
-                                Text("Categories")
-                                    .font(.system(size: 12, weight: .light))
-                                    .foregroundStyle(currentTheme.textForeground.opacity(0.5))
-                            }
-                        }
-                        .frame(width: 200, height: 200)
-                    }
-                    .padding(.vertical, 16)
-                    
-                    // 5. Detailed Breakdown
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("BREAKDOWN")
-                            .font(.system(size: 12, weight: .regular, design: .serif))
-                            .foregroundStyle(goldColor)
-                            .tracking(1)
-                            .padding(.horizontal, 4)
-                        
-                        VStack(spacing: 12) {
-                            ForEach(currentStats) { stat in
-                                HStack(spacing: 16) {
-                                    Circle()
-                                        .fill(stat.color)
-                                        .frame(width: 12, height: 12)
-                                        .shadow(color: stat.color.opacity(0.5), radius: 4)
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(stat.name)
-                                            .font(.system(size: 16, weight: .medium))
-                                            .foregroundStyle(currentTheme.textForeground.opacity(0.9))
+                            VStack(spacing: 12) {
+                                ForEach(currentStats) { stat in
+                                    HStack(spacing: 16) {
+                                        Circle()
+                                            .fill(stat.color)
+                                            .frame(width: 12, height: 12)
+                                            .shadow(color: stat.color.opacity(0.5), radius: 4)
                                         
-                                        // Progress Bar
-                                        GeometryReader { proxy in
-                                            ZStack(alignment: .leading) {
-                                                Capsule()
-                                                    .fill(fieldBgColor)
-                                                    .frame(height: 6)
-                                                
-                                                Capsule()
-                                                    .fill(stat.color)
-                                                    .frame(width: proxy.size.width * (stat.percentage / 100), height: 6)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(stat.name)
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundStyle(currentTheme.textForeground.opacity(0.9))
+                                            
+                                            // Progress Bar
+                                            GeometryReader { proxy in
+                                                ZStack(alignment: .leading) {
+                                                    Capsule()
+                                                        .fill(fieldBgColor)
+                                                        .frame(height: 6)
+                                                    
+                                                    Capsule()
+                                                        .fill(stat.color)
+                                                        .frame(width: proxy.size.width * (stat.percentage / 100), height: 6)
+                                                }
                                             }
+                                            .frame(height: 6)
                                         }
-                                        .frame(height: 6)
+                                        
+                                        VStack(alignment: .trailing, spacing: 4) {
+                                            Text(formatDuration(stat.minutes))
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundStyle(stat.color)
+                                            Text("\(String(format: "%.0f", stat.percentage))%")
+                                                .font(.system(size: 12, weight: .light))
+                                                .foregroundStyle(currentTheme.textForeground.opacity(0.5))
+                                        }
                                     }
-                                    
-                                    VStack(alignment: .trailing, spacing: 4) {
-                                        Text(formatDuration(stat.minutes))
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(stat.color)
-                                        Text("\(String(format: "%.0f", stat.percentage))%")
-                                            .font(.system(size: 12, weight: .light))
-                                            .foregroundStyle(currentTheme.textForeground.opacity(0.5))
-                                    }
+                                    .padding()
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(fieldBgColor)
+                                            .shadow(color: shadowDark, radius: 4, x: 2, y: 2)
+                                    )
                                 }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(fieldBgColor)
-                                        .shadow(color: shadowDark, radius: 4, x: 2, y: 2)
-                                )
                             }
                         }
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 60)
                     }
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 60)
                 }
             }
+            .scrollIndicators(.hidden)
+            
+            if let info = selectedMetricInfo {
+                MetricInfoOverlay(info: info, isPresented: Binding(
+                    get: { selectedMetricInfo != nil },
+                    set: { if !$0 { selectedMetricInfo = nil } }
+                ))
+            }
         }
-        .scrollIndicators(.hidden)
         .sheet(isPresented: $showingPaywall) {
             HaikuProView()
         }
+    }
+}
+
+struct MetricInfoOverlay: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
+    let info: ProfileAnalyticsView.MetricInfo
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.2)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isPresented = false
+                    }
+                }
+            
+            VStack(spacing: 20) {
+                HStack {
+                    Text(info.title.uppercased())
+                        .font(.system(size: 14, weight: .bold, design: .serif))
+                        .foregroundStyle(currentTheme.accent)
+                        .tracking(2)
+                    Spacer()
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isPresented = false
+                        }
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.3))
+                    }
+                }
+                
+                Text(info.description)
+                    .font(.system(size: 14, design: .serif))
+                    .foregroundStyle(currentTheme.textForeground.opacity(0.8))
+                    .lineSpacing(6)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isPresented = false
+                    }
+                }) {
+                    Text("Got it")
+                        .font(.system(size: 14, weight: .bold, design: .serif))
+                        .foregroundStyle(currentTheme.bg)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(currentTheme.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .padding(24)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(currentTheme.bg)
+                    .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
+            )
+            .padding(.horizontal, 40)
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.9).combined(with: .opacity),
+                removal: .scale(scale: 0.9).combined(with: .opacity)
+            ))
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isPresented)
     }
 }
 

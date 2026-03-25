@@ -132,6 +132,7 @@ struct NewCategoryView: View {
                             let newCat = Category(name: name, icon: selectedIcon, rgb: aestheticColors[selectedColorIndex])
                             categoryManager.categories.append(newCat)
                             selectedCategoryId = newCat.id
+                            AnalyticsManager.shared.capture("category_created", properties: ["icon": selectedIcon])
                             dismiss()
                         }) {
                             Text("Create Category")
@@ -168,4 +169,3 @@ struct NewCategoryView: View {
         .preferredColorScheme(.dark)
     }
 }
-

@@ -52,7 +52,12 @@ struct WeeklyView: View {
                 
                 // Layout Toggle
                 HStack(spacing: 0) {
-                    Button(action: { withAnimation(.spring()) { isCalendarLayout = false } }) {
+                    Button(action: { 
+                        withAnimation(.spring()) { 
+                            isCalendarLayout = false 
+                            AnalyticsManager.shared.capture("weekly_layout_changed", properties: ["layout": "clocks"])
+                        } 
+                    }) {
                         Text("Clocks")
                             .font(.system(size: 13, weight: .medium, design: .serif))
                             .foregroundStyle(isCalendarLayout ? currentTheme.textForeground.opacity(0.5) : currentTheme.bg)
@@ -62,7 +67,12 @@ struct WeeklyView: View {
                             .clipShape(Capsule())
                     }
                     
-                    Button(action: { withAnimation(.spring()) { isCalendarLayout = true } }) {
+                    Button(action: { 
+                        withAnimation(.spring()) { 
+                            isCalendarLayout = true 
+                            AnalyticsManager.shared.capture("weekly_layout_changed", properties: ["layout": "calendar"])
+                        } 
+                    }) {
                         Text("Calendar")
                             .font(.system(size: 13, weight: .medium, design: .serif))
                             .foregroundStyle(!isCalendarLayout ? currentTheme.textForeground.opacity(0.5) : currentTheme.bg)
@@ -85,9 +95,9 @@ struct WeeklyView: View {
                     .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .trailing)), removal: .opacity))
             } else {
                 // Grid of Large Clocks
+                let days = getDaysInWeek()
                 ScrollView {
                     VStack(spacing: 32) {
-                        let days = getDaysInWeek()
                         ForEach(0..<days.count, id: \.self) { index in
                             if let date = days[index] {
                                 let tasks = tasksByDate[date, default: []]
@@ -181,22 +191,32 @@ struct WeeklyView: View {
             if let newWeek = Calendar.current.date(byAdding: .day, value: days, to: displayWeek) {
                 displayWeek = newWeek
                 onWeekChanged?(newWeek)
+                AnalyticsManager.shared.capture("week_changed", properties: ["days_delta": days])
             }
         }
     }
     
+    private let rangeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter
+    }()
+
+    private let yearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy"
+        return formatter
+    }()
+
     private func weekRangeString(from date: Date) -> String {
         let cal = Calendar.current
         let endDate = cal.date(byAdding: .day, value: 6, to: date) ?? date
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
+        rangeFormatter.dateFormat = "MMM d"
+        let startStr = rangeFormatter.string(from: date)
+        let endStr = rangeFormatter.string(from: endDate)
         
-        let startStr = formatter.string(from: date)
-        let endStr = formatter.string(from: endDate)
-        
-        formatter.dateFormat = "yyyy"
-        let yearStr = formatter.string(from: endDate)
+        let yearStr = yearFormatter.string(from: endDate)
         
         return "\(startStr) - \(endStr), \(yearStr)"
     }

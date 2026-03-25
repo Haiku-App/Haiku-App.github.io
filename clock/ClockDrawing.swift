@@ -65,6 +65,7 @@ struct ClockView: View {
                             .onEnded { _ in
                                 if let drag = activeDrag, let task = tasks.first(where: { $0.id == drag.taskId }) {
                                     onTaskUpdated?(task)
+                                    logAnalytics("task_modified_via_drag", properties: ["mode": "\(drag.mode)"])
                                 }
                                 activeDrag = nil
                                 tasks.sort { $0.startMinutes < $1.startMinutes }
@@ -88,24 +89,37 @@ struct ClockView: View {
 
                 Circle()
                     .fill(
-                        RadialGradient(colors: [clockFaceColor.opacity(0.8), clockFaceColor], center: .center, startRadius: 0, endRadius: faceRadius)
+                        RadialGradient(colors: [clockFaceColor.opacity(0.9), clockFaceColor], center: .center, startRadius: 0, endRadius: faceRadius)
                     )
                     .frame(width: faceRadius * 2, height: faceRadius * 2)
-                    .shadow(color: shadowDark.opacity(0.8), radius: 12, x: 10, y: 10)
-                    .shadow(color: shadowLight.opacity(0.5), radius: 12, x: -10, y: -10)
+                    .shadow(color: shadowDark.opacity(0.4), radius: 15, x: 8, y: 8) // Softer, deeper shadow
+                    .shadow(color: shadowLight.opacity(0.3), radius: 15, x: -8, y: -8)
                     .overlay(
                         Circle()
                             .stroke(
-                                LinearGradient(colors: [textForeground.opacity(0.2), .clear, textForeground.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                                lineWidth: 2
+                                LinearGradient(colors: [textForeground.opacity(0.15), .clear, textForeground.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                lineWidth: 1
                             )
+                    )
+                    .overlay(
+                        // Frosted / Ceramic Texture
+                        Circle()
+                            .fill(.white.opacity(0.02))
+                            .blur(radius: 1)
                     )
                     .allowsHitTesting(false)
                 
                 if is24HourClock {
-                    // Empty 24H Track (Outer)
+                    // Empty 24H Track (Outer) - Clean Engraved Look
                     Circle()
-                        .stroke(taskTrackColor.opacity(0.4), lineWidth: ringWidth)
+                        .stroke(
+                            LinearGradient(
+                                colors: [shadowDark.opacity(0.7), shadowLight.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: ringWidth
+                        )
                         .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
                         .allowsHitTesting(false)
                         
@@ -115,31 +129,76 @@ struct ClockView: View {
                         .position(x: center.x, y: center.y - pmRingRadius)
                         .allowsHitTesting(false)
 
-                    // Sun/Moon indicators
+                    // Sun/Moon indicators (Moved inward to avoid numbers)
                     Group {
                         Image(systemName: "moon.stars.fill")
                             .font(.system(size: 12))
                             .foregroundStyle(goldColor.opacity(0.6))
-                            .position(x: center.x, y: center.y - faceRadius + 25)
+                            .position(x: center.x, y: center.y - faceRadius + 55)
                         
                         Image(systemName: "sun.max.fill")
                             .font(.system(size: 12))
                             .foregroundStyle(.yellow.opacity(0.6))
-                            .position(x: center.x, y: center.y + faceRadius - 25)
+                            .position(x: center.x, y: center.y + faceRadius - 55)
                     }
                     .allowsHitTesting(false)
 
                 } else {
-                    // Empty AM/PM Tracks
-                    Circle()
-                        .stroke(taskTrackColor.opacity(0.3), lineWidth: ringWidth)
-                        .frame(width: amRingRadius * 2, height: amRingRadius * 2)
-                        .allowsHitTesting(false)
+                    // Empty AM/PM Tracks (Clean Engraved Look with Dynamic Focus)
+                    let isAM = currentMinute < 720
+                    let amOpacity: Double = isAM ? 1.0 : 0.25
+                    let pmOpacity: Double = isAM ? 0.25 : 1.0
                     
-                    Circle()
-                        .stroke(taskTrackColor.opacity(0.5), lineWidth: ringWidth)
-                        .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
-                        .allowsHitTesting(false)
+                    Group {
+                        // AM Track
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [shadowDark.opacity(0.7 * amOpacity), shadowLight.opacity(0.3 * amOpacity)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: ringWidth
+                            )
+                            .frame(width: amRingRadius * 2, height: amRingRadius * 2)
+                        
+                        // PM Track
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [shadowDark.opacity(0.7 * pmOpacity), shadowLight.opacity(0.3 * pmOpacity)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: ringWidth
+                            )
+                            .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
+                    }
+                    .allowsHitTesting(false)
+                    
+                    // AM/PM Labels & Anchors
+                    Group {
+                        // AM Section
+                        VStack(spacing: 2) {
+                            Image(systemName: "sun.max.fill")
+                                .font(.system(size: 8))
+                            Text("AM")
+                                .font(.system(size: 7, weight: .heavy, design: .monospaced))
+                        }
+                        .foregroundStyle(goldColor.opacity(isAM ? 0.8 : 0.2))
+                        .position(x: center.x, y: center.y - amRingRadius)
+                        
+                        // PM Section
+                        VStack(spacing: 2) {
+                            Image(systemName: "moon.fill")
+                                .font(.system(size: 8))
+                            Text("PM")
+                                .font(.system(size: 7, weight: .heavy, design: .monospaced))
+                        }
+                        .foregroundStyle(goldColor.opacity(!isAM ? 0.8 : 0.2))
+                        .position(x: center.x, y: center.y - pmRingRadius)
+                    }
+                    .allowsHitTesting(false)
                 }
                 
                 // Scheduled Tasks
@@ -157,27 +216,35 @@ struct ClockView: View {
                         let r = is24HourClock ? pmRingRadius : (frag.isAM ? amRingRadius : pmRingRadius)
 
                         ZStack {
+                            // Subtle Bottom Shadow for slight depth
+                            TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
+                                .stroke(Color.black.opacity(0.15), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
+                                .offset(x: 0.5, y: 0.5)
+                            
+                            // Main Task Fill (True color)
                             TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
                                 .stroke(
-                                    AngularGradient(
-                                        colors: [task.color.opacity(opacity * 0.8), task.color.opacity(opacity), task.color.opacity(opacity * 0.8)],
-                                        center: .center,
-                                        startAngle: .degrees(is24HourClock ? frag.startMinutes * 0.25 - 90 : frag.startMinutes * 0.5 - 90),
-                                        endAngle: .degrees(is24HourClock ? frag.endMinutes * 0.25 - 90 : frag.endMinutes * 0.5 - 90)
-                                    ),
+                                    task.color.opacity(opacity),
                                     style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
                                 )
-                                .frame(width: r * 2, height: r * 2)
-                                .shadow(color: glowColor, radius: glowRadius)
-                                .allowsHitTesting(true)
+                            
+                            // Very subtle Top Highlight
+                            TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
+                                .stroke(
+                                    LinearGradient(colors: [.white.opacity(0.2), .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                    style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
+                                )
+                                .blendMode(.overlay)
                         }
+                        .frame(width: r * 2, height: r * 2)
+                        .shadow(color: glowColor, radius: glowRadius)
+                        .allowsHitTesting(true)
                     }
                 }
 
                 // Premium Ticks (Baton markers)
                 let numTicks = is24HourClock ? 48 : 60
                 ForEach(0..<numTicks, id: \.self) { i in
-                    let isMajor = is24HourClock ? (i % 2 == 0) : (i % 5 == 0)
                     let isHour = is24HourClock ? (i % 4 == 0) : (i % 5 == 0)
                     
                     let angleDeg = Double(i) * (360.0 / Double(numTicks)) - 90
@@ -194,12 +261,25 @@ struct ClockView: View {
                         path.move(to: CGPoint(x: startX, y: startY))
                         path.addLine(to: CGPoint(x: endX, y: endY))
                     }
-                    .stroke(goldColor.opacity(isHour ? 0.8 : 0.3), lineWidth: isHour ? 2 : 1)
+                    .stroke(goldColor.opacity(isHour ? 0.6 : 0.2), lineWidth: isHour ? 1.5 : 0.5)
                 }
                 .allowsHitTesting(false)
 
                 // Hour Numbers (Minimalist)
-                if !is24HourClock {
+                if is24HourClock {
+                    ForEach([24, 6, 12, 18], id: \.self) { hour in
+                        // For 24h clock, each hour is 15 degrees. 24 is at top (0/24), 6 at right, 12 at bottom, 18 at left.
+                        let angle = Angle.degrees(Double(hour) * 15 - 90)
+                        let dist = faceRadius - 28
+                        let x = cos(CGFloat(angle.radians)) * dist
+                        let y = sin(CGFloat(angle.radians)) * dist
+                        
+                        Text("\(hour)")
+                            .font(.system(size: 16, weight: .medium, design: .serif))
+                            .foregroundStyle(goldColor.opacity(0.9))
+                            .position(x: center.x + x, y: center.y + y)
+                    }
+                } else {
                     ForEach([12, 3, 6, 9], id: \.self) { hour in
                         let angle = Angle.degrees(Double(hour) * 30 - 90)
                         let dist = faceRadius - 28
@@ -220,6 +300,7 @@ struct ClockView: View {
                     Button(action: {
                         withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
                             isFlowState.toggle()
+                            logAnalytics("flow_state_toggled", properties: ["is_active": isFlowState])
                         }
                     }) {
                         VStack(spacing: 4) {
@@ -288,6 +369,12 @@ struct ClockView: View {
                 }
             }
         }
+    }
+    
+    // Lightweight analytics shim to avoid hard dependency on an AnalyticsManager implementation
+    private func logAnalytics(_ event: String, properties: [String: Any] = [:]) {
+        // Intentionally left as a no-op. Hook up your analytics SDK here if desired.
+        // print("Analytics: \(event) -> \(properties)")
     }
     
     // MARK: - Drag Logic

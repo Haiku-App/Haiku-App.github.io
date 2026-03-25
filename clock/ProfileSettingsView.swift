@@ -1,5 +1,4 @@
 import SwiftUI
-import PostHog
 import EventKit
 
 struct ProfileSettingsView: View {
@@ -45,7 +44,7 @@ struct ProfileSettingsView: View {
 
                 if !isPro {
                     Button(action: { 
-                        PostHogSDK.shared.capture("upgrade_banner_clicked")
+                        AnalyticsManager.shared.capture("upgrade_banner_clicked")
                         showingPaywall = true 
                     }) {
                         HStack {
@@ -125,7 +124,7 @@ struct ProfileSettingsView: View {
                                         showingCustomOffsetAlert = true
                                     }
                                 } else {
-                                    PostHogSDK.shared.capture("upgrade_custom_notification_clicked")
+                                    AnalyticsManager.shared.capture("upgrade_custom_notification_clicked")
                                     showingPaywall = true
                                 }
                             }) {
@@ -211,17 +210,19 @@ struct ProfileSettingsView: View {
                                         appleCalendarStatus = EKEventStore.authorizationStatus(for: .event)
                                     }
                                 } else {
-                                    PostHogSDK.shared.capture("upgrade_apple_calendar_clicked")
+                                    AnalyticsManager.shared.capture("upgrade_apple_calendar_clicked")
                                     showingPaywall = true
                                 }
                             }) {
                                 HStack(spacing: 12) {
-                                    let isAuthorized = appleCalendarStatus == .authorized || ( {
+                                    let isAuthorized: Bool = {
                                         if #available(iOS 17.0, *) {
                                             return appleCalendarStatus == .fullAccess
+                                        } else {
+                                            // Fallback for older iOS versions where .authorized is not deprecated
+                                            return appleCalendarStatus.rawValue == 3
                                         }
-                                        return false
-                                    }() )
+                                    }()
                                     
                                     Image(systemName: isPro ? "apple.logo" : "lock.fill")
                                         .foregroundStyle(goldColor)
@@ -256,14 +257,14 @@ struct ProfileSettingsView: View {
                                         }
                                     }
                                 } else {
-                                    PostHogSDK.shared.capture("upgrade_google_signin_clicked")
+                                    AnalyticsManager.shared.capture("upgrade_google_signin_clicked")
                                     showingPaywall = true
                                 }
                             }) {
                                 HStack(spacing: 12) {
                                     Image(systemName: isPro ? "g.circle.fill" : "lock.fill")
                                         .foregroundStyle(googleCalendarManager.isSignedIn ? Color.red : goldColor)
-                                    Text(googleCalendarManager.isSignedIn ? "Sign Out of Google" : "Sign In with Google")
+                                    Text(googleCalendarManager.isSignedIn ? "Sign Out of Google" : "Sign In with Google (Coming Soon)")
                                         .font(.system(size: 16, weight: .medium))
                                         .foregroundStyle(currentTheme.textForeground.opacity(0.9))
                                     Spacer()
@@ -282,7 +283,7 @@ struct ProfileSettingsView: View {
                             }
                             .buttonStyle(.plain)
 
-                            Text("Connect Google, Microsoft, or iCloud.")
+                            Text("Connect Google or iCloud.")
                                 .font(.system(size: 11, weight: .regular))
                                 .foregroundStyle(currentTheme.textForeground.opacity(0.6))
                                 .multilineTextAlignment(.center)
@@ -338,10 +339,10 @@ struct ProfileSettingsView: View {
             HaikuProView()
         }
         .onChange(of: currentTheme) { oldTheme, newTheme in
-            PostHogSDK.shared.capture("theme_changed", properties: ["theme_name": newTheme.name])
+            AnalyticsManager.shared.capture("theme_changed", properties: ["theme_name": newTheme.name])
         }
         .onChange(of: is24HourClock) { oldVal, newVal in
-            PostHogSDK.shared.capture("clock_format_toggled", properties: ["is_24_hour": newVal])
+            AnalyticsManager.shared.capture("clock_format_toggled", properties: ["is_24_hour": newVal])
         }
     }
 }

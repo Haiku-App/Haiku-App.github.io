@@ -1,5 +1,4 @@
 import SwiftUI
-import PostHog
 
 struct AddTaskView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
@@ -66,9 +65,9 @@ struct AddTaskView: View {
             ZStack {
                 bgColor.ignoresSafeArea()
                 
+            VStack(spacing: 0) {
                 ScrollView {
                     VStack(spacing: 32) {
-                        
                         // Categories
                         VStack(alignment: .leading, spacing: 12) {
                             Text("CATEGORIES")
@@ -244,24 +243,45 @@ struct AddTaskView: View {
                                     .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
                             )
                         }
-                        
-                        // Add Button
-                        Button(action: saveTask) {
-                            Text(taskToEdit == nil ? "Add to Agenda" : "Update Task")
-                                .font(.system(size: 16, weight: .medium, design: .serif))
-                                .foregroundStyle(bgColor)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(goldColor)
-                                        .shadow(color: .black.opacity(0.3), radius: 5, x: 2, y: 4)
-                                )
-                        }
-                        .padding(.top, 16)
                     }
                     .padding(32)
                 }
+
+                // Fixed Bottom Action Bar
+                VStack(spacing: 0) {
+                    Divider()
+                        .background(goldColor.opacity(0.2))
+                    
+                    VStack(spacing: 8) {
+                        if selectedCategoryId == nil {
+                            Text("Please select a category")
+                                .font(.system(size: 12, weight: .medium, design: .serif))
+                                .foregroundStyle(goldColor.opacity(0.8))
+                                .transition(.opacity)
+                        }
+                        
+                        Button(action: saveTask) {
+                            Text(taskToEdit == nil ? "Schedule Task" : "Update Task")
+                                .font(.system(size: 16, weight: .bold, design: .serif))
+                                .foregroundStyle(selectedCategoryId == nil ? goldColor.opacity(0.3) : bgColor)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 18)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(selectedCategoryId == nil ? goldColor.opacity(0.1) : goldColor)
+                                        .shadow(color: .black.opacity(selectedCategoryId == nil ? 0 : 0.2), radius: 10, x: 0, y: 5)
+                                )
+                        }
+                        .disabled(selectedCategoryId == nil)
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 24)
+                    .background(
+                        bgColor.opacity(0.9)
+                            .background(.ultraThinMaterial)
+                    )
+                }
+            }
             }
             .navigationTitle(taskToEdit == nil ? "New Task" : "Edit Task")
             .navigationBarTitleDisplayMode(.inline)
@@ -359,7 +379,7 @@ struct AddTaskView: View {
             tasksByDate[day] = dayTasks
 
             // PostHog: Track task update
-            PostHogSDK.shared.capture("task_updated", properties: [
+            AnalyticsManager.shared.capture("task_updated", properties: [
                 "duration_minutes": updatedTask.endMinutes - updatedTask.startMinutes,
             ])
 
@@ -396,7 +416,7 @@ struct AddTaskView: View {
             tasksByDate[day] = dayTasks
 
             // PostHog: Track task creation
-            PostHogSDK.shared.capture("task_created", properties: [
+            AnalyticsManager.shared.capture("task_created", properties: [
                 "duration_minutes": newTask.endMinutes - newTask.startMinutes,
                 "from_brain_dump": brainDumpTaskId != nil,
             ])

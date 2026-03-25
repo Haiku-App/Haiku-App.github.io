@@ -1,5 +1,4 @@
 import SwiftUI
-import PostHog
 
 struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -59,7 +58,7 @@ struct OnboardingView: View {
                         Button(action: {
                             NotificationManager.shared.requestAuthorization()
                             // PostHog: Track onboarding completion
-                            PostHogSDK.shared.capture("onboarding_completed")
+                            AnalyticsManager.shared.capture("onboarding_completed")
                             withAnimation(.spring()) {
                                 hasCompletedOnboarding = true
                             }
@@ -92,7 +91,7 @@ struct OnboardingView: View {
                     
                     Button(action: {
                         // PostHog: Track onboarding skip
-                        PostHogSDK.shared.capture("onboarding_skipped", properties: [
+                        AnalyticsManager.shared.capture("onboarding_skipped", properties: [
                             "page_skipped_from": currentPage,
                         ])
                         withAnimation {

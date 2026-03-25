@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import WidgetKit
 
 /// A simple model representing a task/meeting on a clock.
 /// Times are in minutes from midnight (0...1440). For a 12-hour clock, values wrap every 720 minutes.
@@ -96,6 +97,7 @@ class SharedTaskManager {
 
     func save(isPro: Bool) {
         userDefaults.set(isPro, forKey: isProKey)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func loadIsPro() -> Bool {
@@ -105,6 +107,7 @@ class SharedTaskManager {
     func save(tasksByDate: [Date: [ClockTask]]) {        let groups = tasksByDate.map { TaskGroup(date: $0.key, tasks: $0.value) }
         if let data = try? JSONEncoder().encode(groups) {
             userDefaults.set(data, forKey: key)
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
     
@@ -122,6 +125,7 @@ class SharedTaskManager {
 
     func save(is24HourClock: Bool) {
         userDefaults.set(is24HourClock, forKey: is24HourKey)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func loadIs24HourClock() -> Bool {
@@ -130,6 +134,7 @@ class SharedTaskManager {
 
     func save(theme: AppTheme) {
         userDefaults.set(theme.rawValue, forKey: "appThemeSetting")
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func loadTheme() -> AppTheme {

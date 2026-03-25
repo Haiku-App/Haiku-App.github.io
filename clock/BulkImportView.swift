@@ -1,5 +1,4 @@
 import SwiftUI
-import PostHog
 
 struct BulkImportView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
@@ -103,7 +102,7 @@ struct BulkImportView: View {
         }
         
         if importedCount > 0 {
-            PostHogSDK.shared.capture("bulk_import_completed", properties: ["task_count": importedCount])
+            AnalyticsManager.shared.capture("bulk_import_completed", properties: ["task_count": importedCount])
         }
         
         isPresented = false

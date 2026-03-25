@@ -14,9 +14,11 @@ import PostHog
 enum PostHogEnv: String {
     case projectToken = "POSTHOG_PROJECT_TOKEN"
     case host = "POSTHOG_HOST"
+    case revenueCatKey = "REVENUECAT_API_KEY"
 
     var value: String {
         guard let value = ProcessInfo.processInfo.environment[rawValue] else {
+            if rawValue == "REVENUECAT_API_KEY" { return "test_BnEWCtQiNhXXQxCUtUuJfKUDncB" } // Fallback to test key
             fatalError("Set \(rawValue) in the Xcode scheme environment variables.")
         }
         return value
@@ -32,7 +34,7 @@ struct clockApp: App {
     init() {
         // Initialize RevenueCat
         Purchases.logLevel = .debug
-        Purchases.configure(withAPIKey: "test_BnEWCtQiNhXXQxCUtUuJfKUDncB")
+        Purchases.configure(withAPIKey: PostHogEnv.revenueCatKey.value)
 
         // Initialize PostHog
         let config = PostHogConfig(apiKey: PostHogEnv.projectToken.value, host: PostHogEnv.host.value)
