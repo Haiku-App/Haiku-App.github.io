@@ -79,6 +79,12 @@ struct HaikuProView: View {
                                     price: monthly.localizedPriceString,
                                     theme: currentTheme
                                 ) { buyPro(monthly) }
+                            } else {
+                                CompactPricingButton(
+                                    title: "Monthly",
+                                    price: "$3.99",
+                                    theme: currentTheme
+                                ) { } // Disabled until loaded
                             }
                             
                             if let annual = currentOffering.annual {
@@ -88,6 +94,13 @@ struct HaikuProView: View {
                                     isBestValue: true,
                                     theme: currentTheme
                                 ) { buyPro(annual) }
+                            } else {
+                                CompactPricingButton(
+                                    title: "Annual",
+                                    price: "$19.99",
+                                    isBestValue: true,
+                                    theme: currentTheme
+                                ) { }
                             }
                             
                             if let lifetime = currentOffering.lifetime {
@@ -96,6 +109,12 @@ struct HaikuProView: View {
                                     price: lifetime.localizedPriceString,
                                     theme: currentTheme
                                 ) { buyPro(lifetime) }
+                            } else {
+                                CompactPricingButton(
+                                    title: "Lifetime",
+                                    price: "$49.99",
+                                    theme: currentTheme
+                                ) { }
                             }
                         }
                         .padding(.horizontal, 20)

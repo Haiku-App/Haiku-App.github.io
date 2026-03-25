@@ -245,7 +245,6 @@ struct ClockView: View {
                 // Premium Ticks (Baton markers)
                 let numTicks = is24HourClock ? 48 : 60
                 ForEach(0..<numTicks, id: \.self) { i in
-                    let isMajor = is24HourClock ? (i % 2 == 0) : (i % 5 == 0)
                     let isHour = is24HourClock ? (i % 4 == 0) : (i % 5 == 0)
                     
                     let angleDeg = Double(i) * (360.0 / Double(numTicks)) - 90

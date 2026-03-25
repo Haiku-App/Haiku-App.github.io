@@ -10,7 +10,7 @@ class StoreManager: ObservableObject {
     @Published private(set) var isPro: Bool = false
     @Published private(set) var customerInfo: CustomerInfo?
     
-    private let proEntitlementID = "Haiku  Pro"
+    private let proEntitlementID = "Haiku Pro"
     private var customerInfoTask: Task<Void, Never>?
     
     init() {

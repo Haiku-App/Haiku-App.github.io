@@ -215,12 +215,14 @@ struct ProfileSettingsView: View {
                                 }
                             }) {
                                 HStack(spacing: 12) {
-                                    let isAuthorized = appleCalendarStatus == .authorized || ( {
+                                    let isAuthorized: Bool = {
                                         if #available(iOS 17.0, *) {
                                             return appleCalendarStatus == .fullAccess
+                                        } else {
+                                            // Fallback for older iOS versions where .authorized is not deprecated
+                                            return appleCalendarStatus.rawValue == 3
                                         }
-                                        return false
-                                    }() )
+                                    }()
                                     
                                     Image(systemName: isPro ? "apple.logo" : "lock.fill")
                                         .foregroundStyle(goldColor)
