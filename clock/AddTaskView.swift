@@ -81,9 +81,6 @@ struct AddTaskView: View {
                                     ForEach(categoryManager.categories) { cat in
                                         Button(action: {
                                             selectedCategoryId = cat.id
-                                            if let idx = aestheticColors.firstIndex(where: { $0 == cat.rgb }) {
-                                                selectedColorIndex = idx
-                                            }
                                         }) {
                                             VStack(spacing: 12) {
                                                 Image(systemName: cat.icon)
@@ -160,7 +157,6 @@ struct AddTaskView: View {
                                     ForEach(0..<aestheticColors.count, id: \.self) { index in
                                         Button(action: {
                                             selectedColorIndex = index
-                                            selectedCategoryId = nil
                                         }) {
                                             Circle()
                                                 .fill(aestheticColors[index].color)
@@ -331,14 +327,10 @@ struct AddTaskView: View {
         let sMin = (sComps.hour ?? 0) * 60 + (sComps.minute ?? 0)
         let eMin = (eComps.hour ?? 0) * 60 + (eComps.minute ?? 0)
         
-        let colorToUse: Color
-        if let id = selectedCategoryId, let cat = categoryManager.categories.first(where: { $0.id == id }) {
-            colorToUse = cat.color
-        } else if let toEdit = taskToEdit {
-            colorToUse = toEdit.color
-        } else {
-            colorToUse = aestheticColors[selectedColorIndex].color
-        }
+        let colorToUse = aestheticColors[selectedColorIndex].color
+        let cat = categoryManager.categories.first(where: { $0.id == selectedCategoryId })
+        let categoryId = cat?.id
+        let categoryName = cat?.name
         
         let day = cal.startOfDay(for: taskDate)
         
@@ -355,6 +347,8 @@ struct AddTaskView: View {
             updatedTask.startMinutes = sMin
             updatedTask.endMinutes = eMin
             updatedTask.color = colorToUse
+            updatedTask.categoryId = categoryId
+            updatedTask.categoryName = categoryName
             
             // Sync update to Apple Calendar or Google Calendar if Pro
             if isPro {
@@ -381,6 +375,7 @@ struct AddTaskView: View {
             // PostHog: Track task update
             AnalyticsManager.shared.capture("task_updated", properties: [
                 "duration_minutes": updatedTask.endMinutes - updatedTask.startMinutes,
+                "category": categoryName ?? "None"
             ])
 
         } else {
@@ -388,7 +383,9 @@ struct AddTaskView: View {
                 title: title.isEmpty ? "New Task" : title,
                 startMinutes: sMin,
                 endMinutes: eMin,
-                color: colorToUse
+                color: colorToUse,
+                categoryId: categoryId,
+                categoryName: categoryName
             )
             
             // Push to external calendars if Pro

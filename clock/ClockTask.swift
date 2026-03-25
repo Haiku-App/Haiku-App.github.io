@@ -20,13 +20,15 @@ struct ClockTask: Identifiable, Hashable, Codable {
     var isCompleted: Bool = false
     var url: URL? = nil
     var externalEventId: String? = nil
+    var categoryId: UUID? = nil
+    var categoryName: String? = nil
 
     /// Normalize to 12h range in minutes [0, 720)
     var start12h: Double { Double(startMinutes % 720) }
     var end12h: Double { Double(endMinutes % 720) }
     
     enum CodingKeys: String, CodingKey {
-        case id, title, startMinutes, endMinutes, color, isCompleted, url, externalEventId
+        case id, title, startMinutes, endMinutes, color, isCompleted, url, externalEventId, categoryId, categoryName
     }
 
     struct ColorData: Codable {
@@ -42,6 +44,8 @@ struct ClockTask: Identifiable, Hashable, Codable {
         try container.encode(isCompleted, forKey: .isCompleted)
         try container.encodeIfPresent(url, forKey: .url)
         try container.encodeIfPresent(externalEventId, forKey: .externalEventId)
+        try container.encodeIfPresent(categoryId, forKey: .categoryId)
+        try container.encodeIfPresent(categoryName, forKey: .categoryName)
         
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
@@ -49,7 +53,7 @@ struct ClockTask: Identifiable, Hashable, Codable {
         try container.encode(cd, forKey: .color)
     }
 
-    init(id: UUID = UUID(), title: String, startMinutes: Int, endMinutes: Int, color: Color, isCompleted: Bool = false, url: URL? = nil, externalEventId: String? = nil) {
+    init(id: UUID = UUID(), title: String, startMinutes: Int, endMinutes: Int, color: Color, isCompleted: Bool = false, url: URL? = nil, externalEventId: String? = nil, categoryId: UUID? = nil, categoryName: String? = nil) {
         self.id = id
         self.title = title
         self.startMinutes = startMinutes
@@ -58,6 +62,8 @@ struct ClockTask: Identifiable, Hashable, Codable {
         self.isCompleted = isCompleted
         self.url = url
         self.externalEventId = externalEventId
+        self.categoryId = categoryId
+        self.categoryName = categoryName
     }
 
     init(from decoder: Decoder) throws {
@@ -69,6 +75,8 @@ struct ClockTask: Identifiable, Hashable, Codable {
         self.isCompleted = try container.decode(Bool.self, forKey: .isCompleted)
         self.url = try container.decodeIfPresent(URL.self, forKey: .url)
         self.externalEventId = try container.decodeIfPresent(String.self, forKey: .externalEventId)
+        self.categoryId = try container.decodeIfPresent(UUID.self, forKey: .categoryId)
+        self.categoryName = try container.decodeIfPresent(String.self, forKey: .categoryName)
         
         if let cd = try? container.decode(ColorData.self, forKey: .color) {
             self.color = Color(red: cd.r, green: cd.g, blue: cd.b, opacity: cd.a)

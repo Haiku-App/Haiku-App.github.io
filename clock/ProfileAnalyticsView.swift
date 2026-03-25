@@ -33,14 +33,21 @@ struct ProfileAnalyticsView: View {
     }
 
     private var stats: [CategoryStats] {
-        var breakdown: [Color: Double] = [:]
+        struct CategoryKey: Hashable {
+            let id: UUID?
+            let name: String?
+            let color: Color
+        }
+        
+        var breakdown: [CategoryKey: Double] = [:]
         var totalMinutes: Double = 0
         
         for (_, tasks) in tasksByDate {
             for task in tasks {
                 let duration = Double(task.endMinutes - task.startMinutes)
                 if duration > 0 {
-                    breakdown[task.color, default: 0] += duration
+                    let key = CategoryKey(id: task.categoryId, name: task.categoryName, color: task.color)
+                    breakdown[key, default: 0] += duration
                     totalMinutes += duration
                 }
             }
@@ -48,16 +55,33 @@ struct ProfileAnalyticsView: View {
         
         if totalMinutes == 0 { return [] }
         
-        let result = breakdown.map { (color, minutes) -> CategoryStats in
-            let percentage = (minutes / totalMinutes) * 100
+        // Final consolidation: Group by name if multiple colors are used for the same category
+        var consolidated: [String: (color: Color, minutes: Double)] = [:]
+        for (key, minutes) in breakdown {
+            var catName = "Custom"
+            var catColor = key.color
             
-            // Try to find the category name from saved categories
-            var name = "Custom"
-            if let cat = categoryManager.categories.first(where: { $0.color == color }) {
-                name = cat.name
+            if let name = key.name {
+                catName = name
+                // Use the category's official color for the chart if possible
+                if let cat = categoryManager.categories.first(where: { $0.id == key.id }) {
+                    catColor = cat.color
+                }
+            } else {
+                // Legacy color-based lookup
+                if let cat = categoryManager.categories.first(where: { $0.color == key.color }) {
+                    catName = cat.name
+                    catColor = cat.color
+                }
             }
             
-            return CategoryStats(name: name, color: color, minutes: minutes, percentage: percentage)
+            let current = consolidated[catName, default: (catColor, 0)]
+            consolidated[catName] = (current.color, current.minutes + minutes)
+        }
+        
+        let result = consolidated.map { (name, data) -> CategoryStats in
+            let percentage = (data.minutes / totalMinutes) * 100
+            return CategoryStats(name: name, color: data.color, minutes: data.minutes, percentage: percentage)
         }
         
         return result.sorted { $0.minutes > $1.minutes }
