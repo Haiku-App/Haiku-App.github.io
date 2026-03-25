@@ -577,20 +577,20 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		4856ABCF2F7300000056ABCF /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/PostHog/posthog-ios.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.48.0;
-			};
-		};
 		484C12BC2F71B1D4001F962B /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 5.66.0;
+			};
+		};
+		4856ABCF2F7300000056ABCF /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PostHog/posthog-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.48.0;
 			};
 		};
 		E25D362EB56B8A84D486B329 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
@@ -604,11 +604,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		4856ABCE2F7300000056ABCE /* PostHog */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 4856ABCF2F7300000056ABCF /* XCRemoteSwiftPackageReference "posthog-ios" */;
-			productName = PostHog;
-		};
 		484C12BD2F71E7E1001F962B /* RevenueCat */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 484C12BC2F71B1D4001F962B /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
@@ -618,6 +613,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 484C12BC2F71B1D4001F962B /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
 			productName = RevenueCatUI;
+		};
+		4856ABCE2F7300000056ABCE /* PostHog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4856ABCF2F7300000056ABCF /* XCRemoteSwiftPackageReference "posthog-ios" */;
+			productName = PostHog;
 		};
 		55807460388D95E26153B0D9 /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -137,13 +137,17 @@ struct ClockView: View {
                     .allowsHitTesting(false)
 
                 } else {
-                    // Empty AM/PM Tracks (Clean Engraved Look)
+                    // Empty AM/PM Tracks (Clean Engraved Look with Dynamic Focus)
+                    let isAM = currentMinute < 720
+                    let amOpacity: Double = isAM ? 1.0 : 0.25
+                    let pmOpacity: Double = isAM ? 0.25 : 1.0
+                    
                     Group {
                         // AM Track
                         Circle()
                             .stroke(
                                 LinearGradient(
-                                    colors: [shadowDark.opacity(0.7), shadowLight.opacity(0.3)],
+                                    colors: [shadowDark.opacity(0.7 * amOpacity), shadowLight.opacity(0.3 * amOpacity)],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
@@ -155,7 +159,7 @@ struct ClockView: View {
                         Circle()
                             .stroke(
                                 LinearGradient(
-                                    colors: [shadowDark.opacity(0.7), shadowLight.opacity(0.3)],
+                                    colors: [shadowDark.opacity(0.7 * pmOpacity), shadowLight.opacity(0.3 * pmOpacity)],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
@@ -165,17 +169,27 @@ struct ClockView: View {
                     }
                     .allowsHitTesting(false)
                     
-                    // AM/PM Labels
+                    // AM/PM Labels & Anchors
                     Group {
-                        Text("AM")
-                            .font(.system(size: 8, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(goldColor.opacity(0.4))
-                            .position(x: center.x, y: center.y - amRingRadius)
+                        // AM Section
+                        VStack(spacing: 2) {
+                            Image(systemName: "sun.max.fill")
+                                .font(.system(size: 8))
+                            Text("AM")
+                                .font(.system(size: 7, weight: .heavy, design: .monospaced))
+                        }
+                        .foregroundStyle(goldColor.opacity(isAM ? 0.8 : 0.2))
+                        .position(x: center.x, y: center.y - amRingRadius)
                         
-                        Text("PM")
-                            .font(.system(size: 8, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(goldColor.opacity(0.4))
-                            .position(x: center.x, y: center.y - pmRingRadius)
+                        // PM Section
+                        VStack(spacing: 2) {
+                            Image(systemName: "moon.fill")
+                                .font(.system(size: 8))
+                            Text("PM")
+                                .font(.system(size: 7, weight: .heavy, design: .monospaced))
+                        }
+                        .foregroundStyle(goldColor.opacity(!isAM ? 0.8 : 0.2))
+                        .position(x: center.x, y: center.y - pmRingRadius)
                     }
                     .allowsHitTesting(false)
                 }

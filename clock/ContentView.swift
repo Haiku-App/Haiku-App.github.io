@@ -60,229 +60,36 @@ struct ContentView: View {
         return notificationOffsetsData.split(separator: ",").compactMap { Int($0) }
     }
 
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("hasSeenTutorial") private var hasSeenTutorial = false
+    @State private var showingTutorial = false
+
     var body: some View {
         ZStack {
             bgColor.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Header
-                VStack(spacing: 8) {
-                    Text("HAIKU")
-                        .font(.system(size: 26, weight: .regular, design: .serif))
-                        .foregroundStyle(goldColor)
-                        .tracking(2)
-
-                    ZStack {
-                        // Centered Date and Chevrons
-                        HStack(spacing: 16) {
-                            Button(action: { changeDate(by: -1) }) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(goldColor.opacity(0.8))
-                            }
-
-                            Button(action: { showingDatePicker = true }) {
-                                Text(formattedSelectedDate())
-                                    .font(.system(size: 14, weight: .medium, design: .serif))
-                                    .foregroundStyle(currentTheme.textForeground.opacity(0.9))
-                                    .frame(minWidth: 100, alignment: .center)
-                                    .id(selectedDate) // Forces animation on change
-                                    .transition(.opacity)
-                            }
-
-                            Button(action: { changeDate(by: 1) }) {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(goldColor.opacity(0.8))
-                            }
-                        }
-
-                        // Right-aligned Plus Button
-                        HStack {
-                            Spacer()
-                            Button(action: { 
-                                prefilledTaskTitle = nil
-                                taskToEdit = nil
-                                showingAddTask = true 
-                            }) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 20, weight: .bold))
-                                    .foregroundStyle(goldColor)
-                            }
-                            .padding(.trailing, 40)
-                        }
-                    }
-                }
-                .padding(.top, 20)
-                .opacity(selectedTab == .clock && !isFlowState ? 1 : 0)
-                .frame(height: selectedTab == .clock && !isFlowState ? nil : 0)
-                .clipped()
-
+                headerView()
+                
                 Spacer()
 
-                // Content Views
-                Group {
-                    if selectedTab == .clock {
-                        clockContentView()
-                            .id(selectedDate) // Animate view transition when date changes
-                            .transition(.asymmetric(insertion: .opacity, removal: .opacity))
-                    } else if selectedTab == .weekly {
-                        WeeklyView(
-                            tasksByDate: tasksByDate,
-                            selectedDate: $selectedDate,
-                            selectedTab: $selectedTab,
-                            onAppear: { weekStart in
-                                let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
-                                syncCalendarRange(from: weekStart, to: weekEnd)
-                            },
-                            onWeekChanged: { weekStart in
-                                let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
-                                syncCalendarRange(from: weekStart, to: weekEnd)
-                            }
-                        )
-                    } else if selectedTab == .todo {                        TodoView(onSchedule: { title, id in
-                            prefilledTaskTitle = title
-                            prefilledTaskId = id
-                            taskToEdit = nil
-                            showingAddTask = true
-                        })
-                    } else if selectedTab == .analytics {
-                        ProfileAnalyticsView(tasksByDate: tasksByDate)
-                    } else if selectedTab == .profile {
-                        ProfileSettingsView(is24HourClock: $is24HourClock, showingCustomOffsetAlert: $showingCustomOffsetAlert)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
+                mainContentView()
+                
                 Spacer()
 
-                // Bottom Tab Bar
-                HStack {
-                    TabBarButton(icon: "clock.fill", text: "Clock", isSelected: selectedTab == .clock) {
-                        selectedTab = .clock
-                    }
-                    Spacer()
-                    TabBarButton(icon: "calendar", text: "Weekly", isSelected: selectedTab == .weekly) {
-                        selectedTab = .weekly
-                    }
-                    Spacer()
-                    TabBarButton(icon: "list.bullet", text: "To-Do", isSelected: selectedTab == .todo) {
-                        selectedTab = .todo
-                    }
-                    Spacer()
-                    TabBarButton(icon: "chart.pie.fill", text: "Analytics", isSelected: selectedTab == .analytics) {
-                        selectedTab = .analytics
-                    }
-                    Spacer()
-                    TabBarButton(icon: "person.fill", text: "Profile", isSelected: selectedTab == .profile) {
-                        selectedTab = .profile
-                    }
-                }
-                .padding(.horizontal, 40)
-                .padding(.bottom, 20)
-                .foregroundStyle(currentTheme.textForeground.opacity(0.6))
-                .opacity(isFlowState ? 0 : 1)
-                .animation(.easeInOut, value: isFlowState)
+                tabBarView()
             }
             .environmentObject(storeManager)
-            .blur(radius: showingCustomOffsetAlert ? 4 : 0)
-            .disabled(showingCustomOffsetAlert)
+            .blur(radius: showingCustomOffsetAlert || showingTutorial ? 4 : 0)
+            .disabled(showingCustomOffsetAlert || showingTutorial)
 
             if showingCustomOffsetAlert {
-                Color.black.opacity(0.15)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.easeInOut) {
-                            showingCustomOffsetAlert = false
-                            customOffsetString = ""
-                        }
-                    }
-
-                VStack(spacing: 24) {
-                    VStack(spacing: 8) {
-                        Text("Custom Notification")
-                            .font(.system(size: 20, weight: .bold, design: .serif))
-                            .foregroundStyle(goldColor)
-
-                        Text("Enter how many minutes before the task you'd like to be notified.")
-                            .font(.system(size: 14, weight: .regular, design: .serif))
-                            .foregroundStyle(currentTheme.textForeground.opacity(0.7))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-
-                    HStack {
-                        TextField("0", text: $customOffsetString)
-                            .keyboardType(.numberPad)
-                            .font(.system(size: 24, weight: .bold, design: .serif))
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(currentTheme.textForeground)
-
-                        Text("minutes")
-                            .font(.system(size: 16, weight: .medium, design: .serif))
-                            .foregroundStyle(currentTheme.textForeground.opacity(0.5))
-                    }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 20)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(currentTheme.fieldBg)
-                            .shadow(color: currentTheme.shadowDark, radius: 4, x: 2, y: 2)
-                            .shadow(color: currentTheme.shadowLight, radius: 4, x: -2, y: -2)
-                    )
-
-                    HStack(spacing: 16) {
-                        Button(action: {
-                            withAnimation(.easeInOut) {
-                                showingCustomOffsetAlert = false
-                                customOffsetString = ""
-                            }
-                        }) {
-                            Text("Cancel")
-                                .font(.system(size: 16, weight: .medium, design: .serif))
-                                .foregroundStyle(currentTheme.textForeground.opacity(0.6))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button(action: {
-                            if let customValue = Int(customOffsetString), customValue >= 0 {
-                                var currentSet = Set(notificationOffsets)
-                                currentSet.insert(customValue)
-                                notificationOffsetsData = currentSet.sorted().map(String.init).joined(separator: ",")
-                                NotificationManager.shared.requestAuthorization()
-                            }
-                            withAnimation(.easeInOut) {
-                                showingCustomOffsetAlert = false
-                                customOffsetString = ""
-                            }
-                        }) {
-                            Text("Add")
-                                .font(.system(size: 16, weight: .bold, design: .serif))
-                                .foregroundStyle(currentTheme.bg)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(goldColor)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(32)
-                .background(
-                    RoundedRectangle(cornerRadius: 28)
-                        .fill(currentTheme.bg)
-                        .shadow(color: currentTheme.shadowDark.opacity(0.3), radius: 20, x: 10, y: 10)
-                        .shadow(color: currentTheme.shadowLight.opacity(0.3), radius: 20, x: -10, y: -10)
-                )
-                .padding(.horizontal, 40)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.9).combined(with: .opacity),
-                    removal: .scale(scale: 0.9).combined(with: .opacity)
-                ))
+                customNotificationAlertView()
+            }
+            
+            if showingTutorial {
+                TutorialOverlayView(isPresented: $showingTutorial)
+                    .transition(.opacity)
             }
         }
         .onReceive(timer) { date in
@@ -347,6 +154,12 @@ struct ContentView: View {
             .preferredColorScheme(.dark)
         }
         .onAppear {
+            if hasCompletedOnboarding && !hasSeenTutorial {
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    showingTutorial = true
+                    hasSeenTutorial = true
+                }
+            }
             syncCalendar(for: selectedDate)
             SharedTaskManager.shared.save(is24HourClock: is24HourClock)
             SharedTaskManager.shared.save(theme: currentTheme)
@@ -390,6 +203,234 @@ struct ContentView: View {
             if newVal {
                 syncCalendar(for: selectedDate)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func headerView() -> some View {
+        VStack(spacing: 6) {
+            Text("HAIKU")
+                .font(.system(size: 24, weight: .light, design: .serif))
+                .foregroundStyle(goldColor)
+                .tracking(4)
+
+            ZStack {
+                HStack(spacing: 20) {
+                    Button(action: { changeDate(by: -1) }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 12, weight: .light))
+                            .foregroundStyle(goldColor.opacity(0.6))
+                    }
+
+                    Button(action: { showingDatePicker = true }) {
+                        Text(formattedSelectedDate().uppercased())
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.8))
+                            .tracking(1.5)
+                            .frame(minWidth: 120, alignment: .center)
+                            .id(selectedDate)
+                            .transition(.opacity)
+                    }
+
+                    Button(action: { changeDate(by: 1) }) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .light))
+                            .foregroundStyle(goldColor.opacity(0.6))
+                    }
+                }
+
+                HStack {
+                    Spacer()
+                    Button(action: { 
+                        prefilledTaskTitle = nil
+                        taskToEdit = nil
+                        showingAddTask = true 
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .light))
+                            .foregroundStyle(goldColor)
+                    }
+                    .padding(.trailing, 32)
+                }
+            }
+        }
+        .padding(.top, 24)
+        .opacity(selectedTab == .clock && !isFlowState ? 1 : 0)
+        .frame(height: selectedTab == .clock && !isFlowState ? nil : 0)
+        .clipped()
+    }
+
+    @ViewBuilder
+    private func mainContentView() -> some View {
+        Group {
+            if selectedTab == .clock {
+                clockContentView()
+                    .id(selectedDate)
+                    .transition(.asymmetric(insertion: .opacity, removal: .opacity))
+            } else if selectedTab == .weekly {
+                WeeklyView(
+                    tasksByDate: tasksByDate,
+                    selectedDate: $selectedDate,
+                    selectedTab: $selectedTab,
+                    onAppear: { weekStart in
+                        let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
+                        syncCalendarRange(from: weekStart, to: weekEnd)
+                    },
+                    onWeekChanged: { weekStart in
+                        let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
+                        syncCalendarRange(from: weekStart, to: weekEnd)
+                    }
+                )
+            } else if selectedTab == .todo {
+                TodoView(onSchedule: { title, id in
+                    prefilledTaskTitle = title
+                    prefilledTaskId = id
+                    taskToEdit = nil
+                    showingAddTask = true
+                })
+            } else if selectedTab == .analytics {
+                ProfileAnalyticsView(tasksByDate: tasksByDate)
+            } else if selectedTab == .profile {
+                ProfileSettingsView(is24HourClock: $is24HourClock, showingCustomOffsetAlert: $showingCustomOffsetAlert)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func tabBarView() -> some View {
+        HStack {
+            TabBarButton(icon: "clock", text: "Clock", isSelected: selectedTab == .clock) {
+                selectedTab = .clock
+            }
+            Spacer()
+            TabBarButton(icon: "calendar", text: "Weekly", isSelected: selectedTab == .weekly) {
+                selectedTab = .weekly
+            }
+            Spacer()
+            TabBarButton(icon: "list.bullet", text: "To-Do", isSelected: selectedTab == .todo) {
+                selectedTab = .todo
+            }
+            Spacer()
+            TabBarButton(icon: "chart.pie", text: "Analytics", isSelected: selectedTab == .analytics) {
+                selectedTab = .analytics
+            }
+            Spacer()
+            TabBarButton(icon: "person", text: "Profile", isSelected: selectedTab == .profile) {
+                selectedTab = .profile
+            }
+        }
+        .padding(.horizontal, 40)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+        .background(
+            Rectangle()
+                .fill(currentTheme.bg.opacity(0.8))
+                .background(.ultraThinMaterial)
+                .ignoresSafeArea()
+        )
+        .foregroundStyle(currentTheme.textForeground.opacity(0.4))
+        .opacity(isFlowState ? 0 : 1)
+        .animation(.easeInOut, value: isFlowState)
+    }
+
+    @ViewBuilder
+    private func customNotificationAlertView() -> some View {
+        ZStack {
+            Color.black.opacity(0.15)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.easeInOut) {
+                        showingCustomOffsetAlert = false
+                        customOffsetString = ""
+                    }
+                }
+
+            VStack(spacing: 24) {
+                VStack(spacing: 8) {
+                    Text("Custom Notification")
+                        .font(.system(size: 20, weight: .bold, design: .serif))
+                        .foregroundStyle(goldColor)
+
+                    Text("Enter how many minutes before the task you'd like to be notified.")
+                        .font(.system(size: 14, weight: .regular, design: .serif))
+                        .foregroundStyle(currentTheme.textForeground.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+
+                HStack {
+                    TextField("0", text: $customOffsetString)
+                        .keyboardType(.numberPad)
+                        .font(.system(size: 24, weight: .bold, design: .serif))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(currentTheme.textForeground)
+
+                    Text("minutes")
+                        .font(.system(size: 16, weight: .medium, design: .serif))
+                        .foregroundStyle(currentTheme.textForeground.opacity(0.5))
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 20)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(currentTheme.fieldBg)
+                        .shadow(color: currentTheme.shadowDark, radius: 4, x: 2, y: 2)
+                        .shadow(color: currentTheme.shadowLight, radius: 4, x: -2, y: -2)
+                )
+
+                HStack(spacing: 16) {
+                    Button(action: {
+                        withAnimation(.easeInOut) {
+                            showingCustomOffsetAlert = false
+                            customOffsetString = ""
+                        }
+                    }) {
+                        Text("Cancel")
+                            .font(.system(size: 16, weight: .medium, design: .serif))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.6))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: {
+                        if let customValue = Int(customOffsetString), customValue >= 0 {
+                            var currentSet = Set(notificationOffsets)
+                            currentSet.insert(customValue)
+                            notificationOffsetsData = currentSet.sorted().map(String.init).joined(separator: ",")
+                            NotificationManager.shared.requestAuthorization()
+                        }
+                        withAnimation(.easeInOut) {
+                            showingCustomOffsetAlert = false
+                            customOffsetString = ""
+                        }
+                    }) {
+                        Text("Add")
+                            .font(.system(size: 16, weight: .bold, design: .serif))
+                            .foregroundStyle(currentTheme.bg)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(goldColor)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(32)
+            .background(
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(currentTheme.bg)
+                    .shadow(color: currentTheme.shadowDark.opacity(0.3), radius: 20, x: 10, y: 10)
+                    .shadow(color: currentTheme.shadowLight.opacity(0.3), radius: 20, x: -10, y: -10)
+            )
+            .padding(.horizontal, 40)
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.9).combined(with: .opacity),
+                removal: .scale(scale: 0.9).combined(with: .opacity)
+            ))
         }
     }
 
@@ -710,4 +751,3 @@ struct TabBarButton: View {
     ContentView()
         .environmentObject(StoreManager())
 }
-
