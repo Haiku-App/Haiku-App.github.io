@@ -1,0 +1,32 @@
+<svg width="400" height="800" viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg">
+  <!-- iPhone Bezel -->
+  <rect x="10" y="10" width="380" height="780" rx="50" fill="#2E3B2E" stroke="#1a1a1a" stroke-width="14"/>
+  <!-- Dynamic Island / Notch -->
+  <rect x="130" y="20" width="140" height="35" rx="17.5" fill="#000000"/>
+  
+  <!-- Clock Neumorphic Base -->
+  <circle cx="200" cy="350" r="150" fill="#2E3B2E"/>
+  <circle cx="200" cy="350" r="150" fill="transparent" stroke="#1E291E" stroke-width="8" style="transform: translate(6px, 6px); filter: blur(6px);"/>
+  <circle cx="200" cy="350" r="150" fill="transparent" stroke="#384738" stroke-width="8" style="transform: translate(-6px, -6px); filter: blur(6px);"/>
+
+  <!-- Clock Tracks -->
+  <circle cx="200" cy="350" r="120" stroke="#263326" stroke-width="24" fill="none"/>
+  <!-- Active Task Arc (Gold) -->
+  <path d="M 200 230 A 120 120 0 0 1 310 400" stroke="#D9C794" stroke-width="24" fill="none" stroke-linecap="round"/>
+  
+  <!-- Center Readout -->
+  <text x="200" y="340" font-family="sans-serif" font-size="28" font-weight="bold" fill="#D9C794" text-anchor="middle">45 min</text>
+  <text x="200" y="365" font-family="serif" font-size="14" fill="#FFFFFF" opacity="0.8" text-anchor="middle">Deep Work</text>
+
+  <!-- Task List Background -->
+  <rect x="0" y="550" width="400" height="250" fill="#263326"/>
+  
+  <!-- Task Rows -->
+  <rect x="30" y="580" width="340" height="60" rx="15" fill="#2E3B2E"/>
+  <rect x="50" y="605" width="180" height="10" rx="5" fill="#FFFFFF" opacity="0.9"/>
+  <circle cx="340" cy="610" r="10" fill="#D9C794"/>
+
+  <rect x="30" y="660" width="340" height="60" rx="15" fill="#2E3B2E"/>
+  <rect x="50" y="685" width="120" height="10" rx="5" fill="#FFFFFF" opacity="0.5"/>
+  <circle cx="340" cy="690" r="10" fill="#88857D"/>
+</svg>

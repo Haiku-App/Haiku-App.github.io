@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Haiku</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Converted from Swift Color(red: 0.18, green: 0.23, blue: 0.18) */
+            --bg: #2E3B2E; 
+            /* fieldBg Color(red: 0.15, green: 0.20, blue: 0.15) */
+            --field-bg: #263326;
+            --text-main: #FFFFFF;
+            --text-muted: rgba(255, 255, 255, 0.6);
+            /* accent Color(red: 0.85, green: 0.78, blue: 0.58) */
+            --accent: #D9C794; 
+            /* shadowDark Color(red: 0.12, green: 0.16, blue: 0.12) */
+            --shadow-dark: #1E291E;
+            /* shadowLight Color(red: 0.22, green: 0.28, blue: 0.22) */
+            --shadow-light: #384738;
+            --font-serif: 'Playfair Display', Georgia, serif;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.8;
+            margin: 0;
+            padding: 4rem 2rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 700px;
+            background: var(--bg);
+            padding: 3rem;
+            border-radius: 30px;
+            box-shadow: 15px 15px 30px var(--shadow-dark), 
+                       -15px -15px 30px var(--shadow-light);
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-family: var(--font-serif);
+            color: var(--accent);
+            font-size: 2.5rem;
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.05em;
+        }
+
+        h2 {
+            font-family: var(--font-serif);
+            color: var(--text-main);
+            font-size: 1.5rem;
+            margin-top: 2.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--shadow-dark);
+            padding-bottom: 0.5rem;
+        }
+
+        p, li {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .date {
+            font-style: italic;
+            margin-bottom: 3rem;
+            color: var(--text-muted);
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 2rem;
+            padding: 0.8rem 1.5rem;
+            border-radius: 15px;
+            background: var(--bg);
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            box-shadow: 5px 5px 10px var(--shadow-dark), 
+                       -5px -5px 10px var(--shadow-light);
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            color: var(--accent);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-btn">&larr; Back to Home</a>
+        
+        <h1>Privacy Policy</h1>
+        <p class="date">Last updated: March 23, 2026 </p>
+
+        <h2>1. Introduction</h2>
+        <p>Welcome to Haiku. We are committed to protecting your personal information and your right to privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our iOS application.</p>
+
+        <h2>2. Information We Collect</h2>
+        <p>Haiku is designed with privacy in mind. We collect minimal information:</p>
+        <ul>
+            <li><strong>Calendar Data:</strong> The app requests access to your Apple Calendar and Google Calendar (if you choose to connect it) strictly to display and manage your events within the app.</li>
+            <li><strong>App Data:</strong> Your preferences, themes, and tasks created exclusively within Haiku are stored locally on your device or via your personal iCloud account.</li>
+            <li><strong>Analytics Data:</strong> We collect anonymized usage data to help us understand how you use the app and to improve its features. This data is collected through PostHog and does not include any personal information or calendar content.</li>
+        </ul>
+
+        <h2>3. Analytics</h2>
+        <p>We use <strong>PostHog</strong> to help us analyze how our users interact with the app. This helps us identify popular features and areas that may need improvement. The data collected is strictly related to app usage (e.g., button clicks, theme changes, or navigation) and is <strong>entirely anonymized</strong>. We do not collect names, email addresses, the titles of your tasks, or any information from your calendars through this analytics service.</p>
+        <p>You can learn more about how PostHog handles data in their <a href="https://posthog.com/privacy" target="_blank">Privacy Policy</a>.</p>
+
+        <h2>4. How We Use Your Information</h2>
+        <p>Your calendar data is used solely to provide the core functionality of the app—displaying your schedule on the clock interface and allowing you to create or modify events. <strong>We do not transmit your calendar data to our servers, nor do we sell or share your data with third parties.</strong> All communication regarding your Google Calendar events happens directly between your local device and Google's servers.</p>
+
+        <h2>5. Google API Services & Limited Use Policy</h2>
+        <p>If you choose to sync your Google Calendar, Haiku will authenticate using Google Sign-In and access your events via the Google Calendar API. Your use of this feature is subject to the <a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a>.</p>
+        
+        <p><strong>Haiku's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank">Google API Services User Data Policy</a>, including the Limited Use requirements.</strong> Specifically:</p>
+        <ul>
+            <li><strong>Limited Use:</strong> We only use the data obtained through the Google Calendar API to provide or improve the core user-facing features of the Haiku app (displaying and managing your schedule).</li>
+            <li><strong>No Data Transfers:</strong> We do not transfer your Google data to any third party, except as necessary to comply with applicable laws, for security purposes (investigating abuse), or as part of a merger/acquisition.</li>
+            <li><strong>No Human Access:</strong> No human will read your Google data unless we obtain your affirmative agreement for specific messages/files, it is necessary for security purposes, or it is necessary to comply with applicable law.</li>
+            <li><strong>No Advertising or Profiling:</strong> We absolutely do not transfer, sell, or use your user data for serving ads, including retargeting, personalized, or interest-based advertising. We do not use your data for credit-worthiness or lending purposes.</li>
+            <li><strong>No Data Brokers:</strong> We do not transfer or sell user data to third parties like advertising platforms, data brokers, or any information resellers.</li>
+        </ul>
+
+        <h2>6. Data Security</h2>
+        <p>We rely on the security features provided by iOS and the official Google Sign-In SDK to protect your authentication tokens and data. We do not maintain our own databases for your calendar information.</p>
+
+        <h2>7. Contact Us</h2>
+        <p>If you have any questions or concerns about our Privacy Policy, please contact us at <a href="mailto:reswink17@gmail.com">reswink17@gmail.com</a>.</p>
+    </div>
+</body>
+</html>
