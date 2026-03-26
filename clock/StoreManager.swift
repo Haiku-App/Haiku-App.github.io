@@ -111,7 +111,12 @@ class StoreManager: ObservableObject {
         var proActive = info.entitlements[proEntitlementID]?.isActive == true
         print("RevenueCat: Checking entitlement '\(proEntitlementID)'. Active: \(proActive)")
         
-        // Keep Pro active for TestFlight/Sandbox ONLY if they have already "unlocked" it once
+        // LEGACY TESTER GIFT: If they ever unlocked it during TestFlight, keep it forever.
+        if hasUnlockedFreePro {
+            proActive = true
+        }
+        
+        // Keep Pro active for TestFlight/Sandbox even if RevenueCat says otherwise (for initial unlock)
         if isSandboxMode && hasUnlockedFreePro {
             proActive = true
         }
