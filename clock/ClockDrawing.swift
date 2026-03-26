@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ClockView: View {
     var now: Date
+    var displayedDate: Date = Date()
     @Binding var tasks: [ClockTask]
     @Binding var isFlowState: Bool
     var is24HourClock: Bool = false
@@ -36,6 +37,12 @@ struct ClockView: View {
     private var currentMinute: Double {
         let comps = Calendar.current.dateComponents([.hour, .minute, .second], from: now)
         return Double((comps.hour ?? 0) * 60 + (comps.minute ?? 0)) + Double(comps.second ?? 0) / 60.0
+    }
+    
+    private var dayStatus: Int { // -1: past, 0: today, 1: future
+        let cal = Calendar.current
+        if cal.isDateInToday(displayedDate) { return 0 }
+        return displayedDate < now ? -1 : 1
     }
     
     private var activeTask: ClockTask? {
@@ -205,39 +212,46 @@ struct ClockView: View {
                 ForEach(tasks) { task in
                     let isDragging = activeDrag?.taskId == task.id
                     let isActive = activeTask?.id == task.id && !isDragging
-                    let isPast = task.endMinutes <= Int(currentMinute) && !isDragging
                     
-                    let opacity: Double = isPast ? 0.3 : 1.0
                     let glowRadius: CGFloat = (isActive && (pulseState || isFlowState)) ? (isFlowState ? 16 : 8) : (isDragging ? 4 : 0)
                     let glowColor = task.color.opacity((isActive && (pulseState || isFlowState)) ? (isFlowState ? 0.6 : 0.4) : (isDragging ? 0.6 : 0))
 
                     let frags = is24HourClock ? [TaskFragment(isAM: false, startMinutes: Double(task.startMinutes), endMinutes: Double(task.endMinutes), task: task)] : getFragments(for: task)
-                    ForEach(Array(frags.enumerated()), id: \.offset) { index, frag in
+                    ForEach(frags) { frag in
                         let r = is24HourClock ? pmRingRadius : (frag.isAM ? amRingRadius : pmRingRadius)
-
-                        ZStack {
-                            // Subtle Bottom Shadow for slight depth
-                            TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
-                                .stroke(Color.black.opacity(0.15), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
-                                .offset(x: 0.5, y: 0.5)
-                            
-                            // Main Task Fill (True color)
-                            TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
-                                .stroke(
-                                    task.color.opacity(opacity),
-                                    style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
-                                )
-                            
-                            // Very subtle Top Highlight
-                            TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
-                                .stroke(
-                                    LinearGradient(colors: [.white.opacity(0.2), .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
-                                    style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
-                                )
-                                .blendMode(.overlay)
+                        
+                        Group {
+                            if isDragging || dayStatus > 0 {
+                                // Full color for dragging or future days
+                                TaskSegmentView(start: frag.startMinutes, end: frag.endMinutes, color: task.color, opacity: 1.0, isFuture: true, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
+                            } else if dayStatus < 0 {
+                                // Greyed out for past days
+                                TaskSegmentView(start: frag.startMinutes, end: frag.endMinutes, color: task.color, opacity: 0.3, isFuture: false, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
+                            } else {
+                                // Today logic: split if needed
+                                let fragStart = frag.startMinutes
+                                let fragEnd = frag.endMinutes
+                                let absStart = is24HourClock ? fragStart : (frag.isAM ? fragStart : fragStart + 720)
+                                let absEnd = is24HourClock ? fragEnd : (frag.isAM ? fragEnd : fragEnd + 720)
+                                
+                                if currentMinute >= absEnd {
+                                    // Fragment entirely in the past
+                                    TaskSegmentView(start: fragStart, end: fragEnd, color: task.color, opacity: 0.3, isFuture: false, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
+                                } else if currentMinute <= absStart {
+                                    // Fragment entirely in the future
+                                    TaskSegmentView(start: fragStart, end: fragEnd, color: task.color, opacity: 1.0, isFuture: true, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
+                                } else {
+                                    // Fragment spans current time: SPLIT
+                                    let splitPoint = is24HourClock ? currentMinute : (frag.isAM ? currentMinute : currentMinute - 720)
+                                    
+                                    ZStack {
+                                        TaskSegmentView(start: fragStart, end: splitPoint, color: task.color, opacity: 0.3, isFuture: false, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
+                                        TaskSegmentView(start: splitPoint, end: fragEnd, color: task.color, opacity: 1.0, isFuture: true, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
+                                    }
+                                }
+                            }
                         }
                         .frame(width: r * 2, height: r * 2)
-                        .shadow(color: glowColor, radius: glowRadius)
                         .allowsHitTesting(true)
                     }
                 }
@@ -437,23 +451,21 @@ struct ClockView: View {
         let dy = location.y - center.y
         let dist = sqrt(dx*dx + dy*dy)
         
+        // Calculate the raw minute based solely on angle (0...720)
+        let min12h = minute(from: location, in: size)
+
         // DEADZONE: If the finger is too close to the center, ignore movements.
-        // atan2 becomes extremely sensitive/unstable at the exact center.
+        // We update lastMouseMinute so that when we exit the deadzone, we don't jump.
         if dist < 40 {
-            // Update the last angle so that when we exit the deadzone, 
-            // we don't calculate a huge delta from the entry point.
-            drag.lastMouseMinute = minute(from: location, in: size)
+            drag.lastMouseMinute = min12h
             activeDrag = drag
             return
         }
         
-        // Calculate the raw minute based solely on angle (0...720)
-        let min12h = minute(from: location, in: size)
-        
-        // Calculate angular delta based on min12h to prevent jumps when crossing rings radially
+        // Calculate angular delta
         var delta = min12h - drag.lastMouseMinute
         
-        // Handle angular wrap-around
+        // Handle angular wrap-around (crossing 12 o'clock)
         if delta > 360 { delta -= 720 }
         else if delta < -360 { delta += 720 }
         
@@ -804,3 +816,39 @@ func getFragments(for task: ClockTask) -> [TaskFragment] {
     return frags
 }
 
+struct TaskSegmentView: View {
+    let start: Double
+    let end: Double
+    let color: Color
+    let opacity: Double
+    let isFuture: Bool
+    let glowColor: Color
+    let glowRadius: CGFloat
+    let ringWidth: CGFloat
+    let is24HourClock: Bool
+
+    var body: some View {
+        ZStack {
+            // Subtle Bottom Shadow
+            TaskArc(startMinutes: start, endMinutes: end, is24HourClock: is24HourClock)
+                .stroke(Color.black.opacity(0.15 * opacity), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
+                .offset(x: 0.5, y: 0.5)
+            
+            // Main Task Fill
+            TaskArc(startMinutes: start, endMinutes: end, is24HourClock: is24HourClock)
+                .stroke(
+                    color.opacity(opacity),
+                    style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
+                )
+            
+            // Very subtle Top Highlight
+            TaskArc(startMinutes: start, endMinutes: end, is24HourClock: is24HourClock)
+                .stroke(
+                    LinearGradient(colors: [.white.opacity(0.2 * opacity), .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
+                )
+                .blendMode(.overlay)
+        }
+        .shadow(color: isFuture ? glowColor : .clear, radius: glowRadius)
+    }
+}
