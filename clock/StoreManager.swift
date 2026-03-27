@@ -13,7 +13,7 @@ class StoreManager: ObservableObject {
     @Published private(set) var isRevenueCatConfigured: Bool = AppConfiguration.isRevenueCatConfigured
     private var hasUnlockedFreePro: Bool = false
     
-    private let proEntitlementID = "Haiku  Pro"
+    private let proEntitlementID = "Haiku Pro"
     private var customerInfoTask: Task<Void, Never>?
     
     init() {

@@ -117,7 +117,7 @@ class SharedTaskManager {
     private let hasUnlockedFreeProKey = "hasUnlockedFreeProSetting"
 
     init() {
-        self.userDefaults = UserDefaults(suiteName: "group.reswin.clock") ?? UserDefaults.standard
+        self.userDefaults = UserDefaults(suiteName: "group.reswink.haiku") ?? UserDefaults.standard
     }
 
     func save(isPro: Bool) {
