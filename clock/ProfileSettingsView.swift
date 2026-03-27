@@ -16,6 +16,16 @@ struct ProfileSettingsView: View {
 
     private var bgColor: Color { currentTheme.bg }
     private var goldColor: Color { currentTheme.accent }
+    private var appVersionText: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+
+        if let buildNumber, buildNumber != shortVersion {
+            return "Version \(shortVersion) (\(buildNumber))"
+        }
+
+        return "Version \(shortVersion)"
+    }
 
     private var offsets: [Int] {
         if notificationOffsetsData.isEmpty { return [] }
@@ -268,7 +278,7 @@ struct ProfileSettingsView: View {
                                 HStack(spacing: 12) {
                                     Image(systemName: isPro ? "g.circle.fill" : "lock.fill")
                                         .foregroundStyle(googleCalendarManager.isSignedIn ? Color.red : goldColor)
-                                    Text(googleCalendarManager.isSignedIn ? "Sign Out of Google" : "Sign In with Google (Coming Soon)")
+                                    Text(googleCalendarManager.isSignedIn ? "Sign Out of Google" : (isPro ? "Sign In with Google" : "Google Calendar Sync"))
                                         .font(.system(size: 16, weight: .medium))
                                         .foregroundStyle(currentTheme.textForeground.opacity(0.9))
                                     Spacer()
@@ -329,7 +339,7 @@ struct ProfileSettingsView: View {
                         Text("HAIKU")
                             .font(.system(size: 16, weight: .medium, design: .serif))
                             .foregroundStyle(goldColor)
-                        Text("Version 1.0.0")
+                        Text(appVersionText)
                             .font(.system(size: 10, weight: .light))
                             .foregroundStyle(currentTheme.textForeground.opacity(0.4))
                     }
@@ -350,4 +360,3 @@ struct ProfileSettingsView: View {
         }
     }
 }
-

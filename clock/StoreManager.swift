@@ -10,6 +10,7 @@ class StoreManager: ObservableObject {
     @Published private(set) var isPro: Bool = false
     @Published private(set) var customerInfo: CustomerInfo?
     @Published private(set) var isSandboxMode: Bool = false
+    @Published private(set) var isRevenueCatConfigured: Bool = AppConfiguration.isRevenueCatConfigured
     private var hasUnlockedFreePro: Bool = false
     
     private let proEntitlementID = "Haiku  Pro"
@@ -24,17 +25,22 @@ class StoreManager: ObservableObject {
         Task {
             await detectEnvironment()
         }
-        
+
+        guard isRevenueCatConfigured else {
+            print("RevenueCat: Missing API key. Skipping offerings and entitlement refresh.")
+            return
+        }
+
         // Then fetch fresh status from server
         Task {
             if let info = try? await Purchases.shared.customerInfo() {
                 self.updateProStatus(info)
             }
         }
-        
+
         // Start listening to customer info updates
         subscribeToCustomerInfo()
-        
+
         // Initial fetch of offerings
         refreshOfferings()
     }
@@ -88,6 +94,11 @@ class StoreManager: ObservableObject {
     }
     
     func refreshOfferings() {
+        guard isRevenueCatConfigured else {
+            offerings = nil
+            return
+        }
+
         Task {
             do {
                 self.offerings = try await Purchases.shared.offerings()
@@ -98,6 +109,8 @@ class StoreManager: ObservableObject {
     }
     
     private func subscribeToCustomerInfo() {
+        guard isRevenueCatConfigured else { return }
+
         // The modern way to handle state changes in RevenueCat SDK
         customerInfoTask = Task {
             for await info in Purchases.shared.customerInfoStream {
@@ -132,11 +145,20 @@ class StoreManager: ObservableObject {
     }
     
     func purchase(package: Package) async throws {
+        guard isRevenueCatConfigured else {
+            throw StoreManagerError.purchasesUnavailable
+        }
+
         let result = try await Purchases.shared.purchase(package: package)
         updateProStatus(result.customerInfo)
     }
     
     func restore() async {
+        guard isRevenueCatConfigured else {
+            print("RevenueCat: Restore skipped because purchases are unavailable in this build.")
+            return
+        }
+
         do {
             let info = try await Purchases.shared.restorePurchases()
             updateProStatus(info)
@@ -148,5 +170,16 @@ class StoreManager: ObservableObject {
     
     deinit {
         customerInfoTask?.cancel()
+    }
+}
+
+enum StoreManagerError: LocalizedError {
+    case purchasesUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .purchasesUnavailable:
+            return "Purchases are unavailable in this build."
+        }
     }
 }

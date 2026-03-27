@@ -25,7 +25,7 @@ struct AddTaskView: View {
     @State private var showingNewCategory = false
     @State private var newCategoryName = ""
     
-    @State private var selectedColorIndex: Int = Int.random(in: 0..<aestheticColors.count)
+    @State private var selectedColorIndex: Int
     
     init(tasksByDate: Binding<[Date: [ClockTask]]>, selectedDate: Binding<Date>, prefilledTitle: String? = nil, brainDumpTaskId: UUID? = nil, taskToEdit: ClockTask? = nil) {
         self._tasksByDate = tasksByDate
@@ -34,18 +34,21 @@ struct AddTaskView: View {
         self.brainDumpTaskId = brainDumpTaskId
         self.taskToEdit = taskToEdit
         
-        let initialDate = taskToEdit != nil ? selectedDate.wrappedValue : selectedDate.wrappedValue
+        let initialDate = selectedDate.wrappedValue
         self._taskDate = State(initialValue: initialDate)
         
         if let toEdit = taskToEdit {
             self._title = State(initialValue: toEdit.title)
+            self._selectedCategoryId = State(initialValue: toEdit.categoryId)
             
             let cal = Calendar.current
             let dayStart = cal.startOfDay(for: initialDate)
             self._startTime = State(initialValue: cal.date(byAdding: .minute, value: toEdit.startMinutes, to: dayStart) ?? Date())
             self._endTime = State(initialValue: cal.date(byAdding: .minute, value: toEdit.normalizedEndMinutes, to: dayStart) ?? Date())
+            self._selectedColorIndex = State(initialValue: aestheticColors.firstIndex(where: { $0.color == toEdit.color }) ?? 0)
         } else {
             self._title = State(initialValue: prefilledTitle ?? "")
+            self._selectedColorIndex = State(initialValue: Int.random(in: 0..<aestheticColors.count))
         }
     }
     
@@ -54,6 +57,7 @@ struct AddTaskView: View {
     private var goldColor: Color { currentTheme.accent }
     private var shadowLight: Color { currentTheme.shadowLight }
     private var shadowDark: Color { currentTheme.shadowDark }
+    private var requiresCategorySelection: Bool { taskToEdit == nil && selectedCategoryId == nil }
 
     var body: some View {
         NavigationStack {
@@ -246,7 +250,7 @@ struct AddTaskView: View {
                         .background(goldColor.opacity(0.2))
                     
                     VStack(spacing: 8) {
-                        if selectedCategoryId == nil {
+                        if requiresCategorySelection {
                             Text("Please select a category")
                                 .font(.system(size: 12, weight: .medium, design: .serif))
                                 .foregroundStyle(goldColor.opacity(0.8))
@@ -256,16 +260,16 @@ struct AddTaskView: View {
                         Button(action: saveTask) {
                             Text(taskToEdit == nil ? "Schedule Task" : "Update Task")
                                 .font(.system(size: 16, weight: .bold, design: .serif))
-                                .foregroundStyle(selectedCategoryId == nil ? goldColor.opacity(0.3) : bgColor)
+                                .foregroundStyle(requiresCategorySelection ? goldColor.opacity(0.3) : bgColor)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 18)
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .fill(selectedCategoryId == nil ? goldColor.opacity(0.1) : goldColor)
-                                        .shadow(color: .black.opacity(selectedCategoryId == nil ? 0 : 0.2), radius: 10, x: 0, y: 5)
+                                        .fill(requiresCategorySelection ? goldColor.opacity(0.1) : goldColor)
+                                        .shadow(color: .black.opacity(requiresCategorySelection ? 0 : 0.2), radius: 10, x: 0, y: 5)
                                 )
                         }
-                        .disabled(selectedCategoryId == nil)
+                        .disabled(requiresCategorySelection)
                     }
                     .padding(.horizontal, 32)
                     .padding(.vertical, 24)

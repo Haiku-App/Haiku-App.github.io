@@ -11,20 +11,6 @@ import RevenueCat
 import RevenueCatUI
 import PostHog
 
-enum PostHogEnv: String {
-    case projectToken = "POSTHOG_PROJECT_TOKEN"
-    case host = "POSTHOG_HOST"
-    case revenueCatKey = "REVENUECAT_API_KEY"
-
-    var value: String {
-        guard let value = ProcessInfo.processInfo.environment[rawValue] else {
-            if rawValue == "REVENUECAT_API_KEY" { return "test_BnEWCtQiNhXXQxCUtUuJfKUDncB" } // Fallback to test key
-            fatalError("Set \(rawValue) in the Xcode scheme environment variables.")
-        }
-        return value
-    }
-}
-
 @main
 struct clockApp: App {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -32,16 +18,27 @@ struct clockApp: App {
     @State private var showingPaywall = false
 
     init() {
-        // Initialize RevenueCat
+        #if DEBUG
         Purchases.logLevel = .debug
-        Purchases.configure(withAPIKey: PostHogEnv.revenueCatKey.value)
+        #else
+        Purchases.logLevel = .warn
+        #endif
 
-        // Initialize PostHog
-        let config = PostHogConfig(apiKey: PostHogEnv.projectToken.value, host: PostHogEnv.host.value)
-        config.captureApplicationLifecycleEvents = true
-        PostHogSDK.shared.setup(config)
-        
-        AnalyticsManager.shared.capture("app_session_started")
+        if let revenueCatAPIKey = AppConfiguration.revenueCatAPIKey {
+            Purchases.configure(withAPIKey: revenueCatAPIKey)
+        } else {
+            print("RevenueCat: Missing API key. Purchase flows are disabled for this build.")
+        }
+
+        if let projectToken = AppConfiguration.postHogProjectToken,
+           let host = AppConfiguration.postHogHost {
+            let config = PostHogConfig(apiKey: projectToken, host: host)
+            config.captureApplicationLifecycleEvents = true
+            PostHogSDK.shared.setup(config)
+            AnalyticsManager.shared.capture("app_session_started")
+        } else {
+            print("PostHog: Missing project token or host. Analytics are disabled for this build.")
+        }
     }
     
     var body: some Scene {

@@ -19,6 +19,10 @@
     </array>
     <key>GIDClientID</key>
     <string>313459507705-1k57s4u6ejhm8kl5c93ql4hu5th2r0eq.apps.googleusercontent.com</string>
+    <key>PostHogHost</key>
+    <string>https://us.i.posthog.com</string>
+    <key>PostHogProjectToken</key>
+    <string>phc_3hRgReCLQ0X9ta7ElpTS4I8SBiFsdNHDMbYewuPIpBf</string>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>

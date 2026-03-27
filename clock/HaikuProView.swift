@@ -120,6 +120,20 @@ struct HaikuProView: View {
                         .padding(.horizontal, 20)
                         .opacity(appearanceAnimate ? 1 : 0)
                         .scaleEffect(appearanceAnimate ? 1 : 0.95)
+                    } else if !storeManager.isRevenueCatConfigured {
+                        VStack(spacing: 8) {
+                            Image(systemName: storeManager.isSandboxMode ? "wrench.and.screwdriver.fill" : "exclamationmark.triangle.fill")
+                                .font(.system(size: 20))
+                                .foregroundStyle(currentTheme.accent)
+                            Text(storeManager.isSandboxMode ? "Tester build detected." : "Purchases unavailable in this build.")
+                                .font(.system(size: 13, weight: .semibold, design: .serif))
+                                .foregroundStyle(currentTheme.textForeground)
+                            Text(storeManager.isSandboxMode ? "Use the free tester unlock below to access Pro." : "Add a RevenueCat API key to enable subscriptions.")
+                                .font(.system(size: 11, weight: .regular, design: .serif))
+                                .foregroundStyle(currentTheme.textForeground.opacity(0.6))
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.horizontal, 32)
                     } else {
                         ProgressView()
                             .tint(currentTheme.accent)
@@ -151,8 +165,9 @@ struct HaikuProView: View {
                         Button("Restore") {
                             Task { await storeManager.restore() }
                         }
+                        .disabled(!storeManager.isRevenueCatConfigured)
                         
-                        if storeManager.isPro {
+                        if storeManager.isPro && storeManager.isRevenueCatConfigured {
                             Button("Manage") { showingCustomerCenter = true }
                         }
                         
