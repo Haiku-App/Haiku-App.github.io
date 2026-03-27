@@ -313,7 +313,7 @@ struct ProfileSettingsView: View {
                             .tracking(1)
                             .padding(.horizontal, 4)
 
-                        Link(destination: URL(string: "https://haiku-app.github.io/haiku/privacy.html")!) {
+                        Link(destination: URL(string: "https://haiku-app.github.io/privacy.html")!) {
                             HStack {
                                 Text("Privacy Policy")
                                     .font(.system(size: 16, weight: .medium, design: .serif))
