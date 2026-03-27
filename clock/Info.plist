@@ -21,5 +21,7 @@
 	<string>phc_3hRgReCLQ0X9ta7ElpTS4I8SBiFsdNHDMbYewuPIpBf</string>
 	<key>RevenueCatAPIKey</key>
 	<string>appl_prmQlhmWmtJdjyklqnPdmsbgTaN</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 </dict>
 </plist>

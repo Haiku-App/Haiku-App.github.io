@@ -63,6 +63,7 @@
 				ClockDrawing.swift,
 				ClockModels.swift,
 				ClockTask.swift,
+				HaikuLiveActivityAttributes.swift,
 				StaticClockView.swift,
 			);
 			target = 48AA4D7E2F69E2280088657A /* clockWidgetExtension */;

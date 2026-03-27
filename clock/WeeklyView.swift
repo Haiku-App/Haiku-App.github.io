@@ -120,7 +120,7 @@ struct WeeklyView: View {
                                     // Right side: Big Clock with tasks
                                     ZStack {
                                         StaticClockView(now: Date(), tasks: tasks, is24HourClock: is24HourClock, theme: currentTheme, showHands: true, showText: true)
-                                            .frame(width: 180, height: 180)
+                                            .frame(width: 168, height: 168)
                                             .padding(4)
                                             .background(
                                                 Circle()
@@ -147,18 +147,36 @@ struct WeeklyView: View {
                                     VStack(alignment: .leading, spacing: 8) {
                                         if !tasks.isEmpty {
                                             ForEach(tasks.prefix(4)) { task in
-                                                Circle()
-                                                    .fill(task.color)
-                                                    .frame(width: 8, height: 8)
+                                                HStack(alignment: .center, spacing: 8) {
+                                                    Circle()
+                                                        .fill(task.color)
+                                                        .frame(width: 8, height: 8)
+                                                    
+                                                    VStack(alignment: .leading, spacing: 2) {
+                                                        Text(task.title)
+                                                            .font(.system(size: 12, weight: .medium, design: .serif))
+                                                            .foregroundStyle(currentTheme.textForeground)
+                                                            .lineLimit(1)
+                                                        
+                                                        Text("\(formatTime(task.startMinutes)) - \(formatTime(task.endMinutes))")
+                                                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                                                            .foregroundStyle(currentTheme.textForeground.opacity(0.55))
+                                                            .lineLimit(1)
+                                                    }
+                                                }
                                             }
                                             if tasks.count > 4 {
                                                 Text("+\(tasks.count - 4)")
-                                                    .font(.system(size: 10, weight: .bold))
-                                                    .foregroundStyle(currentTheme.textForeground.opacity(0.4))
+                                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                                    .foregroundStyle(currentTheme.accent.opacity(0.75))
                                             }
+                                        } else {
+                                            Text("Open day")
+                                                .font(.system(size: 11, weight: .medium, design: .serif))
+                                                .foregroundStyle(currentTheme.textForeground.opacity(0.35))
                                         }
                                     }
-                                    .frame(width: 12)
+                                    .frame(width: 120, alignment: .leading)
                                 }
                                 .padding(.vertical, 20)
                                 .padding(.horizontal, 20)
@@ -223,6 +241,15 @@ struct WeeklyView: View {
             }
         }
         return days
+    }
+
+    private func formatTime(_ minutes: Int) -> String {
+        let hour = minutes / 60
+        let minute = minutes % 60
+        let date = Calendar.current.date(from: DateComponents(hour: hour, minute: minute)) ?? Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = is24HourClock ? "HH:mm" : "h:mm a"
+        return formatter.string(from: date)
     }
 }
 

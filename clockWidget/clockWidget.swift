@@ -41,6 +41,134 @@ struct SimpleEntry: TimelineEntry {
     let date: Date
 }
 
+private struct WidgetTaskContext {
+    let tasks: [ClockTask]
+    let currentTask: ClockTask?
+    let nextTask: ClockTask?
+    let nextTaskStartDate: Date?
+    let is24HourClock: Bool
+    let theme: AppTheme
+
+    init(date: Date, tasks: [ClockTask], is24HourClock: Bool, theme: AppTheme) {
+        self.tasks = tasks
+        self.is24HourClock = is24HourClock
+        self.theme = theme
+
+        let calendar = Calendar.current
+        let nowMinutes = calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date)
+        let sortedTasks = tasks.sorted { $0.startMinutes < $1.startMinutes }
+
+        self.currentTask = sortedTasks.first {
+            !$0.isCompleted && nowMinutes >= $0.startMinutes && nowMinutes < $0.normalizedEndMinutes
+        }
+
+        self.nextTask = sortedTasks.first {
+            !$0.isCompleted && $0.startMinutes > nowMinutes
+        }
+
+        if let nextTask {
+            let startOfDay = calendar.startOfDay(for: date)
+            self.nextTaskStartDate = calendar.date(byAdding: .minute, value: nextTask.startMinutes, to: startOfDay)
+        } else {
+            self.nextTaskStartDate = nil
+        }
+    }
+
+    var headlineTask: ClockTask? {
+        currentTask ?? nextTask
+    }
+
+    var headlineLabel: String {
+        if currentTask != nil {
+            return "Now"
+        } else if nextTask != nil {
+            return "Next"
+        } else {
+            return "Open"
+        }
+    }
+
+    var statusLine: String {
+        if let currentTask {
+            return "Until \(formattedTime(minutes: currentTask.endMinutes))"
+        }
+
+        if let nextTaskStartDate {
+            let minutes = max(0, Int(nextTaskStartDate.timeIntervalSinceNow / 60))
+            if minutes < 60 {
+                return "Starts in \(minutes)m"
+            }
+            return formattedTime(minutes: nextTask?.startMinutes ?? 0)
+        }
+
+        return "Free canvas"
+    }
+
+    var inlineStatusLine: String {
+        if currentTask != nil {
+            return statusLine
+        }
+
+        if let nextTaskStartDate {
+            let minutes = max(1, Int(ceil(nextTaskStartDate.timeIntervalSinceNow / 60)))
+            if minutes <= 60 {
+                return "\(minutes)m"
+            }
+        }
+
+        return statusLine
+    }
+
+    var timeLine: String {
+        guard let task = headlineTask else { return formattedCurrentTime }
+        return "\(formattedTime(minutes: task.startMinutes)) - \(formattedTime(minutes: task.endMinutes))"
+    }
+
+    var compactTitle: String {
+        guard let title = headlineTask?.title.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else {
+            return "Haiku"
+        }
+
+        let words = title.split(separator: " ").prefix(2)
+        let compact = words.joined(separator: " ")
+        return compact.count > 18 ? String(compact.prefix(18)) : compact
+    }
+
+    var accentColor: Color {
+        headlineTask?.color ?? theme.accent
+    }
+
+    var remainingFraction: Double {
+        guard let nextTaskStartDate else { return 0.0 }
+        let seconds = nextTaskStartDate.timeIntervalSinceNow
+        let clamped = min(max(seconds, 0), 60 * 60)
+        return 1.0 - (clamped / (60 * 60))
+    }
+
+    var circularProgress: Double {
+        if currentTask != nil {
+            return 0.85
+        }
+
+        return remainingFraction
+    }
+
+    private var formattedCurrentTime: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = is24HourClock ? "HH:mm" : "h:mm"
+        return formatter.string(from: Date())
+    }
+
+    private func formattedTime(minutes: Int) -> String {
+        let hour = minutes / 60
+        let minute = minutes % 60
+        let date = Calendar.current.date(from: DateComponents(hour: hour, minute: minute)) ?? Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = is24HourClock ? "HH:mm" : "h:mm a"
+        return formatter.string(from: date)
+    }
+}
+
 struct clockWidgetEntryView : View {
     @Environment(\.widgetFamily) var family
     var entry: Provider.Entry
@@ -204,6 +332,183 @@ struct clockWidgetEntryView : View {
     }
 }
 
+struct lockscreenWidgetEntryView: View {
+    @Environment(\.widgetFamily) private var family
+    var entry: Provider.Entry
+
+    private var theme: AppTheme {
+        SharedTaskManager.shared.loadTheme()
+    }
+
+    private var context: WidgetTaskContext {
+        WidgetTaskContext(
+            date: entry.date,
+            tasks: fetchWidgetTasks(),
+            is24HourClock: fetchIs24HourClock(),
+            theme: theme
+        )
+    }
+
+    var body: some View {
+        switch family {
+        case .accessoryInline:
+            inlineView
+        case .accessoryCircular:
+            circularView
+        case .accessoryRectangular:
+            rectangularView
+        default:
+            rectangularView
+        }
+    }
+
+    private var inlineView: some View {
+        HStack(spacing: 4) {
+            Image(systemName: context.currentTask == nil ? "sparkles" : "leaf.fill")
+                .widgetAccentable()
+            Text(context.compactTitle)
+            Text("• \(context.inlineStatusLine)")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var circularView: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(0.14), lineWidth: 6)
+
+            Circle()
+                .trim(from: 0, to: max(context.circularProgress, 0.12))
+                .stroke(context.accentColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .widgetAccentable()
+
+            VStack(spacing: 2) {
+                Image(systemName: context.currentTask == nil ? "sparkles" : "leaf.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .widgetAccentable()
+                Text(context.currentTask == nil ? "UP" : "NOW")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                Text(shortCircularText)
+                    .font(.system(size: 11, weight: .semibold, design: .serif))
+                    .lineLimit(1)
+            }
+            .multilineTextAlignment(.center)
+            .padding(8)
+        }
+    }
+
+    private var rectangularView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(0.10))
+                    Text(context.headlineLabel.uppercased())
+                        .font(.system(size: 8, weight: .bold, design: .rounded))
+                        .foregroundStyle(context.accentColor)
+                        .widgetAccentable()
+                }
+                .frame(width: 28, height: 28)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(context.compactTitle)
+                        .font(.system(size: 15, weight: .semibold, design: .serif))
+                        .lineLimit(1)
+                    Text(context.timeLine)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(context.statusLine)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(context.accentColor)
+                    .widgetAccentable()
+                    .lineLimit(1)
+            }
+
+            HStack(spacing: 10) {
+                miniDial
+                    .frame(width: 34, height: 34)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(context.statusLine)
+                        .font(.system(size: 13, weight: .medium, design: .serif))
+                        .lineLimit(1)
+                    Text(context.currentTask == nil ? "A soft nudge before the day shifts." : "Living on the clock, not in a list.")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var miniDial: some View {
+        ZStack {
+            Circle()
+                .fill(Color.primary.opacity(0.07))
+
+            Circle()
+                .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+
+            Circle()
+                .trim(from: 0, to: max(context.circularProgress, 0.12))
+                .stroke(context.accentColor, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .padding(4)
+
+            VStack(spacing: 1) {
+                Image(systemName: context.currentTask == nil ? "sparkles" : "leaf.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .widgetAccentable()
+                Text(shortCircularText)
+                    .font(.system(size: 7, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var shortCircularText: String {
+        let title = context.compactTitle
+        if title.count <= 4 {
+            return title
+        }
+        return String(title.prefix(4))
+    }
+
+    private func fetchIs24HourClock() -> Bool {
+        SharedTaskManager.shared.loadIs24HourClock()
+    }
+
+    private func fetchWidgetTasks() -> [ClockTask] {
+        let today = Calendar.current.startOfDay(for: Date())
+        if let savedTasks = SharedTaskManager.shared.load(), let todaysTasks = savedTasks[today] {
+            return todaysTasks
+        }
+
+        let manager = CalendarManager()
+        let status = EKEventStore.authorizationStatus(for: .event)
+
+        let isAuthorized: Bool
+        if #available(iOS 17.0, *) {
+            isAuthorized = status == .fullAccess || status == .writeOnly
+        } else {
+            isAuthorized = status == .authorized
+        }
+
+        if isAuthorized {
+            return manager.fetchEvents(for: Date(), theme: theme)
+        } else {
+            return []
+        }
+    }
+}
+
 struct clockWidget: Widget {
     let kind: String = "clockWidget"
 
@@ -243,5 +548,25 @@ struct largeClockWidget: Widget {
         .configurationDisplayName("Large Aesthetic Clock")
         .description("A larger view of just the minimal clock face.")
         .supportedFamilies([.systemLarge])
+    }
+}
+
+struct lockscreenClockWidget: Widget {
+    let kind: String = "lockscreenClockWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+            if #available(iOS 17.0, *) {
+                lockscreenWidgetEntryView(entry: entry)
+                    .containerBackground(for: .widget) {
+                        Color.clear
+                    }
+            } else {
+                lockscreenWidgetEntryView(entry: entry)
+            }
+        }
+        .configurationDisplayName("Haiku Lock Screen")
+        .description("A calm lock screen glance for what matters next.")
+        .supportedFamilies([.accessoryInline, .accessoryCircular, .accessoryRectangular])
     }
 }
