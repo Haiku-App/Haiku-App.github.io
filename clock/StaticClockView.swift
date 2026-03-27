@@ -37,21 +37,22 @@ struct StaticClockView: View {
             let radius = size / 2
 
             ZStack {
-                // Task Tracks (Concentric AM/PM Rings)
-                let ringWidth: CGFloat = is24HourClock ? 24 : 18
+                // Proportional constants
+                let ringWidth: CGFloat = size * (is24HourClock ? 0.08 : 0.06)
+                let ringSpacing: CGFloat = size * 0.015
                 let pmRingRadius = radius - (ringWidth/2)
-                let amRingRadius = pmRingRadius - ringWidth - 4
+                let amRingRadius = pmRingRadius - ringWidth - ringSpacing
                 
-                // Neumorphic Base
-                let faceRadius = is24HourClock ? (pmRingRadius - (ringWidth/2) - 4) : (amRingRadius - (ringWidth/2) - 4)
+                // Neumorphic Base (Push it out more to make face larger)
+                let faceRadius = is24HourClock ? (pmRingRadius - (ringWidth/2) - ringSpacing) : (amRingRadius - (ringWidth/2) - ringSpacing)
                 
                 Circle()
                     .fill(
                         RadialGradient(colors: [clockFaceColor.opacity(0.9), clockFaceColor], center: .center, startRadius: 0, endRadius: faceRadius)
                     )
                     .frame(width: faceRadius * 2, height: faceRadius * 2)
-                    .shadow(color: shadowDark.opacity(0.4), radius: size * 0.03, x: size * 0.02, y: size * 0.02)
-                    .shadow(color: shadowLight.opacity(0.3), radius: size * 0.03, x: -size * 0.02, y: -size * 0.02)
+                    .shadow(color: shadowDark.opacity(0.4), radius: size * 0.02, x: size * 0.015, y: size * 0.015)
+                    .shadow(color: shadowLight.opacity(0.3), radius: size * 0.02, x: -size * 0.015, y: -size * 0.015)
                     .overlay(
                         Circle().stroke(textForeground.opacity(0.1), lineWidth: 1)
                     )
@@ -68,17 +69,17 @@ struct StaticClockView: View {
                         )
                         .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
                     
-                    // Sun/Moon indicators
+                    // Sun/Moon indicators (Positioned relative to face size)
                     Group {
                         Image(systemName: "moon.fill")
-                            .font(.system(size: size * 0.05))
+                            .font(.system(size: size * 0.06))
                             .foregroundStyle(goldColor.opacity(0.8))
-                            .position(x: center.x, y: center.y - faceRadius + (size * 0.20))
+                            .position(x: center.x, y: center.y - faceRadius * 0.6)
                         
                         Image(systemName: "sun.max.fill")
-                            .font(.system(size: size * 0.05))
+                            .font(.system(size: size * 0.06))
                             .foregroundStyle(.yellow.opacity(0.8))
-                            .position(x: center.x, y: center.y + faceRadius - (size * 0.20))
+                            .position(x: center.x, y: center.y + faceRadius * 0.6)
                     }
                 } else {
                     Group {
@@ -111,18 +112,18 @@ struct StaticClockView: View {
                     Group {
                         VStack(spacing: 2) {
                             Image(systemName: "sun.max.fill")
-                                .font(.system(size: size * 0.025))
+                                .font(.system(size: size * 0.03))
                             Text("AM")
-                                .font(.system(size: size * 0.022, weight: .heavy, design: .monospaced))
+                                .font(.system(size: size * 0.025, weight: .heavy, design: .monospaced))
                         }
                         .foregroundStyle(goldColor.opacity(0.4))
                         .position(x: center.x, y: center.y - amRingRadius)
                         
                         VStack(spacing: 2) {
                             Image(systemName: "moon.fill")
-                                .font(.system(size: size * 0.025))
+                                .font(.system(size: size * 0.03))
                             Text("PM")
-                                .font(.system(size: size * 0.022, weight: .heavy, design: .monospaced))
+                                .font(.system(size: size * 0.025, weight: .heavy, design: .monospaced))
                         }
                         .foregroundStyle(goldColor.opacity(0.4))
                         .position(x: center.x, y: center.y - pmRingRadius)
@@ -169,8 +170,8 @@ struct StaticClockView: View {
                     let isHour = is24HourClock ? (i % 4 == 0) : (i % 5 == 0)
                     let angleDeg = Double(i) * (360.0 / Double(numTicks)) - 90
                     let angle = Angle.degrees(angleDeg)
-                    let tickStart = faceRadius - (isHour ? 12 : 8)
-                    let tickEnd = faceRadius - 4
+                    let tickStart = faceRadius - (isHour ? size * 0.05 : size * 0.03)
+                    let tickEnd = faceRadius - (size * 0.015)
                     
                     Path { path in
                         let startX = center.x + cos(CGFloat(angle.radians)) * tickStart
@@ -189,7 +190,7 @@ struct StaticClockView: View {
                         ForEach(0..<12, id: \.self) { i in
                             let hour = i * 2
                             let angle = Angle.degrees(Double(hour) * 15 - 90)
-                            let dist = faceRadius - (size * 0.10)
+                            let dist = faceRadius * 0.8
                             let x = cos(CGFloat(angle.radians)) * dist
                             let y = sin(CGFloat(angle.radians)) * dist
                             
@@ -204,19 +205,19 @@ struct StaticClockView: View {
                             let isMain = hour % 6 == 0
                             
                             Text(label)
-                                .font(.system(size: isMain ? size * 0.04 : size * 0.045, weight: isMain ? .bold : .medium, design: .serif))
+                                .font(.system(size: isMain ? size * 0.045 : size * 0.04, weight: isMain ? .bold : .medium, design: .serif))
                                 .foregroundStyle(isMain ? goldColor : goldColor.opacity(0.4))
                                 .position(x: center.x + x, y: center.y + y)
                         }
                     } else {
                         ForEach([12, 3, 6, 9], id: \.self) { hour in
                             let angle = Angle.degrees(Double(hour) * 30 - 90)
-                            let dist = faceRadius - (size * 0.1)
+                            let dist = faceRadius * 0.75
                             let x = cos(CGFloat(angle.radians)) * dist
                             let y = sin(CGFloat(angle.radians)) * dist
                             
                             Text("\(hour)")
-                                .font(.system(size: size * 0.05, weight: .medium, design: .serif))
+                                .font(.system(size: size * 0.055, weight: .medium, design: .serif))
                                 .foregroundStyle(goldColor.opacity(0.9))
                                 .position(x: center.x + x, y: center.y + y)
                         }
@@ -232,35 +233,35 @@ struct StaticClockView: View {
                                 .font(.system(size: size * 0.04, weight: .bold))
                                 .foregroundStyle(active.color)
                         }
-                        .position(x: center.x, y: center.y + faceRadius - (size * 0.18))
+                        .position(x: center.x, y: center.y + faceRadius * 0.6)
                     } else {
                         Text(formatTime(now).uppercased())
-                            .font(.system(size: size * 0.03, weight: .bold, design: .monospaced))
+                            .font(.system(size: size * 0.035, weight: .bold, design: .monospaced))
                             .tracking(1)
                             .foregroundStyle(textForeground.opacity(0.4))
-                            .position(x: center.x, y: center.y + faceRadius - (size * 0.18))
+                            .position(x: center.x, y: center.y + faceRadius * 0.6)
                     }
                 }
 
                 // Hands
                 if showHands {
-                    let hourHandLength = faceRadius * 0.5
-                    let minuteHandLength = faceRadius * 0.8
+                    let hourHandLength = faceRadius * 0.55
+                    let minuteHandLength = faceRadius * 0.85
 
                     // Hour Hand
-                    TaperedHand(now: now, is24HourClock: is24HourClock, length: hourHandLength, width: 6)
+                    TaperedHand(now: now, is24HourClock: is24HourClock, length: hourHandLength, width: size * 0.035)
                         .fill(goldColor)
-                        .shadow(color: .black.opacity(0.3), radius: 4, x: 2, y: 3)
+                        .shadow(color: .black.opacity(0.3), radius: size * 0.02, x: 2, y: 3)
 
                     // Minute Hand
-                    TaperedHand(now: now, is24HourClock: false, length: minuteHandLength, width: 4, isMinute: true)
+                    TaperedHand(now: now, is24HourClock: false, length: minuteHandLength, width: size * 0.025, isMinute: true)
                         .fill(goldColor)
-                        .shadow(color: .black.opacity(0.3), radius: 4, x: 2, y: 4)
+                        .shadow(color: .black.opacity(0.3), radius: size * 0.02, x: 2, y: 4)
 
                     // Center dot
                     Circle()
                         .fill(goldColor)
-                        .frame(width: 8, height: 8)
+                        .frame(width: size * 0.04, height: size * 0.04)
                         .overlay(Circle().stroke(Color.black.opacity(0.1), lineWidth: 1))
                         .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                 }

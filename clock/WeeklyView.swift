@@ -105,32 +105,33 @@ struct WeeklyView: View {
                                 let dayName = daysOfWeek[index]
                                 let dayNum = Calendar.current.component(.day, from: date)
                                 
-                                HStack(spacing: 24) {
+                                HStack(spacing: 20) {
                                     // Left side: Day info
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(dayName)
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundStyle(isSelected ? currentTheme.accent : currentTheme.textForeground.opacity(0.4))
                                         Text("\(dayNum)")
-                                            .font(.system(size: 32, weight: .light, design: .serif))
+                                            .font(.system(size: 36, weight: .light, design: .serif))
                                             .foregroundStyle(isSelected ? currentTheme.textForeground : currentTheme.textForeground.opacity(0.8))
                                     }
-                                    .frame(width: 60, alignment: .leading)
+                                    .frame(width: 50, alignment: .leading)
                                     
                                     // Right side: Big Clock with tasks
                                     ZStack {
                                         StaticClockView(now: Date(), tasks: tasks, is24HourClock: is24HourClock, theme: currentTheme, showHands: true, showText: true)
-                                            .frame(width: 140, height: 140)
+                                            .frame(width: 180, height: 180)
+                                            .padding(4)
                                             .background(
                                                 Circle()
-                                                    .fill(currentTheme.fieldBg)
-                                                    .shadow(color: currentTheme.shadowDark, radius: 10, x: 6, y: 6)
-                                                    .shadow(color: currentTheme.shadowLight, radius: 10, x: -6, y: -6)
+                                                    .fill(currentTheme.bg)
+                                                    .shadow(color: currentTheme.shadowDark.opacity(0.3), radius: 8, x: 4, y: 4)
+                                                    .shadow(color: currentTheme.shadowLight.opacity(0.5), radius: 8, x: -4, y: -4)
                                             )
                                             .overlay(
                                                 Circle()
-                                                    .stroke(isSelected ? currentTheme.accent : Color.clear, lineWidth: 3)
-                                                    .padding(-8)
+                                                    .stroke(isSelected ? currentTheme.accent.opacity(0.3) : Color.clear, lineWidth: 2)
+                                                    .padding(-4)
                                             )
                                     }
                                     .onTapGesture {
@@ -140,38 +141,30 @@ struct WeeklyView: View {
                                         }
                                     }
                                     
+                                    Spacer()
+                                    
                                     // Task summary
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        if tasks.isEmpty {
-                                            Text("No tasks")
-                                                .font(.system(size: 12, weight: .light))
-                                                .foregroundStyle(currentTheme.textForeground.opacity(0.3))
-                                        } else {
-                                            ForEach(tasks.prefix(3)) { task in
-                                                HStack(spacing: 6) {
-                                                    Circle()
-                                                        .fill(task.color)
-                                                        .frame(width: 6, height: 6)
-                                                    Text(task.title)
-                                                        .font(.system(size: 12, weight: .medium))
-                                                        .foregroundStyle(currentTheme.textForeground.opacity(0.8))
-                                                        .lineLimit(1)
-                                                }
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        if !tasks.isEmpty {
+                                            ForEach(tasks.prefix(4)) { task in
+                                                Circle()
+                                                    .fill(task.color)
+                                                    .frame(width: 8, height: 8)
                                             }
-                                            if tasks.count > 3 {
-                                                Text("+ \(tasks.count - 3) more")
-                                                    .font(.system(size: 10, weight: .light))
+                                            if tasks.count > 4 {
+                                                Text("+\(tasks.count - 4)")
+                                                    .font(.system(size: 10, weight: .bold))
                                                     .foregroundStyle(currentTheme.textForeground.opacity(0.4))
                                             }
                                         }
                                     }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(width: 12)
                                 }
-                                .padding(.vertical, 16)
-                                .padding(.horizontal, 24)
+                                .padding(.vertical, 20)
+                                .padding(.horizontal, 20)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 24)
-                                        .fill(isSelected ? currentTheme.fieldBg.opacity(0.5) : Color.clear)
+                                    RoundedRectangle(cornerRadius: 32)
+                                        .fill(isSelected ? currentTheme.fieldBg.opacity(0.3) : Color.clear)
                                 )
                             }
                         }
