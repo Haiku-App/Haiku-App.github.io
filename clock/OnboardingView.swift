@@ -17,7 +17,8 @@ struct OnboardingView: View {
                         description: "Experience a more mindful way to manage your day through visual flow.",
                         imageName: "clock",
                         step: 0,
-                        theme: currentTheme
+                        theme: currentTheme,
+                        isActive: currentPage == 0
                     )
                     .tag(0)
 
@@ -27,7 +28,8 @@ struct OnboardingView: View {
                         description: "Time isn’t just a list of boxes to check. It’s a circle to live in. By visualizing your day as a flow, you find more space for what matters.",
                         imageName: "leaf.fill",
                         step: 1,
-                        theme: currentTheme
+                        theme: currentTheme,
+                        isActive: currentPage == 1
                     )
                     .tag(1)
                     
@@ -37,7 +39,8 @@ struct OnboardingView: View {
                         description: "Your schedule is laid out on a 24-hour clock, giving you a natural sense of time.",
                         imageName: "calendar",
                         step: 2,
-                        theme: currentTheme
+                        theme: currentTheme,
+                        isActive: currentPage == 2
                     )
                     .tag(2)
                     
@@ -47,7 +50,8 @@ struct OnboardingView: View {
                         description: "Get subtle notifications before your next task, so you never have to rush.",
                         imageName: "bell",
                         step: 3,
-                        theme: currentTheme
+                        theme: currentTheme,
+                        isActive: currentPage == 3
                     )
                     .tag(3)
                 }
@@ -116,11 +120,20 @@ struct OnboardingStepView: View {
     let imageName: String
     let step: Int
     let theme: AppTheme
+    let isActive: Bool
     
     @State private var isAnimating = false
     @State private var animationProgress: Double = 0.0
     
-    // Mock tasks for Step 1
+    // Mock tasks for onboarding
+    private let onboardingMockTasks = [
+        ClockTask(title: "Morning Routine", startMinutes: 6 * 60, endMinutes: 8 * 60 + 30, color: Color(red: 0.45, green: 0.65, blue: 0.85)), // Blue
+        ClockTask(title: "Deep Focus", startMinutes: 10 * 60, endMinutes: 13 * 60, color: Color(red: 0.85, green: 0.55, blue: 0.45)), // Terracotta
+        ClockTask(title: "Afternoon Flow", startMinutes: 14 * 60 + 30, endMinutes: 17 * 60, color: Color(red: 0.65, green: 0.75, blue: 0.55)), // Sage
+        ClockTask(title: "Evening Wind Down", startMinutes: 19 * 60, endMinutes: 21 * 60 + 30, color: Color(red: 0.75, green: 0.65, blue: 0.85)) // Lavender
+    ]
+    
+    // Original mock tasks for other steps
     private let mockTasks = [
         ClockTask(title: "Morning Yoga", startMinutes: 7 * 60, endMinutes: 8 * 60, color: Color(red: 0.85, green: 0.78, blue: 0.58)),
         ClockTask(title: "Deep Work", startMinutes: 9 * 60, endMinutes: 12 * 60, color: Color(red: 0.75, green: 0.55, blue: 0.45)),
@@ -134,11 +147,11 @@ struct OnboardingStepView: View {
             // Animated Illustration Area
             ZStack {
                 if step == 0 {
-                    // Step 0: Realistic Clock with Mock Tasks
+                    // Step 0: Realistic Clock with Overlapping Mock Tasks
                     StaticClockView(
                         now: Calendar.current.date(bySettingHour: 10, minute: 15, second: 0, of: Date()) ?? Date(),
-                        tasks: mockTasks,
-                        is24HourClock: false,
+                        tasks: onboardingMockTasks,
+                        is24HourClock: true,
                         theme: theme,
                         showHands: true,
                         showText: true,
@@ -148,14 +161,6 @@ struct OnboardingStepView: View {
                     .frame(width: 280, height: 280)
                     .scaleEffect(isAnimating ? 1.0 : 0.8)
                     .opacity(isAnimating ? 1.0 : 0)
-                    .onAppear {
-                        withAnimation(.spring(response: 0.8, dampingFraction: 0.6)) {
-                            isAnimating = true
-                        }
-                        withAnimation(.easeInOut(duration: 1.5).delay(0.2)) {
-                            animationProgress = 1.0
-                        }
-                    }
                 } else if step == 1 {
                     // Step 1: Zen Ripple Animation
                     ZStack {
@@ -179,9 +184,6 @@ struct OnboardingStepView: View {
                             .shadow(color: theme.accent.opacity(0.3), radius: 10)
                             .scaleEffect(isAnimating ? 1.05 : 0.95)
                             .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isAnimating)
-                    }
-                    .onAppear {
-                        isAnimating = true
                     }
                 } else if step == 2 {
                     // Step 2: Animated Task Timeline
@@ -209,7 +211,6 @@ struct OnboardingStepView: View {
                             .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(Double(i) * 0.2), value: isAnimating)
                         }
                     }
-                    .onAppear { isAnimating = true }
                 } else {
                     // Step 3: Beautiful Pulsing Bell
                     ZStack {
@@ -228,14 +229,22 @@ struct OnboardingStepView: View {
                             .foregroundStyle(theme.accent)
                             .rotationEffect(.degrees(isAnimating ? 15 : -15))
                     }
-                    .onAppear {
-                        withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                            isAnimating = true
-                        }
-                    }
                 }
             }
             .frame(height: 300)
+            .onAppear {
+                if isActive {
+                    startAnimations()
+                }
+            }
+            .onChange(of: isActive) { active in
+                if active {
+                    startAnimations()
+                } else {
+                    isAnimating = false
+                    animationProgress = 0.0
+                }
+            }
             
             VStack(spacing: 16) {
                 Text(title)
@@ -257,6 +266,25 @@ struct OnboardingStepView: View {
             }
             
             Spacer()
+        }
+    }
+    
+    private func startAnimations() {
+        if step == 0 {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.6)) {
+                isAnimating = true
+            }
+            withAnimation(.easeInOut(duration: 1.5).delay(0.2)) {
+                animationProgress = 1.0
+            }
+        } else if step == 1 {
+            isAnimating = true
+        } else if step == 2 {
+            isAnimating = true
+        } else {
+            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                isAnimating = true
+            }
         }
     }
 }

@@ -38,7 +38,7 @@ struct StaticClockView: View {
 
             ZStack {
                 // Task Tracks (Concentric AM/PM Rings)
-                let ringWidth: CGFloat = is24HourClock ? (size * 0.075) : (size * 0.056)
+                let ringWidth: CGFloat = is24HourClock ? 24 : 18
                 let pmRingRadius = radius - (ringWidth/2)
                 let amRingRadius = pmRingRadius - ringWidth - 4
                 
@@ -46,12 +46,14 @@ struct StaticClockView: View {
                 let faceRadius = is24HourClock ? (pmRingRadius - (ringWidth/2) - 4) : (amRingRadius - (ringWidth/2) - 4)
                 
                 Circle()
-                    .fill(clockFaceColor)
+                    .fill(
+                        RadialGradient(colors: [clockFaceColor.opacity(0.9), clockFaceColor], center: .center, startRadius: 0, endRadius: faceRadius)
+                    )
                     .frame(width: faceRadius * 2, height: faceRadius * 2)
-                    .shadow(color: shadowDark, radius: size * 0.03, x: size * 0.025, y: size * 0.025)
-                    .shadow(color: shadowLight, radius: size * 0.03, x: -size * 0.025, y: -size * 0.025)
+                    .shadow(color: shadowDark.opacity(0.4), radius: size * 0.03, x: size * 0.02, y: size * 0.02)
+                    .shadow(color: shadowLight.opacity(0.3), radius: size * 0.03, x: -size * 0.02, y: -size * 0.02)
                     .overlay(
-                        Circle().stroke(textForeground.opacity(0.05), lineWidth: 1)
+                        Circle().stroke(textForeground.opacity(0.1), lineWidth: 1)
                     )
                 
                 if is24HourClock {
@@ -65,6 +67,19 @@ struct StaticClockView: View {
                             lineWidth: ringWidth
                         )
                         .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
+                    
+                    // Sun/Moon indicators
+                    Group {
+                        Image(systemName: "moon.fill")
+                            .font(.system(size: size * 0.05))
+                            .foregroundStyle(goldColor.opacity(0.8))
+                            .position(x: center.x, y: center.y - faceRadius + (size * 0.20))
+                        
+                        Image(systemName: "sun.max.fill")
+                            .font(.system(size: size * 0.05))
+                            .foregroundStyle(.yellow.opacity(0.8))
+                            .position(x: center.x, y: center.y + faceRadius - (size * 0.20))
+                    }
                 } else {
                     Group {
                         // AM Track
@@ -94,15 +109,23 @@ struct StaticClockView: View {
 
                     // AM/PM Labels
                     Group {
-                        Text("AM")
-                            .font(.system(size: size * 0.025, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(goldColor.opacity(0.4))
-                            .position(x: center.x, y: center.y - amRingRadius)
+                        VStack(spacing: 2) {
+                            Image(systemName: "sun.max.fill")
+                                .font(.system(size: size * 0.025))
+                            Text("AM")
+                                .font(.system(size: size * 0.022, weight: .heavy, design: .monospaced))
+                        }
+                        .foregroundStyle(goldColor.opacity(0.4))
+                        .position(x: center.x, y: center.y - amRingRadius)
                         
-                        Text("PM")
-                            .font(.system(size: size * 0.025, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(goldColor.opacity(0.4))
-                            .position(x: center.x, y: center.y - pmRingRadius)
+                        VStack(spacing: 2) {
+                            Image(systemName: "moon.fill")
+                                .font(.system(size: size * 0.025))
+                            Text("PM")
+                                .font(.system(size: size * 0.022, weight: .heavy, design: .monospaced))
+                        }
+                        .foregroundStyle(goldColor.opacity(0.4))
+                        .position(x: center.x, y: center.y - pmRingRadius)
                     }
                 }
                 
@@ -119,7 +142,7 @@ struct StaticClockView: View {
                             // Depth shadow
                             TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
                                 .trim(from: 0, to: animationProgress)
-                                .stroke(Color.black.opacity(0.1), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
+                                .stroke(Color.black.opacity(0.15 * opacity), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
                                 .offset(x: 0.5, y: 0.5)
                             
                             // Main Task Fill
@@ -131,7 +154,7 @@ struct StaticClockView: View {
                             TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
                                 .trim(from: 0, to: animationProgress)
                                 .stroke(
-                                    LinearGradient(colors: [.white.opacity(0.15), .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                    LinearGradient(colors: [.white.opacity(0.2 * opacity), .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
                                     style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
                                 )
                                 .blendMode(.overlay)
@@ -140,43 +163,62 @@ struct StaticClockView: View {
                     }
                 }
 
-                // Clock Dots and Numbers
+                // Premium Ticks (Baton markers)
+                let numTicks = is24HourClock ? 48 : 60
+                ForEach(0..<numTicks, id: \.self) { i in
+                    let isHour = is24HourClock ? (i % 4 == 0) : (i % 5 == 0)
+                    let angleDeg = Double(i) * (360.0 / Double(numTicks)) - 90
+                    let angle = Angle.degrees(angleDeg)
+                    let tickStart = faceRadius - (isHour ? 12 : 8)
+                    let tickEnd = faceRadius - 4
+                    
+                    Path { path in
+                        let startX = center.x + cos(CGFloat(angle.radians)) * tickStart
+                        let startY = center.y + sin(CGFloat(angle.radians)) * tickStart
+                        let endX = center.x + cos(CGFloat(angle.radians)) * tickEnd
+                        let endY = center.y + sin(CGFloat(angle.radians)) * tickEnd
+                        path.move(to: CGPoint(x: startX, y: startY))
+                        path.addLine(to: CGPoint(x: endX, y: endY))
+                    }
+                    .stroke(goldColor.opacity(isHour ? 0.6 : 0.2), lineWidth: isHour ? 1.5 : 0.5)
+                }
+
+                // Clock Numbers
                 if showText {
-                    let numDots = is24HourClock ? 24 : 12
-                    ForEach(0..<numDots, id: \.self) { i in
-                        let angleDeg = is24HourClock ? (Double(i) * 15 - 90) : (Double(i) * 30 - 90)
-                        let angle = Angle.degrees(angleDeg)
-                        let dotDistance = faceRadius - (size * 0.06)
-                        
-                        let x = cos(CGFloat(angle.radians)) * dotDistance
-                        let y = sin(CGFloat(angle.radians)) * dotDistance
-                        
-                        if is24HourClock {
-                            if i % 6 == 0 {
-                                let hourNumber = i == 0 ? 24 : i
-                                Text("\(hourNumber)")
-                                    .font(.system(size: size * 0.045, weight: .light, design: .serif))
-                                    .foregroundStyle(goldColor)
-                                    .position(x: center.x + x, y: center.y + y)
-                            } else if i % 2 == 0 {
-                                Circle()
-                                    .fill(goldColor.opacity(0.6))
-                                    .frame(width: 2, height: 2)
-                                    .position(x: center.x + x, y: center.y + y)
-                            }
-                        } else {
-                            if i % 3 == 0 {
-                                let hourNumber = i == 0 ? 12 : i
-                                Text("\(hourNumber)")
-                                    .font(.system(size: size * 0.045, weight: .light, design: .serif))
-                                    .foregroundStyle(goldColor)
-                                    .position(x: center.x + x, y: center.y + y)
-                            } else {
-                                Circle()
-                                    .fill(goldColor.opacity(0.6))
-                                    .frame(width: 2, height: 2)
-                                    .position(x: center.x + x, y: center.y + y)
-                            }
+                    if is24HourClock {
+                        ForEach(0..<12, id: \.self) { i in
+                            let hour = i * 2
+                            let angle = Angle.degrees(Double(hour) * 15 - 90)
+                            let dist = faceRadius - (size * 0.10)
+                            let x = cos(CGFloat(angle.radians)) * dist
+                            let y = sin(CGFloat(angle.radians)) * dist
+                            
+                            let label: String = {
+                                if hour == 0 || hour == 24 { return "12AM" }
+                                if hour == 6 { return "6AM" }
+                                if hour == 12 { return "12PM" }
+                                if hour == 18 { return "6PM" }
+                                return "\(hour % 12 == 0 ? 12 : hour % 12)"
+                            }()
+                            
+                            let isMain = hour % 6 == 0
+                            
+                            Text(label)
+                                .font(.system(size: isMain ? size * 0.04 : size * 0.045, weight: isMain ? .bold : .medium, design: .serif))
+                                .foregroundStyle(isMain ? goldColor : goldColor.opacity(0.4))
+                                .position(x: center.x + x, y: center.y + y)
+                        }
+                    } else {
+                        ForEach([12, 3, 6, 9], id: \.self) { hour in
+                            let angle = Angle.degrees(Double(hour) * 30 - 90)
+                            let dist = faceRadius - (size * 0.1)
+                            let x = cos(CGFloat(angle.radians)) * dist
+                            let y = sin(CGFloat(angle.radians)) * dist
+                            
+                            Text("\(hour)")
+                                .font(.system(size: size * 0.05, weight: .medium, design: .serif))
+                                .foregroundStyle(goldColor.opacity(0.9))
+                                .position(x: center.x + x, y: center.y + y)
                         }
                     }
                 }
@@ -190,32 +232,37 @@ struct StaticClockView: View {
                                 .font(.system(size: size * 0.04, weight: .bold))
                                 .foregroundStyle(active.color)
                         }
-                        .position(x: center.x, y: center.y + faceRadius - (size * 0.12))
+                        .position(x: center.x, y: center.y + faceRadius - (size * 0.18))
                     } else {
-                        Text(formatTime(now))
-                            .font(.system(size: size * 0.04, weight: .light))
-                            .foregroundStyle(textForeground.opacity(0.5))
-                            .position(x: center.x, y: center.y + faceRadius - (size * 0.12))
+                        Text(formatTime(now).uppercased())
+                            .font(.system(size: size * 0.03, weight: .bold, design: .monospaced))
+                            .tracking(1)
+                            .foregroundStyle(textForeground.opacity(0.4))
+                            .position(x: center.x, y: center.y + faceRadius - (size * 0.18))
                     }
                 }
 
                 // Hands
                 if showHands {
-                    let hourHandLength = faceRadius * 0.45
-                    let minuteHandLength = faceRadius * 0.75
+                    let hourHandLength = faceRadius * 0.5
+                    let minuteHandLength = faceRadius * 0.8
 
-                    TimeHand(now: now, is24HourClock: is24HourClock)
-                        .stroke(goldColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .frame(width: hourHandLength * 2, height: hourHandLength * 2)
+                    // Hour Hand
+                    TaperedHand(now: now, is24HourClock: is24HourClock, length: hourHandLength, width: 6)
+                        .fill(goldColor)
+                        .shadow(color: .black.opacity(0.3), radius: 4, x: 2, y: 3)
 
-                    MinuteHand(now: now)
-                        .stroke(goldColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                        .frame(width: minuteHandLength * 2, height: minuteHandLength * 2)
+                    // Minute Hand
+                    TaperedHand(now: now, is24HourClock: false, length: minuteHandLength, width: 4, isMinute: true)
+                        .fill(goldColor)
+                        .shadow(color: .black.opacity(0.3), radius: 4, x: 2, y: 4)
 
                     // Center dot
                     Circle()
                         .fill(goldColor)
-                        .frame(width: 4, height: 4)
+                        .frame(width: 8, height: 8)
+                        .overlay(Circle().stroke(Color.black.opacity(0.1), lineWidth: 1))
+                        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                 }
             }
             .position(center)

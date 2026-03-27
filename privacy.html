@@ -6,112 +6,10 @@
     <title>Privacy Policy - Haiku</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            /* Converted from Swift Color(red: 0.18, green: 0.23, blue: 0.18) */
-            --bg: #2E3B2E; 
-            /* fieldBg Color(red: 0.15, green: 0.20, blue: 0.15) */
-            --field-bg: #263326;
-            --text-main: #FFFFFF;
-            --text-muted: rgba(255, 255, 255, 0.6);
-            /* accent Color(red: 0.85, green: 0.78, blue: 0.58) */
-            --accent: #D9C794; 
-            /* shadowDark Color(red: 0.12, green: 0.16, blue: 0.12) */
-            --shadow-dark: #1E291E;
-            /* shadowLight Color(red: 0.22, green: 0.28, blue: 0.22) */
-            --shadow-light: #384738;
-            --font-serif: 'Playfair Display', Georgia, serif;
-            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--text-main);
-            font-family: var(--font-sans);
-            line-height: 1.8;
-            margin: 0;
-            padding: 4rem 2rem;
-            display: flex;
-            justify-content: center;
-        }
-
-        .container {
-            max-width: 700px;
-            background: var(--bg);
-            padding: 3rem;
-            border-radius: 30px;
-            box-shadow: 15px 15px 30px var(--shadow-dark), 
-                       -15px -15px 30px var(--shadow-light);
-            animation: fadeInUp 0.8s ease-out forwards;
-        }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        h1 {
-            font-family: var(--font-serif);
-            color: var(--accent);
-            font-size: 2.5rem;
-            margin-top: 0;
-            margin-bottom: 0.5rem;
-            letter-spacing: 0.05em;
-        }
-
-        h2 {
-            font-family: var(--font-serif);
-            color: var(--text-main);
-            font-size: 1.5rem;
-            margin-top: 2.5rem;
-            margin-bottom: 1rem;
-            border-bottom: 1px solid var(--shadow-dark);
-            padding-bottom: 0.5rem;
-        }
-
-        p, li {
-            color: var(--text-muted);
-            font-size: 1.05rem;
-        }
-
-        .date {
-            font-style: italic;
-            margin-bottom: 3rem;
-            color: var(--text-muted);
-        }
-
-        a {
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        a:hover {
-            text-decoration: underline;
-        }
-
-        .back-btn {
-            display: inline-block;
-            margin-bottom: 2rem;
-            padding: 0.8rem 1.5rem;
-            border-radius: 15px;
-            background: var(--bg);
-            color: var(--text-main);
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 0.9rem;
-            box-shadow: 5px 5px 10px var(--shadow-dark), 
-                       -5px -5px 10px var(--shadow-light);
-            transition: all 0.2s ease;
-        }
-
-        .back-btn:hover {
-            color: var(--accent);
-            transform: translateY(-2px);
-        }
-    </style>
+    <link rel="stylesheet" href="shared.css">
 </head>
 <body>
+    <div class="cursor"></div>
     <div class="container">
         <a href="index.html" class="back-btn">&larr; Back to Home</a>
         
@@ -154,5 +52,17 @@
         <h2>7. Contact Us</h2>
         <p>If you have any questions or concerns about our Privacy Policy, please contact us at <a href="mailto:reswink17@gmail.com">reswink17@gmail.com</a>.</p>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script>
+        const cursor = document.querySelector('.cursor');
+        document.addEventListener('mousemove', (e) => {
+            gsap.to(cursor, { x: e.clientX, y: e.clientY, duration: 0.15 });
+        });
+        const hoverTargets = document.querySelectorAll('a, .back-btn');
+        hoverTargets.forEach(t => {
+            t.addEventListener('mouseenter', () => cursor.classList.add('hover-active'));
+            t.addEventListener('mouseleave', () => cursor.classList.remove('hover-active'));
+        });
+    </script>
 </body>
 </html>

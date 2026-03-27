@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haiku | The Flow State</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style_v2.css">
+</head>
+<body>
+    <div class="cursor"></div>
+
+    <nav>
+        <a href="index.html" class="logo">Haiku</a>
+        <div class="nav-links">
+            <a href="privacy.html">Privacy</a>
+            <a href="terms.html">Terms</a>
+        </div>
+    </nav>
+
+    <div class="visual-container" id="visual-bg">
+        <div class="flow-ring" style="transform: scale(1.0);"></div>
+        <div class="flow-ring" style="transform: scale(0.8); opacity: 0.6;"></div>
+        <div class="flow-ring" style="transform: scale(0.6); opacity: 0.3;"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1 class="hero-title">Haiku</h1>
+            <p class="hero-tagline">Find Your Flow State</p>
+            <a href="#" class="cta-btn" style="opacity: 0; margin-top: 2rem;">Explore</a>
+        </section>
+
+        <!-- Section 1: The Circle -->
+        <section class="soul-section">
+            <div class="content-block">
+                <div class="haiku-text">
+                    <span class="haiku-line">Drag tasks to the ring,</span>
+                    <span class="haiku-line">Morning turns slowly to noon,</span>
+                    <span class="haiku-line">Time flows in a loop.</span>
+                </div>
+                <p class="description">A 24-hour visual journey through your day.</p>
+            </div>
+            <div class="soul-visual">
+                <div class="svg-frame" id="clock-svg">
+                    <!-- Inline SVG for better control -->
+                    <svg width="100%" height="100%" viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="400" height="800" fill="transparent" rx="40"/>
+                        <g transform="translate(200, 400)">
+                            <circle r="150" fill="none" stroke="var(--accent)" stroke-width="2" opacity="0.2"/>
+                            <circle r="120" fill="none" stroke="var(--accent)" stroke-width="1" opacity="0.1"/>
+                            <g class="clock-hands">
+                                <line x1="0" y1="0" x2="0" y2="-100" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+                                <circle r="4" fill="var(--accent)"/>
+                            </g>
+                            <!-- Animated Arcs can go here -->
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: The Mind -->
+        <section class="soul-section" style="background: radial-gradient(circle at center, #2e2e3b 0%, #1a1f1a 100%);">
+            <div class="content-block">
+                <div class="haiku-text">
+                    <span class="haiku-line">Thoughts like falling leaves,</span>
+                    <span class="haiku-line">Captured in a simple space,</span>
+                    <span class="haiku-line">Clear your mind to act.</span>
+                </div>
+                <p class="description">Release your thoughts. Focus on the now.</p>
+            </div>
+            <div class="soul-visual">
+                <div class="svg-frame" id="todo-svg" style="transform: scale(0.8);">
+                    <svg width="100%" height="100%" viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Abstract "Mind" visualization -->
+                        <g transform="translate(200, 400)">
+                            <circle r="80" fill="none" stroke="var(--accent)" stroke-width="1" opacity="0.4">
+                                <animate attributeName="r" values="80;90;80" dur="4s" repeatCount="indefinite" />
+                            </circle>
+                            <circle r="120" fill="none" stroke="var(--accent)" stroke-width="0.5" opacity="0.2">
+                                <animate attributeName="r" values="120;110;120" dur="6s" repeatCount="indefinite" />
+                            </circle>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Insights -->
+        <section class="soul-section" style="background: radial-gradient(circle at center, #3b322e 0%, #1a1f1a 100%);">
+            <div class="content-block">
+                <div class="haiku-text">
+                    <span class="haiku-line">Data tells a tale,</span>
+                    <span class="haiku-line">See the hours where you shine,</span>
+                    <span class="haiku-line">Insights for the soul.</span>
+                </div>
+                <p class="description">Your energy, beautifully mapped.</p>
+            </div>
+            <div class="soul-visual">
+                 <div class="svg-frame" id="insights-svg">
+                    <svg width="100%" height="100%" viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg">
+                        <g transform="translate(100, 400)">
+                            <path d="M 0 0 Q 50 -100 100 0 T 200 0" fill="none" stroke="var(--accent)" stroke-width="2" opacity="0.5">
+                                <animate attributeName="d" values="M 0 0 Q 50 -100 100 0 T 200 0; M 0 0 Q 50 100 100 0 T 200 0; M 0 0 Q 50 -100 100 0 T 200 0" dur="10s" repeatCount="indefinite" />
+                            </path>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final Call -->
+        <section class="hero">
+            <h2 class="haiku-text">Begin your journey.</h2>
+            <a href="#" class="cta-btn">Download Now</a>
+        </section>
+
+        <footer style="padding: 5rem; text-align: center; color: var(--muted); font-size: 0.8rem; letter-spacing: 0.1em;">
+            © 2026 HAIKU. ALL RIGHTS RESERVED.
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="script_v2.js"></script>
+</body>
+</html>
