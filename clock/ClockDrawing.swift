@@ -293,16 +293,16 @@ struct ClockView: View {
                         }
                     }) {
                         VStack(spacing: 4) {
-                            Text(timeLabel)
-                                .font(.system(size: isFlowState ? 16 : 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(active.color)
-                            
                             if isFlowState {
                                 Text(active.title.uppercased())
                                     .font(.system(size: 11, weight: .black, design: .rounded))
                                     .tracking(2)
                                     .foregroundStyle(active.color.opacity(0.8))
                                     .transition(.asymmetric(insertion: .opacity.combined(with: .scale), removal: .opacity))
+                            } else {
+                                Text(timeLabel)
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(active.color.opacity(0.001))
                             }
                         }
                         .padding(24)

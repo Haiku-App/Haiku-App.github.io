@@ -43,6 +43,13 @@ struct ContentView: View {
         liveClockTasks ?? tasksByDate[selectedDate, default: []]
     }
 
+    private var activeClockTask: ClockTask? {
+        guard Calendar.current.isDateInToday(selectedDate) else { return nil }
+        let comps = Calendar.current.dateComponents([.hour, .minute], from: now)
+        let minute = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
+        return displayedTasks.first { minute >= $0.startMinutes && minute < $0.normalizedEndMinutes }
+    }
+
     private var bgColor: Color { currentTheme.bg }
     private var goldColor: Color { currentTheme.accent }
 
@@ -614,6 +621,24 @@ struct ContentView: View {
                 }
             )
 
+            if let activeTask = activeClockTask {
+                VStack(spacing: 4) {
+                    Text(activeTask.title)
+                        .font(.system(size: 13, weight: .semibold, design: .serif))
+                        .foregroundStyle(currentTheme.textForeground.opacity(0.85))
+                        .lineLimit(1)
+
+                    Text(activeTaskRemainingLabel(activeTask))
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(activeTask.color)
+                }
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+            } else {
+                Spacer()
+                    .frame(height: 16)
+            }
+
             // Daily Quote
             Text(timeQuote(for: selectedDate))
                 .font(.system(size: 13, weight: .light, design: .serif))
@@ -701,6 +726,12 @@ struct ContentView: View {
                         return
                     }
 
+                    // Keep row swipe actions in the task list from changing the selected day.
+                    let swipeRegionMaxY = clockFrame.maxY + 90
+                    if clockFrame != .zero && value.startLocation.y > swipeRegionMaxY {
+                        return
+                    }
+
                     // Only trigger if the swipe is mostly horizontal
                     if abs(value.translation.width) > abs(value.translation.height) {
                         if value.translation.width < 0 {
@@ -770,6 +801,20 @@ struct ContentView: View {
         "“Discipline is choosing between what you want now and what you want most.” — Abraham Lincoln",
         "“You don't have to be great to start, but you have to start to be great.” — Zig Ziglar"
     ]
+
+    private func activeTaskRemainingLabel(_ task: ClockTask) -> String {
+        let comps = Calendar.current.dateComponents([.hour, .minute], from: now)
+        let currentMinute = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
+        let remaining = max(0, task.normalizedEndMinutes - currentMinute)
+        let hours = remaining / 60
+        let minutes = remaining % 60
+
+        if hours > 0 {
+            return "\(hours)h \(minutes)m left"
+        } else {
+            return "\(minutes)m left"
+        }
+    }
 
     private func timeQuote(for date: Date) -> String {
         // Use .day within .year to compute day-of-year (1-based). Fallback to 1 on failure.
