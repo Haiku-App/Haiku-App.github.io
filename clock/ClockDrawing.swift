@@ -18,6 +18,7 @@ struct ClockView: View {
     private var textForeground: Color { theme.textForeground }
 
     @State private var activeDrag: DragInfo?
+    @State private var interactiveTasks: [ClockTask] = []
     @State private var pulseState: Bool = false
     struct DragInfo {
         var taskId: UUID
@@ -27,6 +28,7 @@ struct ClockView: View {
         var accumulatedDelta: Double
         var initialStartMinutes: Int
         var initialEndMinutes: Int
+        var isInDeadzone: Bool = false
 
         enum Mode {
             case move, resizeStart, resizeEnd, create
@@ -48,7 +50,7 @@ struct ClockView: View {
     private var activeTask: ClockTask? {
         // Return first task that is currently happening
         let min = Int(currentMinute)
-        return tasks.first { min >= $0.startMinutes && min < $0.endMinutes }
+        return interactiveTasks.first { min >= $0.startMinutes && min < $0.normalizedEndMinutes }
     }
 
     var body: some View {
@@ -70,12 +72,14 @@ struct ClockView: View {
                                 handleDragChange(location: value.location, size: proxy.size)
                             }
                             .onEnded { _ in
-                                if let drag = activeDrag, let task = tasks.first(where: { $0.id == drag.taskId }) {
+                                interactiveTasks.sort { $0.startMinutes < $1.startMinutes }
+                                tasks = interactiveTasks
+
+                                if let drag = activeDrag, let task = interactiveTasks.first(where: { $0.id == drag.taskId }) {
                                     onTaskUpdated?(task)
                                     logAnalytics("task_modified_via_drag", properties: ["mode": "\(drag.mode)"])
                                 }
                                 activeDrag = nil
-                                tasks.sort { $0.startMinutes < $1.startMinutes }
                                 UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
                             }
                     )
@@ -203,14 +207,15 @@ struct ClockView: View {
                 }
                 
                 // Scheduled Tasks
-                ForEach(tasks) { task in
+                ForEach(interactiveTasks) { task in
+                    let taskForClock = task.normalizedForClock
                     let isDragging = activeDrag?.taskId == task.id
                     let isActive = activeTask?.id == task.id && !isDragging
                     
                     let glowRadius: CGFloat = (isActive && (pulseState || isFlowState)) ? (isFlowState ? 16 : 8) : (isDragging ? 4 : 0)
                     let glowColor = task.color.opacity((isActive && (pulseState || isFlowState)) ? (isFlowState ? 0.6 : 0.4) : (isDragging ? 0.6 : 0))
 
-                    let frags = is24HourClock ? [TaskFragment(isAM: false, startMinutes: Double(task.startMinutes), endMinutes: Double(task.endMinutes), task: task)] : getFragments(for: task)
+                    let frags = is24HourClock ? [TaskFragment(isAM: false, startMinutes: Double(taskForClock.startMinutes), endMinutes: Double(taskForClock.endMinutes), task: taskForClock)] : getFragments(for: taskForClock)
                     ForEach(frags) { frag in
                         let r = is24HourClock ? pmRingRadius : (frag.isAM ? amRingRadius : pmRingRadius)
                         
@@ -246,7 +251,7 @@ struct ClockView: View {
                             }
                         }
                         .frame(width: r * 2, height: r * 2)
-                        .allowsHitTesting(true)
+                        .allowsHitTesting(false)
                     }
                 }
 
@@ -392,9 +397,15 @@ struct ClockView: View {
             }
             .position(center)
             .onAppear {
+                interactiveTasks = tasks
+                
                 withAnimation(Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
                     pulseState = true
                 }
+            }
+            .onChange(of: tasks) { _, newTasks in
+                guard activeDrag == nil else { return }
+                interactiveTasks = newTasks
             }
         }
     }
@@ -426,21 +437,22 @@ struct ClockView: View {
         let min12h = minute(from: location, in: size)
         let absoluteMinute = is24HourClock ? (min12h * 2) : (isAMClick ? min12h : min12h + 720)
         
-        for task in tasks {
+        for task in interactiveTasks {
             if task.isCompleted { continue }
             
             let touchBuffer: Double = 10.0
             let absMinWrap = absoluteMinute + 1440
             
             // Check if touch is within task bounds (handling midnight wrap)
-            let duration = Double(task.endMinutes - task.startMinutes)
-            let inNormal = absoluteMinute >= (Double(task.startMinutes) - touchBuffer) && absoluteMinute <= (Double(task.endMinutes) + touchBuffer)
-            let inWrap = absMinWrap >= (Double(task.startMinutes) - touchBuffer) && absMinWrap <= (Double(task.endMinutes) + touchBuffer)
+            let taskForClock = task.normalizedForClock
+            let duration = Double(taskForClock.endMinutes - taskForClock.startMinutes)
+            let inNormal = absoluteMinute >= (Double(taskForClock.startMinutes) - touchBuffer) && absoluteMinute <= (Double(taskForClock.endMinutes) + touchBuffer)
+            let inWrap = absMinWrap >= (Double(taskForClock.startMinutes) - touchBuffer) && absMinWrap <= (Double(taskForClock.endMinutes) + touchBuffer)
             
             if inNormal || inWrap {
                 let effAbsolute = inWrap && !inNormal ? absMinWrap : absoluteMinute
-                let distToStart = abs(effAbsolute - Double(task.startMinutes))
-                let distToEnd = abs(effAbsolute - Double(task.endMinutes))
+                let distToStart = abs(effAbsolute - Double(taskForClock.startMinutes))
+                let distToEnd = abs(effAbsolute - Double(taskForClock.endMinutes))
                 
                 var mode: DragInfo.Mode = .move
                 if duration <= 15 {
@@ -451,27 +463,41 @@ struct ClockView: View {
                     else if distToEnd <= 15 { mode = .resizeEnd }
                 }
                 
-                activeDrag = DragInfo(taskId: task.id, mode: mode, initialMouseMinute: min12h, lastMouseMinute: min12h, accumulatedDelta: 0, initialStartMinutes: task.startMinutes, initialEndMinutes: task.endMinutes)
+                activeDrag = DragInfo(taskId: task.id, mode: mode, initialMouseMinute: min12h, lastMouseMinute: min12h, accumulatedDelta: 0, initialStartMinutes: taskForClock.startMinutes, initialEndMinutes: taskForClock.endMinutes)
                 return
             }
         }
     }
 
     private func handleDragChange(location: CGPoint, size: CGSize) {
-        guard var drag = activeDrag, let index = tasks.firstIndex(where: { $0.id == drag.taskId }) else { return }
+        guard var drag = activeDrag, let index = interactiveTasks.firstIndex(where: { $0.id == drag.taskId }) else { return }
         
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let dx = location.x - center.x
         let dy = location.y - center.y
         let dist = sqrt(dx*dx + dy*dy)
+        let deadzoneRadius = min(size.width, size.height) * 0.18
+        let deadzoneExitRadius = deadzoneRadius + 14
         
         // Calculate the raw minute based solely on angle (0...720)
         let min12h = minute(from: location, in: size)
 
-        // DEADZONE: If the finger is too close to the center, ignore movements.
-        // We update lastMouseMinute so that when we exit the deadzone, we don't jump.
-        if dist < 40 {
+        // Freeze the drag while the finger is near the center. Angle gets unstable there,
+        // so we suspend tracking until the touch is clearly back outside the deadzone.
+        if drag.isInDeadzone {
+            if dist < deadzoneExitRadius {
+                activeDrag = drag
+                return
+            }
+
             drag.lastMouseMinute = min12h
+            drag.isInDeadzone = false
+            activeDrag = drag
+            return
+        }
+
+        if dist < deadzoneRadius {
+            drag.isInDeadzone = true
             activeDrag = drag
             return
         }
@@ -492,7 +518,7 @@ struct ClockView: View {
             totalDelta *= 2 // 360 degrees = 1440 minutes for 24h clock
         }
         
-        var task = tasks[index]
+        var task = interactiveTasks[index].normalizedForClock
         let oldStart = task.startMinutes
         let oldEnd = task.endMinutes
         
@@ -559,7 +585,7 @@ struct ClockView: View {
         
         task.startMinutes = proposedStart
         task.endMinutes = proposedEnd
-        tasks[index] = task
+        interactiveTasks[index] = task
     }
 
     private func minute(from location: CGPoint, in size: CGSize) -> Double {

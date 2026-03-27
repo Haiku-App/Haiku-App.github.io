@@ -27,7 +27,7 @@ struct StaticClockView: View {
     
     private var activeTask: ClockTask? {
         let min = Int(currentMinute)
-        return tasks.first { !($0.isCompleted) && min >= $0.startMinutes && min < $0.endMinutes }
+        return tasks.first { !($0.isCompleted) && min >= $0.startMinutes && min < $0.normalizedEndMinutes }
     }
 
     var body: some View {
@@ -132,10 +132,11 @@ struct StaticClockView: View {
                 
                 // Scheduled Tasks
                 ForEach(tasks) { task in
-                    let isPast = task.endMinutes <= Int(currentMinute)
+                    let taskForClock = task.normalizedForClock
+                    let isPast = taskForClock.endMinutes <= Int(currentMinute)
                     let opacity: Double = task.isCompleted ? 0.2 : (isPast ? 0.3 : 1.0)
 
-                    let frags = is24HourClock ? [TaskFragment(isAM: false, startMinutes: Double(task.startMinutes), endMinutes: Double(task.endMinutes), task: task)] : getFragments(for: task)
+                    let frags = is24HourClock ? [TaskFragment(isAM: false, startMinutes: Double(taskForClock.startMinutes), endMinutes: Double(taskForClock.endMinutes), task: taskForClock)] : getFragments(for: taskForClock)
                     ForEach(Array(frags.enumerated()), id: \.offset) { index, frag in
                         let r = is24HourClock ? pmRingRadius : (frag.isAM ? amRingRadius : pmRingRadius)
 
@@ -227,7 +228,7 @@ struct StaticClockView: View {
                 // Central Status Text
                 if showCenterText {
                     if let active = activeTask {
-                        let minsRemaining = active.endMinutes - Int(currentMinute)
+                        let minsRemaining = active.normalizedEndMinutes - Int(currentMinute)
                         VStack(spacing: 2) {
                             Text("\(minsRemaining)m")
                                 .font(.system(size: size * 0.04, weight: .bold))

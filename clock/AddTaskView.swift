@@ -41,15 +41,9 @@ struct AddTaskView: View {
             self._title = State(initialValue: toEdit.title)
             
             let cal = Calendar.current
-            var sComps = cal.dateComponents([.year, .month, .day], from: initialDate)
-            sComps.hour = toEdit.startMinutes / 60
-            sComps.minute = toEdit.startMinutes % 60
-            self._startTime = State(initialValue: cal.date(from: sComps) ?? Date())
-            
-            var eComps = cal.dateComponents([.year, .month, .day], from: initialDate)
-            eComps.hour = toEdit.endMinutes / 60
-            eComps.minute = toEdit.endMinutes % 60
-            self._endTime = State(initialValue: cal.date(from: eComps) ?? Date())
+            let dayStart = cal.startOfDay(for: initialDate)
+            self._startTime = State(initialValue: cal.date(byAdding: .minute, value: toEdit.startMinutes, to: dayStart) ?? Date())
+            self._endTime = State(initialValue: cal.date(byAdding: .minute, value: toEdit.normalizedEndMinutes, to: dayStart) ?? Date())
         } else {
             self._title = State(initialValue: prefilledTitle ?? "")
         }
@@ -329,6 +323,11 @@ struct AddTaskView: View {
         let eComps = cal.dateComponents([.hour, .minute], from: endTime)
         let sMin = (sComps.hour ?? 0) * 60 + (sComps.minute ?? 0)
         let eMin = (eComps.hour ?? 0) * 60 + (eComps.minute ?? 0)
+        let normalizedEndMinutes: Int = {
+            if eMin < sMin { return eMin + 1440 }
+            if eMin == sMin { return sMin + 60 }
+            return eMin
+        }()
         
         let colorToUse = aestheticColors[selectedColorIndex].color
         let cat = categoryManager.categories.first(where: { $0.id == selectedCategoryId })
@@ -348,7 +347,7 @@ struct AddTaskView: View {
             var updatedTask = toEdit
             updatedTask.title = title.isEmpty ? "Updated Task" : title
             updatedTask.startMinutes = sMin
-            updatedTask.endMinutes = eMin
+            updatedTask.endMinutes = normalizedEndMinutes
             updatedTask.color = colorToUse
             updatedTask.categoryId = categoryId
             updatedTask.categoryName = categoryName
@@ -377,7 +376,7 @@ struct AddTaskView: View {
 
             // PostHog: Track task update
             AnalyticsManager.shared.capture("task_updated", properties: [
-                "duration_minutes": updatedTask.endMinutes - updatedTask.startMinutes,
+                "duration_minutes": updatedTask.normalizedEndMinutes - updatedTask.startMinutes,
                 "category": categoryName ?? "None"
             ])
 
@@ -385,7 +384,7 @@ struct AddTaskView: View {
             var newTask = ClockTask(
                 title: title.isEmpty ? "New Task" : title,
                 startMinutes: sMin,
-                endMinutes: eMin,
+                endMinutes: normalizedEndMinutes,
                 color: colorToUse,
                 categoryId: categoryId,
                 categoryName: categoryName
@@ -417,7 +416,7 @@ struct AddTaskView: View {
 
             // PostHog: Track task creation
             AnalyticsManager.shared.capture("task_created", properties: [
-                "duration_minutes": newTask.endMinutes - newTask.startMinutes,
+                "duration_minutes": newTask.normalizedEndMinutes - newTask.startMinutes,
                 "from_brain_dump": brainDumpTaskId != nil,
             ])
 
@@ -483,4 +482,3 @@ struct TaskRow: View {
         }
     }
 }
-

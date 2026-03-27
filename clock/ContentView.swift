@@ -51,6 +51,7 @@ struct ContentView: View {
     @State private var prefilledTaskId: UUID? = nil
     @State private var taskToEdit: ClockTask? = nil
     @State private var deletedExternalIds = Set<String>()
+    @State private var clockFrame: CGRect = .zero
     @AppStorage("is24HourClock") private var is24HourClock = false
     @AppStorage("notificationOffsetsData") private var notificationOffsetsData = ""
 
@@ -577,8 +578,17 @@ struct ContentView: View {
                     }
                 }
             )
-                .frame(width: 280, height: 280)
-                .scaleEffect(isFlowState ? 1.15 : 1.0)
+            .frame(width: 280, height: 280)
+            .scaleEffect(isFlowState ? 1.15 : 1.0)
+            .background(
+                GeometryReader { geometry in
+                    Color.clear
+                        .preference(
+                            key: ClockFramePreferenceKey.self,
+                            value: geometry.frame(in: .named("clockContentView"))
+                        )
+                }
+            )
 
             // Daily Quote
             Text(timeQuote(for: selectedDate))
@@ -652,10 +662,21 @@ struct ContentView: View {
 
             Spacer()
         }
+        .coordinateSpace(name: "clockContentView")
+        .onPreferenceChange(ClockFramePreferenceKey.self) { newFrame in
+            if newFrame != .zero {
+                clockFrame = newFrame
+            }
+        }
         .contentShape(Rectangle())
-        .gesture(
+        .simultaneousGesture(
             DragGesture(minimumDistance: 40)
                 .onEnded { value in
+                    let protectedClockFrame = clockFrame.insetBy(dx: -24, dy: -24)
+                    if protectedClockFrame.contains(value.startLocation) {
+                        return
+                    }
+
                     // Only trigger if the swipe is mostly horizontal
                     if abs(value.translation.width) > abs(value.translation.height) {
                         if value.translation.width < 0 {
@@ -731,6 +752,17 @@ struct ContentView: View {
         let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 1
         let index = dayOfYear % quotes.count
         return quotes[index]
+    }
+}
+
+private struct ClockFramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero {
+            value = next
+        }
     }
 }
 

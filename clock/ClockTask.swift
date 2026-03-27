@@ -27,6 +27,20 @@ struct ClockTask: Identifiable, Hashable, Codable {
     var start12h: Double { Double(startMinutes % 720) }
     var end12h: Double { Double(endMinutes % 720) }
     
+    /// Clock math expects tasks that cross midnight to extend past 1440.
+    var normalizedEndMinutes: Int {
+        if endMinutes < startMinutes {
+            return endMinutes + 1440
+        }
+        return endMinutes
+    }
+    
+    var normalizedForClock: ClockTask {
+        var copy = self
+        copy.endMinutes = normalizedEndMinutes
+        return copy
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id, title, startMinutes, endMinutes, color, isCompleted, url, externalEventId, categoryId, categoryName
     }
