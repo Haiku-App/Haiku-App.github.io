@@ -4,6 +4,7 @@ import WidgetKit
 
 struct ContentView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var storeManager: StoreManager
     private var isPro: Bool { storeManager.isPro }
 
@@ -20,6 +21,7 @@ struct ContentView: View {
     @ObservedObject private var googleCalendarManager = GoogleCalendarManager.shared
     @State private var saveDebounceTask: Task<Void, Never>? = nil
     @State private var liveClockTasks: [ClockTask]? = nil
+    @State private var isApplyingCloudSnapshot = false
 
     @State private var isFlowState = false
 
@@ -169,6 +171,9 @@ struct ContentView: View {
             SharedTaskManager.shared.save(is24HourClock: is24HourClock)
             SharedTaskManager.shared.save(theme: currentTheme)
             NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: tasksByDate, offsets: notificationOffsets)
+            Task {
+                await syncTasksWithCloud()
+            }
         }
         .onChange(of: selectedTab) { oldTab, newTab in
             AnalyticsManager.shared.capture("tab_changed", properties: ["target_tab": "\(newTab)"])
@@ -178,14 +183,24 @@ struct ContentView: View {
             syncCalendar(for: newDate)
         }
         .onChange(of: tasksByDate) { oldTasks, newTasks in
+            let isCloudUpdate = isApplyingCloudSnapshot
             saveDebounceTask?.cancel()
             saveDebounceTask = Task {
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s debounce
                 if !Task.isCancelled {
-                    SharedTaskManager.shared.save(tasksByDate: newTasks)
+                    guard !isCloudUpdate else { return }
+
+                    let modifiedAt = SharedTaskManager.shared.save(tasksByDate: newTasks)
                     WidgetCenter.shared.reloadAllTimelines()
                     NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: newTasks, offsets: notificationOffsets)
+                    await TaskCloudSyncManager.shared.uploadLocalSnapshot(tasksByDate: newTasks, modifiedAt: modifiedAt)
                 }
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await syncTasksWithCloud()
             }
         }
         .onChange(of: notificationOffsetsData) {
@@ -761,6 +776,36 @@ struct ContentView: View {
         let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 1
         let index = dayOfYear % quotes.count
         return quotes[index]
+    }
+
+    @MainActor
+    private func applyCloudSnapshot(_ snapshot: TaskCloudSnapshot) {
+        isApplyingCloudSnapshot = true
+        tasksByDate = snapshot.tasksByDate
+        _ = SharedTaskManager.shared.save(tasksByDate: snapshot.tasksByDate, modifiedAt: snapshot.modifiedAt)
+        WidgetCenter.shared.reloadAllTimelines()
+        NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: snapshot.tasksByDate, offsets: notificationOffsets)
+        isApplyingCloudSnapshot = false
+    }
+
+    private func syncTasksWithCloud() async {
+        let localTasks = tasksByDate
+        var localModifiedAt = SharedTaskManager.shared.loadTasksLastModifiedAt()
+
+        if localModifiedAt == nil && !localTasks.isEmpty {
+            localModifiedAt = SharedTaskManager.shared.save(tasksByDate: localTasks)
+        }
+
+        guard let snapshot = await TaskCloudSyncManager.shared.synchronize(
+            localTasksByDate: localTasks,
+            localModifiedAt: localModifiedAt
+        ) else {
+            return
+        }
+
+        await MainActor.run {
+            applyCloudSnapshot(snapshot)
+        }
     }
 }
 

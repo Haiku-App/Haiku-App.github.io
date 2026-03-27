@@ -8,6 +8,7 @@
 import SwiftUI
 import UIKit
 import WidgetKit
+import Foundation
 
 /// A simple model representing a task/meeting on a clock.
 /// Times are in minutes from midnight (0...1440). For a 12-hour clock, values wrap every 720 minutes.
@@ -110,6 +111,7 @@ class SharedTaskManager {
     
     let userDefaults: UserDefaults
     private let key = "savedTasksByDate"
+    private let tasksLastModifiedKey = "savedTasksByDateLastModified"
     private let is24HourKey = "is24HourClockSetting"
     private let isProKey = "isProSetting"
     private let hasUnlockedFreeProKey = "hasUnlockedFreeProSetting"
@@ -135,18 +137,48 @@ class SharedTaskManager {
         return userDefaults.bool(forKey: hasUnlockedFreeProKey)
     }
 
-    func save(tasksByDate: [Date: [ClockTask]]) {        let groups = tasksByDate.map { TaskGroup(date: $0.key, tasks: $0.value) }
-        if let data = try? JSONEncoder().encode(groups) {
-            userDefaults.set(data, forKey: key)
-            WidgetCenter.shared.reloadAllTimelines()
+    @discardableResult
+    func save(tasksByDate: [Date: [ClockTask]], modifiedAt: Date = Date()) -> Date {
+        guard let data = encode(tasksByDate: tasksByDate) else {
+            return modifiedAt
         }
+
+        userDefaults.set(data, forKey: key)
+        userDefaults.set(modifiedAt, forKey: tasksLastModifiedKey)
+        WidgetCenter.shared.reloadAllTimelines()
+        return modifiedAt
     }
     
     func load() -> [Date: [ClockTask]]? {
         guard let data = userDefaults.data(forKey: key),
-              let groups = try? JSONDecoder().decode([TaskGroup].self, from: data) else {
+              let dict = decodeTasks(from: data) else {
             return nil
         }
+        return dict
+    }
+
+    func loadTasksLastModifiedAt() -> Date? {
+        userDefaults.object(forKey: tasksLastModifiedKey) as? Date
+    }
+
+    func encode(tasksByDate: [Date: [ClockTask]]) -> Data? {
+        Self.encodeTaskGroups(tasksByDate: tasksByDate)
+    }
+
+    func decodeTasks(from data: Data) -> [Date: [ClockTask]]? {
+        Self.decodeTaskGroups(from: data)
+    }
+
+    nonisolated static func encodeTaskGroups(tasksByDate: [Date: [ClockTask]]) -> Data? {
+        let groups = tasksByDate.map { TaskGroup(date: $0.key, tasks: $0.value) }
+        return try? JSONEncoder().encode(groups)
+    }
+
+    nonisolated static func decodeTaskGroups(from data: Data) -> [Date: [ClockTask]]? {
+        guard let groups = try? JSONDecoder().decode([TaskGroup].self, from: data) else {
+            return nil
+        }
+
         var dict: [Date: [ClockTask]] = [:]
         for group in groups {
             dict[group.date] = group.tasks
