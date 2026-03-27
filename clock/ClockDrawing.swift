@@ -471,6 +471,8 @@ struct ClockView: View {
 
     private func handleDragChange(location: CGPoint, size: CGSize) {
         guard var drag = activeDrag, let index = interactiveTasks.firstIndex(where: { $0.id == drag.taskId }) else { return }
+        let minimumTaskDuration = 5
+        let maximumTaskDuration = 1435
         
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let dx = location.x - center.x
@@ -524,10 +526,35 @@ struct ClockView: View {
         
         // Smoother Aim Assist: snap to nearest 15 mins if within 4 minutes
         func snap(_ val: Int) -> Int {
-            let remainder = val % 15
+            let remainder = ((val % 15) + 15) % 15
             if remainder < 4 { return val - remainder }
             if remainder > 11 { return val + (15 - remainder) }
             return val
+        }
+        
+        func clamp(_ value: Int, min lower: Int, max upper: Int) -> Int {
+            min(max(value, lower), upper)
+        }
+        
+        func normalizeDraggedRange(start rawStart: Int, end rawEnd: Int) -> (start: Int, end: Int) {
+            var start = rawStart
+            var end = max(rawEnd, rawStart + minimumTaskDuration)
+            
+            while start < 0 {
+                start += 1440
+                end += 1440
+            }
+            
+            while start >= 1440 {
+                start -= 1440
+                end -= 1440
+            }
+            
+            if end - start > maximumTaskDuration {
+                end = start + maximumTaskDuration
+            }
+            
+            return (start, end)
         }
         
         var proposedStart = task.startMinutes
@@ -541,39 +568,25 @@ struct ClockView: View {
             
             proposedStart = snappedStart
             proposedEnd = snappedStart + duration
-            
-            // Wrap around 24h allowing tasks to span midnight smoothly
-            if proposedStart < 0 {
-                proposedStart += 1440
-                proposedEnd += 1440
-            } else if proposedStart >= 1440 {
-                proposedStart -= 1440
-                proposedEnd -= 1440
-            }
 
         case .resizeStart:
             let rawStart = drag.initialStartMinutes + Int(totalDelta)
-            proposedStart = snap(rawStart)
-            
-            if proposedStart < 0 { proposedStart += 1440 }
-            if proposedStart >= 1440 { proposedStart -= 1440 }
-            
-            // Prevent inverted resize (start going past end)
-            var dist = proposedEnd - proposedStart
-            if dist < 0 { dist += 1440 }
-            if dist < 5 { proposedStart = proposedEnd - 5 }
+            let snappedStart = snap(rawStart)
+            let minStart = drag.initialEndMinutes - maximumTaskDuration
+            let maxStart = drag.initialEndMinutes - minimumTaskDuration
+            proposedStart = clamp(snappedStart, min: minStart, max: maxStart)
             
         case .resizeEnd, .create:
             let rawEnd = drag.initialEndMinutes + Int(totalDelta)
-            proposedEnd = snap(rawEnd)
-            
-            if proposedEnd < 0 { proposedEnd += 1440 }
-            if proposedEnd >= 2880 { proposedEnd -= 1440 } // Keep it within 2 days span for safety
-            
-            var dist = proposedEnd - proposedStart
-            if dist < 0 { dist += 1440 }
-            if dist < 5 { proposedEnd = proposedStart + 5 }
+            let snappedEnd = snap(rawEnd)
+            let minEnd = drag.initialStartMinutes + minimumTaskDuration
+            let maxEnd = drag.initialStartMinutes + maximumTaskDuration
+            proposedEnd = clamp(snappedEnd, min: minEnd, max: maxEnd)
         }
+        
+        let normalizedRange = normalizeDraggedRange(start: proposedStart, end: proposedEnd)
+        proposedStart = normalizedRange.start
+        proposedEnd = normalizedRange.end
         
         // Haptic feedback when snapping to a new boundary
         let startChangedToSnap = proposedStart != oldStart && proposedStart % 15 == 0
