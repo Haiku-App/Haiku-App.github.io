@@ -350,12 +350,8 @@ struct StandardCalendarLayout: View {
     }
     
     private func formatHour(_ hour: Int) -> String {
-        if is24HourClock {
-            return String(format: "%02d:00", hour)
-        } else {
-            let h = hour % 12
-            let period = hour < 12 ? "AM" : "PM"
-            return "\(h == 0 ? 12 : h) \(period)"
-        }
+        let h = hour % 12
+        let period = hour < 12 ? "AM" : "PM"
+        return "\(h == 0 ? 12 : h) \(period)"
     }
 }

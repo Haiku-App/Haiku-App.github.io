@@ -703,7 +703,7 @@ struct ContentView: View {
         comps.minute = min
         let date = Calendar.current.date(from: comps) ?? Date()
         
-        timeFormatter.dateFormat = is24HourClock ? "HH:mm" : "h:mm a"
+        timeFormatter.dateFormat = "h:mm a"
         return timeFormatter.string(from: date)
     }
 

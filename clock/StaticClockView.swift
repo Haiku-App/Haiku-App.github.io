@@ -272,7 +272,7 @@ struct StaticClockView: View {
 
     private func formatTime(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = is24HourClock ? "HH:mm" : "h:mm a"
+        formatter.dateFormat = "h:mm a"
         return formatter.string(from: date)
     }
 }
