@@ -75,6 +75,7 @@
       justify-content: space-between;
       min-height: 84px;
       gap: 20px;
+      padding-inline: clamp(34px, 8vw, 132px);
     }
 
     .logo {
@@ -134,7 +135,10 @@
 
     .hero {
       position: relative;
-      padding: 88px 0 70px;
+      min-height: calc(100svh - 84px);
+      padding: 76px 0 108px;
+      display: flex;
+      align-items: center;
       overflow: hidden;
     }
 
@@ -166,27 +170,35 @@
     .hero-grid {
       position: relative;
       z-index: 2;
+      width: 100%;
       display: grid;
       grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-      gap: 54px;
+      gap: clamp(72px, 7vw, 132px);
+      padding-inline: clamp(34px, 8vw, 132px);
       align-items: center;
+    }
+
+    .hero-copy {
+      max-width: 500px;
+      padding-left: 0;
+      padding-right: 14px;
     }
 
     .hero h1 {
       font-family: 'Poppins', sans-serif;
-      font-size: clamp(3rem, 5.6vw, 5rem);
-      line-height: 1;
+      font-size: clamp(2.45rem, 4.35vw, 4rem);
+      line-height: 0.97;
       letter-spacing: -0.045em;
-      margin-bottom: 22px;
-      max-width: 500px;
+      margin-bottom: 18px;
+      max-width: 460px;
     }
 
     .hero p {
-      font-size: 0.98rem;
+      font-size: 1.02rem;
       color: var(--muted);
-      max-width: 500px;
-      margin-bottom: 30px;
-      line-height: 1.6;
+      max-width: 440px;
+      margin-bottom: 34px;
+      line-height: 1.66;
     }
 
     .cta-row {
@@ -207,7 +219,7 @@
     .hero-visual {
       position: relative;
       display: flex;
-      justify-content: center;
+      justify-content: flex-start;
       align-items: center;
       min-height: 460px;
     }
@@ -227,7 +239,7 @@
       width: min(100%, 590px);
       min-height: 460px;
       display: flex;
-      justify-content: center;
+      justify-content: flex-start;
       align-items: center;
     }
 
@@ -257,128 +269,138 @@
     }
 
     .transition-section {
-      padding: 38px 0 64px;
+      padding: 52px 0 88px;
     }
 
-    .shift-grid {
+    .scattered-shell {
+      max-width: 1140px;
+      margin: 0 auto;
+    }
+
+    .scattered-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-      gap: 34px;
+      grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+      gap: clamp(32px, 6vw, 84px);
       align-items: center;
     }
 
-    .shift-panel {
-      background: linear-gradient(180deg, rgba(255,255,255,0.985), rgba(248,243,235,0.94));
-      border: 1px solid rgba(44, 43, 42, 0.05);
-      border-radius: 42px;
-      padding: 32px;
-      box-shadow:
-        0 32px 82px rgba(31, 24, 16, 0.07),
-        0 8px 20px rgba(31, 24, 16, 0.025),
-        inset 0 1px 0 rgba(255,255,255,0.94);
+    .scattered-copy {
+      max-width: 420px;
     }
 
-    .shift-label {
-      color: rgba(44, 43, 42, 0.34);
-      font-size: 0.78rem;
-      font-weight: 800;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      margin-bottom: 20px;
-    }
-
-    .screenshot-panel {
-      display: grid;
-      gap: 0;
-    }
-
-    .phone-stage {
-      position: relative;
-      min-height: 620px;
-      padding: 30px 28px;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
-      border-radius: 34px;
-      background: radial-gradient(circle at 50% 14%, rgba(255,255,255,0.94) 0%, rgba(249,244,236,0.96) 44%, rgba(245,237,226,0.98) 100%);
-      border: 1px solid rgba(44, 43, 42, 0.045);
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.84),
-        inset 0 -22px 34px rgba(255,255,255,0.26);
-    }
-
-    .phone-stage::before {
-      content: "";
-      position: absolute;
-      inset: 24px;
-      border-radius: 28px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.56), rgba(255,255,255,0));
-      opacity: 0.62;
-      pointer-events: none;
-    }
-
-    .phone-stage::after {
-      content: "";
-      position: absolute;
-      left: 18%;
-      right: 18%;
-      bottom: 28px;
-      height: 44px;
-      border-radius: 999px;
-      background: radial-gradient(circle, rgba(33, 30, 26, 0.12) 0%, rgba(33, 30, 26, 0.04) 48%, transparent 74%);
-      filter: blur(16px);
-      pointer-events: none;
-    }
-
-    .phone-shot {
-      position: relative;
-      z-index: 1;
-      width: min(100%, 340px);
-      height: auto;
-      display: block;
-      filter: drop-shadow(0 30px 44px rgba(16, 14, 12, 0.18));
-    }
-
-    .traditional-shot {
-      width: min(100%, 336px);
-      transform: translateY(2px);
-    }
-
-    .clock-shot {
-      width: min(100%, 346px);
-      transform: translateY(-6px);
-    }
-
-    .shift-arrow {
-      display: grid;
-      gap: 10px;
-      justify-items: center;
+    .scattered-copy .label {
+      display: inline-block;
+      margin-bottom: 14px;
       color: var(--accent);
-    }
-
-    .shift-arrow-badge {
-      width: 68px;
-      height: 68px;
-      border-radius: 50%;
-      display: grid;
-      place-items: center;
-      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,243,235,0.94));
-      border: 1px solid rgba(93,129,95,0.12);
-      box-shadow:
-        0 18px 40px rgba(31, 24, 16, 0.06),
-        inset 0 1px 0 rgba(255,255,255,0.92);
-      font-size: 1.75rem;
       font-weight: 700;
-    }
-
-    .shift-arrow span {
-      color: rgba(44, 43, 42, 0.48);
-      font-size: 0.88rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
+      font-size: 0.82rem;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      text-align: center;
-      max-width: 110px;
+    }
+
+    .scattered-copy h2 {
+      font-family: 'Poppins', sans-serif;
+      font-size: clamp(2.2rem, 4.3vw, 4.1rem);
+      line-height: 0.98;
+      letter-spacing: -0.05em;
+      margin: 0 0 16px;
+    }
+
+    .scattered-copy p {
+      max-width: 360px;
+      color: var(--muted);
+      font-size: 1.02rem;
+      line-height: 1.72;
+      margin: 0;
+    }
+
+    .scattered-stage {
+      position: relative;
+      min-height: 680px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .scattered-stage::before {
+      content: "";
+      position: absolute;
+      inset: 8% 0 10% 18%;
+      border-radius: 52px;
+      background:
+        radial-gradient(circle at 32% 22%, rgba(247, 242, 233, 0.98), rgba(240, 233, 221, 0.64) 48%, rgba(240, 233, 221, 0) 74%),
+        linear-gradient(180deg, rgba(255,255,255,0.74), rgba(244, 239, 231, 0.24));
+      filter: blur(0.5px);
+      z-index: 0;
+    }
+
+    .scattered-phone-wrap {
+      position: relative;
+      width: min(100%, 620px);
+      min-height: 640px;
+      z-index: 1;
+    }
+
+    .scattered-phone {
+      position: absolute;
+      width: clamp(210px, 32vw, 320px);
+      height: auto;
+      opacity: 0;
+      transform-origin: center top;
+      filter: drop-shadow(0 30px 48px rgba(24, 21, 16, 0.16));
+      will-change: transform, opacity;
+    }
+
+    .scattered-phone--back {
+      left: 12%;
+      top: 19%;
+      z-index: 1;
+      transform: translateY(-58px) rotate(-7deg) scale(0.96);
+    }
+
+    .scattered-phone--front {
+      right: 4%;
+      top: 2%;
+      z-index: 2;
+      transform: translateY(-72px) rotate(4deg) scale(0.98);
+    }
+
+    .reveal.visible .scattered-phone--back {
+      animation: phoneDropBack 0.95s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    }
+
+    .reveal.visible .scattered-phone--front {
+      animation: phoneDropFront 1.02s cubic-bezier(0.2, 0.8, 0.2, 1) 0.12s forwards;
+    }
+
+    @keyframes phoneDropBack {
+      0% {
+        opacity: 0;
+        transform: translateY(-58px) rotate(-7deg) scale(0.96);
+      }
+      70% {
+        opacity: 1;
+        transform: translateY(10px) rotate(-7deg) scale(1);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) rotate(-7deg) scale(1);
+      }
+    }
+
+    @keyframes phoneDropFront {
+      0% {
+        opacity: 0;
+        transform: translateY(-72px) rotate(4deg) scale(0.98);
+      }
+      72% {
+        opacity: 1;
+        transform: translateY(12px) rotate(4deg) scale(1);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) rotate(4deg) scale(1);
+      }
     }
 
     section.content-section {
@@ -1483,24 +1505,25 @@
       .analytics-grid { grid-template-columns: 1fr; }
       .haiku-insights-grid { grid-template-columns: 1fr; }
       .distribution-layout { grid-template-columns: 1fr; }
-      .shift-grid { grid-template-columns: 1fr; gap: 22px; }
-      .shift-arrow-badge { transform: rotate(90deg); }
-      .phone-stage { min-height: auto; padding: 24px 20px; }
-      .traditional-shot,
-      .clock-shot { width: min(100%, 320px); transform: none; }
-
-      .hero {
-        padding-top: 54px;
-      }
-
+      .header-inner { padding-inline: 18px; }
       .hero-copy {
         text-align: center;
+        max-width: 100%;
+        padding-left: 0;
+        padding-right: 0;
       }
 
       .hero p, .hero h1 { margin-left: auto; margin-right: auto; }
       .cta-row { justify-content: center; }
 
-      .hero { padding-top: 64px; }
+      .hero {
+        min-height: auto;
+        padding: 64px 0 92px;
+      }
+      .hero-grid {
+        gap: 44px;
+        padding-inline: 0;
+      }
       .hero-visual { min-height: 420px; }
       .device-stack { min-height: 400px; }
     }
@@ -1519,9 +1542,15 @@
 
     @media (max-width: 640px) {
       .container { width: min(var(--max), calc(100% - 28px)); }
-      .header-inner { min-height: 72px; }
+      .header-inner {
+        min-height: 72px;
+        padding-inline: 0;
+      }
       .nav { display: none; }
-      .hero { padding: 48px 0 38px; }
+      .hero {
+        min-height: auto;
+        padding: 48px 0 74px;
+      }
       .hero h1 { font-size: 2.75rem; max-width: 360px; }
       .hero p { font-size: 1rem; }
       .hero-visual { min-height: 280px; }
@@ -1542,12 +1571,34 @@
       .distribution-layout { gap: 22px; }
       .distribution-donut { width: 190px; }
       .window-headline { font-size: 2.2rem; }
-      .transition-section { padding: 24px 0 48px; }
-      .shift-panel { padding: 22px; border-radius: 28px; }
-      .phone-stage { padding: 20px 16px; border-radius: 24px; }
-      .phone-shot,
-      .traditional-shot,
-      .clock-shot { width: min(100%, 292px); }
+      .transition-section { padding: 28px 0 52px; }
+      .scattered-layout { grid-template-columns: 1fr; gap: 18px; }
+      .scattered-copy { max-width: 100%; text-align: center; }
+      .scattered-copy p { max-width: 100%; }
+      .scattered-stage {
+        min-height: 430px;
+        justify-content: center;
+      }
+      .scattered-stage::before {
+        inset: 9% 2% 8%;
+        border-radius: 34px;
+      }
+      .scattered-phone-wrap {
+        width: min(100%, 360px);
+        min-height: 390px;
+      }
+      .scattered-phone {
+        width: min(52vw, 220px);
+        filter: drop-shadow(0 18px 28px rgba(24, 21, 16, 0.13));
+      }
+      .scattered-phone--back {
+        left: 2%;
+        top: 17%;
+      }
+      .scattered-phone--front {
+        right: 2%;
+        top: 2%;
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1800,91 +1851,81 @@
     </section>
 
     <section class="transition-section">
-      <div class="container">
-        <div class="section-head reveal">
-          <div class="label">See The Shift</div>
-          <h2>From stacked time blocks to one calm view</h2>
-          <p>The same plan, shown in a way that makes balance, overlap, and breathing room easier to notice.</p>
-        </div>
-
-        <div class="shift-grid reveal">
-          <article class="shift-panel screenshot-panel">
-            <div class="shift-label">Traditional calendar</div>
-            <div class="phone-stage">
-              <img src="assets/iphone-17.png" alt="Traditional time-blocked calendar view" class="phone-shot traditional-shot" />
-            </div>
-          </article>
-
-          <div class="shift-arrow" aria-hidden="true">
-            <div class="shift-arrow-badge">→</div>
-            <span>same day</span>
+      <div class="container scattered-shell">
+        <div class="scattered-layout">
+          <div class="scattered-copy reveal">
+            <div class="label">See The Shift</div>
+            <h2>Say Bye to Scattered Calendars</h2>
+            <p>Trade packed blocks and cluttered grids for one calm view that actually lets your day breathe.</p>
           </div>
 
-          <article class="shift-panel">
-            <div class="shift-label">Haiku visual calendar</div>
-            <div class="visual-board-shell" aria-hidden="true">
-              <div class="visual-board">
-                <div class="clock-showcase">
-                  <div class="minimal-clock-card">
-                    <div class="clock-face-outer">
-                      <div class="clock-capsules">
-                        <div class="capsule cap-top"></div>
-                        <div class="capsule cap-left-top"></div>
-                        <div class="capsule cap-left"></div>
-                        <div class="capsule cap-bottom"></div>
-                        <div class="capsule cap-right-bottom"></div>
-                      </div>
-                      <div class="clock-face">
-                        <div class="clock-labels">
-                          <span class="label-12">12AM</span>
-                          <span class="label-3">6AM</span>
-                          <span class="label-6">12PM</span>
-                          <span class="label-9">6PM</span>
-                        </div>
-                        <div class="clock-icons">
-                          <span class="icon-moon">🌙</span>
-                          <span class="icon-sun">☀️</span>
-                        </div>
-                        <div class="clock-hands">
-                          <div class="hand-hour"></div>
-                          <div class="hand-minute"></div>
-                          <div class="hand-second"></div>
-                          <div class="hand-center"></div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div class="minimal-task-list">
-                      <div class="minimal-task-item">
-                        <span class="task-dot" style="background: #b87580;"></span>
-                        <div class="task-info">
-                          <strong>Morning Yoga</strong>
-                          <span>Early block</span>
-                        </div>
-                        <span class="task-time">7:30 AM</span>
-                      </div>
-                      <div class="minimal-task-item">
-                        <span class="task-dot" style="background: #7cb1cd;"></span>
-                        <div class="task-info">
-                          <strong>Finish Bio HW</strong>
-                          <span>Focus block</span>
-                        </div>
-                        <span class="task-time">12:00 PM</span>
-                      </div>
-                      <div class="minimal-task-item">
-                        <span class="task-dot" style="background: #e3a9b9;"></span>
-                        <div class="task-info">
-                          <strong>Meeting with Hailey</strong>
-                          <span>Afternoon block</span>
-                        </div>
-                        <span class="task-time">4:00 PM</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+          <div class="scattered-stage reveal">
+            <div class="scattered-phone-wrap">
+              <img src="tradcal.png" alt="Traditional calendar on an iPhone mockup" class="scattered-phone scattered-phone--back" />
+              <img src="newcal.png" alt="Haiku app on an iPhone mockup" class="scattered-phone scattered-phone--front" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="clock-section" style="padding: 40px 0 120px; display: flex; justify-content: center;">
+      <div class="container" style="display: flex; justify-content: center;">
+        <div class="minimal-clock-card reveal">
+          <div class="clock-face-outer">
+            <div class="clock-capsules">
+              <div class="capsule cap-top"></div>
+              <div class="capsule cap-left-top"></div>
+              <div class="capsule cap-left"></div>
+              <div class="capsule cap-bottom"></div>
+              <div class="capsule cap-right-bottom"></div>
+            </div>
+            <div class="clock-face">
+              <div class="clock-labels">
+                <span class="label-12">12AM</span>
+                <span class="label-3">6AM</span>
+                <span class="label-6">12PM</span>
+                <span class="label-9">6PM</span>
+              </div>
+              <div class="clock-icons">
+                <span class="icon-moon">🌙</span>
+                <span class="icon-sun">☀️</span>
+              </div>
+              <div class="clock-hands">
+                <div class="hand-hour"></div>
+                <div class="hand-minute"></div>
+                <div class="hand-second"></div>
+                <div class="hand-center"></div>
               </div>
             </div>
-          </article>
+          </div>
+          
+          <div class="minimal-task-list">
+            <div class="minimal-task-item">
+              <span class="task-dot" style="background: #b87580;"></span>
+              <div class="task-info">
+                <strong>Morning Yoga</strong>
+                <span>Early block</span>
+              </div>
+              <span class="task-time">7:30 AM</span>
+            </div>
+            <div class="minimal-task-item">
+              <span class="task-dot" style="background: #7cb1cd;"></span>
+              <div class="task-info">
+                <strong>Finish Bio HW</strong>
+                <span>Focus block</span>
+              </div>
+              <span class="task-time">12:00 PM</span>
+            </div>
+            <div class="minimal-task-item">
+              <span class="task-dot" style="background: #e3a9b9;"></span>
+              <div class="task-info">
+                <strong>Meeting with Hailey</strong>
+                <span>Afternoon block</span>
+              </div>
+              <span class="task-time">4:00 PM</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
