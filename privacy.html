@@ -4,65 +4,86 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy - Haiku</title>
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="shared.css">
+    <link rel="icon" type="image/png" href="haiku-app-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="shared.css?v=2">
 </head>
 <body>
-    <div class="cursor"></div>
-    <div class="container">
-        <a href="index.html" class="back-btn">&larr; Back to Home</a>
-        
-        <h1>Privacy Policy</h1>
-        <p class="date">Last updated: March 23, 2026 </p>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="index.html" class="logo" aria-label="Haiku home">
+                <img class="logo-mark" src="haiku-app-icon.png" alt="Haiku app icon">
+                <span class="logo-wordmark">Haiku</span>
+            </a>
+            <nav class="nav" aria-label="Legal navigation">
+                <a href="index.html">Home</a>
+                <a href="terms.html">Terms</a>
+                <a href="privacy.html" class="active">Privacy</a>
+            </nav>
+        </div>
+    </header>
 
-        <h2>1. Introduction</h2>
-        <p>Welcome to Haiku. We are committed to protecting your personal information and your right to privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our iOS application.</p>
+    <main class="legal-main">
+        <section class="legal-hero">
+            <div class="hero-panel">
+                <h1>Privacy Policy</h1>
+                <p class="meta-date-inline">Effective Date: March 23, 2026</p>
+            </div>
+        </section>
 
-        <h2>2. Information We Collect</h2>
-        <p>Haiku is designed with privacy in mind. We collect minimal information:</p>
-        <ul>
-            <li><strong>Calendar Data:</strong> The app requests access to your Apple Calendar and Google Calendar (if you choose to connect it) strictly to display and manage your events within the app.</li>
-            <li><strong>App Data:</strong> Your preferences, themes, and tasks created exclusively within Haiku are stored locally on your device or via your personal iCloud account.</li>
-            <li><strong>Analytics Data:</strong> We collect anonymized usage data to help us understand how you use the app and to improve its features. This data is collected through PostHog and does not include any personal information or calendar content.</li>
-        </ul>
+        <section class="legal-content">
+            <article class="section-card">
+                <h2>1. Introduction</h2>
+                <p>Welcome to Haiku. We are committed to protecting your personal information and your right to privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our iOS application.</p>
+            </article>
 
-        <h2>3. Analytics</h2>
-        <p>We use <strong>PostHog</strong> to help us analyze how our users interact with the app. This helps us identify popular features and areas that may need improvement. The data collected is strictly related to app usage (e.g., button clicks, theme changes, or navigation) and is <strong>entirely anonymized</strong>. We do not collect names, email addresses, the titles of your tasks, or any information from your calendars through this analytics service.</p>
-        <p>You can learn more about how PostHog handles data in their <a href="https://posthog.com/privacy" target="_blank">Privacy Policy</a>.</p>
+            <article class="section-card">
+                <h2>2. Information We Collect</h2>
+                <p>Haiku is designed with privacy in mind. We collect minimal information:</p>
+                <ul>
+                    <li><strong>Calendar Data:</strong> The app requests access to your Apple Calendar and Google Calendar, if you choose to connect it, strictly to display and manage your events within the app.</li>
+                    <li><strong>App Data:</strong> Your preferences, themes, and tasks created exclusively within Haiku are stored locally on your device or via your personal iCloud account.</li>
+                    <li><strong>Analytics Data:</strong> We collect anonymized usage data to help us understand how you use the app and to improve its features. This data is collected through PostHog and does not include any personal information or calendar content.</li>
+                </ul>
+            </article>
 
-        <h2>4. How We Use Your Information</h2>
-        <p>Your calendar data is used solely to provide the core functionality of the app—displaying your schedule on the clock interface and allowing you to create or modify events. <strong>We do not transmit your calendar data to our servers, nor do we sell or share your data with third parties.</strong> All communication regarding your Google Calendar events happens directly between your local device and Google's servers.</p>
+            <article class="section-card">
+                <h2>3. Analytics</h2>
+                <p>We use <strong>PostHog</strong> to help us analyze how our users interact with the app. This helps us identify popular features and areas that may need improvement. The data collected is strictly related to app usage, such as button clicks, theme changes, or navigation, and is <strong>entirely anonymized</strong>. We do not collect names, email addresses, the titles of your tasks, or any information from your calendars through this analytics service.</p>
+                <p>You can learn more about how PostHog handles data in their <a href="https://posthog.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.</p>
+            </article>
 
-        <h2>5. Google API Services & Limited Use Policy</h2>
-        <p>If you choose to sync your Google Calendar, Haiku will authenticate using Google Sign-In and access your events via the Google Calendar API. Your use of this feature is subject to the <a href="https://policies.google.com/privacy" target="_blank">Google Privacy Policy</a>.</p>
-        
-        <p><strong>Haiku's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank">Google API Services User Data Policy</a>, including the Limited Use requirements.</strong> Specifically:</p>
-        <ul>
-            <li><strong>Limited Use:</strong> We only use the data obtained through the Google Calendar API to provide or improve the core user-facing features of the Haiku app (displaying and managing your schedule).</li>
-            <li><strong>No Data Transfers:</strong> We do not transfer your Google data to any third party, except as necessary to comply with applicable laws, for security purposes (investigating abuse), or as part of a merger/acquisition.</li>
-            <li><strong>No Human Access:</strong> No human will read your Google data unless we obtain your affirmative agreement for specific messages/files, it is necessary for security purposes, or it is necessary to comply with applicable law.</li>
-            <li><strong>No Advertising or Profiling:</strong> We absolutely do not transfer, sell, or use your user data for serving ads, including retargeting, personalized, or interest-based advertising. We do not use your data for credit-worthiness or lending purposes.</li>
-            <li><strong>No Data Brokers:</strong> We do not transfer or sell user data to third parties like advertising platforms, data brokers, or any information resellers.</li>
-        </ul>
+            <article class="section-card">
+                <h2>4. How We Use Your Information</h2>
+                <p>Your calendar data is used solely to provide the core functionality of the app, displaying your schedule on the clock interface and allowing you to create or modify events. <strong>We do not transmit your calendar data to our servers, nor do we sell or share your data with third parties.</strong> All communication regarding your Google Calendar events happens directly between your local device and Google&apos;s servers.</p>
+            </article>
 
-        <h2>6. Data Security</h2>
-        <p>We rely on the security features provided by iOS and the official Google Sign-In SDK to protect your authentication tokens and data. We do not maintain our own databases for your calendar information.</p>
+            <article class="section-card">
+                <h2>5. Google API Services &amp; Limited Use Policy</h2>
+                <p>If you choose to sync your Google Calendar, Haiku will authenticate using Google Sign-In and access your events via the Google Calendar API. Your use of this feature is subject to the <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</p>
+                <p><strong>Haiku&apos;s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements.</strong> Specifically:</p>
+                <ul>
+                    <li><strong>Limited Use:</strong> We only use the data obtained through the Google Calendar API to provide or improve the core user-facing features of the Haiku app, displaying and managing your schedule.</li>
+                    <li><strong>No Data Transfers:</strong> We do not transfer your Google data to any third party, except as necessary to comply with applicable laws, for security purposes, or as part of a merger or acquisition.</li>
+                    <li><strong>No Human Access:</strong> No human will read your Google data unless we obtain your affirmative agreement for specific messages or files, it is necessary for security purposes, or it is necessary to comply with applicable law.</li>
+                    <li><strong>No Advertising or Profiling:</strong> We absolutely do not transfer, sell, or use your user data for serving ads, including retargeting, personalized, or interest-based advertising. We do not use your data for credit-worthiness or lending purposes.</li>
+                    <li><strong>No Data Brokers:</strong> We do not transfer or sell user data to third parties like advertising platforms, data brokers, or any information resellers.</li>
+                </ul>
+            </article>
 
-        <h2>7. Contact Us</h2>
-        <p>If you have any questions or concerns about our Privacy Policy, please contact us at <a href="mailto:support@haiku.xyz">support@haiku.xyz</a>.</p>
-    </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script>
-        const cursor = document.querySelector('.cursor');
-        document.addEventListener('mousemove', (e) => {
-            gsap.to(cursor, { x: e.clientX, y: e.clientY, duration: 0.15 });
-        });
-        const hoverTargets = document.querySelectorAll('a, .back-btn');
-        hoverTargets.forEach(t => {
-            t.addEventListener('mouseenter', () => cursor.classList.add('hover-active'));
-            t.addEventListener('mouseleave', () => cursor.classList.remove('hover-active'));
-        });
-    </script>
+            <article class="section-card">
+                <h2>6. Data Security</h2>
+                <p>We rely on the security features provided by iOS and the official Google Sign-In SDK to protect your authentication tokens and data. We do not maintain our own databases for your calendar information.</p>
+            </article>
+
+            <article class="section-card">
+                <h2>7. Contact Us</h2>
+                <p>If you have any questions or concerns about our Privacy Policy, please contact us at <a href="mailto:support@haiku.xyz">support@haiku.xyz</a>.</p>
+            </article>
+        </section>
+    </main>
+
 </body>
 </html>
