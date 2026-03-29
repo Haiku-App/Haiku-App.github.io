@@ -5,7 +5,6 @@ struct ProfileAnalyticsView: View {
     @EnvironmentObject var storeManager: StoreManager
     private var isPro: Bool { storeManager.isPro }
     
-    @AppStorage("is24HourClock") private var is24HourClock = false
     var tasksByDate: [Date: [ClockTask]]
     
     @StateObject private var categoryManager = CategoryManager()
@@ -17,6 +16,7 @@ struct ProfileAnalyticsView: View {
     private var goldColor: Color { currentTheme.accent }
     private var shadowLight: Color { currentTheme.shadowLight }
     private var shadowDark: Color { currentTheme.shadowDark }
+    private let uncategorizedColor = Color(red: 0.60, green: 0.60, blue: 0.60)
 
     struct MetricInfo: Identifiable {
         let id = UUID()
@@ -33,53 +33,24 @@ struct ProfileAnalyticsView: View {
     }
 
     private var stats: [CategoryStats] {
-        struct CategoryKey: Hashable {
-            let id: UUID?
-            let name: String?
-            let color: Color
-        }
-        
-        var breakdown: [CategoryKey: Double] = [:]
+        var breakdown: [String: (color: Color, minutes: Double)] = [:]
         var totalMinutes: Double = 0
         
         for (_, tasks) in tasksByDate {
             for task in tasks {
                 let duration = Double(task.endMinutes - task.startMinutes)
                 if duration > 0 {
-                    let key = CategoryKey(id: task.categoryId, name: task.categoryName, color: task.color)
-                    breakdown[key, default: 0] += duration
+                    let resolved = resolvedCategory(for: task)
+                    let current = breakdown[resolved.name, default: (resolved.color, 0)]
+                    breakdown[resolved.name] = (resolved.color, current.minutes + duration)
                     totalMinutes += duration
                 }
             }
         }
         
         if totalMinutes == 0 { return [] }
-        
-        // Final consolidation: Group by name if multiple colors are used for the same category
-        var consolidated: [String: (color: Color, minutes: Double)] = [:]
-        for (key, minutes) in breakdown {
-            var catName = "Custom"
-            var catColor = key.color
-            
-            if let name = key.name {
-                catName = name
-                // Use the category's official color for the chart if possible
-                if let cat = categoryManager.categories.first(where: { $0.id == key.id }) {
-                    catColor = cat.color
-                }
-            } else {
-                // Legacy color-based lookup
-                if let cat = categoryManager.categories.first(where: { $0.color == key.color }) {
-                    catName = cat.name
-                    catColor = cat.color
-                }
-            }
-            
-            let current = consolidated[catName, default: (catColor, 0)]
-            consolidated[catName] = (current.color, current.minutes + minutes)
-        }
-        
-        let result = consolidated.map { (name, data) -> CategoryStats in
+
+        let result = breakdown.map { (name, data) -> CategoryStats in
             let percentage = (data.minutes / totalMinutes) * 100
             return CategoryStats(name: name, color: data.color, minutes: data.minutes, percentage: percentage)
         }
@@ -130,7 +101,13 @@ struct ProfileAnalyticsView: View {
     }
     
     private var peakHour: Int {
-        hourlyDensity.max { $0.value < $1.value }?.key ?? 9
+        let maxCount = hourlyDensity.values.max() ?? 0
+        guard maxCount > 0 else { return 9 }
+
+        return hourlyDensity
+            .filter { $0.value == maxCount }
+            .map(\.key)
+            .min() ?? 9
     }
     
     private var deepWorkRatio: (deep: Double, shallow: Double) {
@@ -160,14 +137,33 @@ struct ProfileAnalyticsView: View {
         return "\(m)m"
     }
     
-    private func formatHour(_ hour: Int) -> String {
-        if is24HourClock {
-            return String(format: "%02d:00", hour)
-        } else {
-            let h = hour % 12
-            let period = hour < 12 ? "AM" : "PM"
-            return "\(h == 0 ? 12 : h) \(period)"
+    private func resolvedCategory(for task: ClockTask) -> (name: String, color: Color) {
+        if let categoryId = task.categoryId,
+           let category = categoryManager.categories.first(where: { $0.id == categoryId }) {
+            return (category.name, category.color)
         }
+
+        if let categoryName = task.categoryName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !categoryName.isEmpty {
+            if let category = categoryManager.categories.first(where: { $0.name.caseInsensitiveCompare(categoryName) == .orderedSame }) {
+                return (category.name, category.color)
+            }
+
+            return (categoryName, task.color)
+        }
+
+        if let category = categoryManager.categories.first(where: { $0.color == task.color }) {
+            return (category.name, category.color)
+        }
+
+        return ("Custom", uncategorizedColor)
+    }
+
+    private func formatHour(_ hour: Int) -> String {
+        let normalizedHour = ((hour % 24) + 24) % 24
+        let displayHour = normalizedHour % 12 == 0 ? 12 : normalizedHour % 12
+        let period = normalizedHour < 12 ? "am" : "pm"
+        return "\(displayHour)\(period)"
     }
 
     var body: some View {
@@ -698,4 +694,3 @@ struct MomentumChart: View {
         }
     }
 }
-
