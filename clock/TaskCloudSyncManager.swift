@@ -13,6 +13,7 @@ actor TaskCloudSyncManager {
     private let recordID = CKRecord.ID(recordName: "task-state")
     private let recordType = "TaskState"
     private let schemaVersion: Int64 = 1
+    private let mergeWindow: TimeInterval = 300
 
     private var privateDatabase: CKDatabase {
         container.privateCloudDatabase
@@ -31,12 +32,31 @@ actor TaskCloudSyncManager {
                 return remoteSnapshot
             }
 
-            if remoteSnapshot.modifiedAt.timeIntervalSince(localModifiedAt) > 1 {
+            let timeDelta = remoteSnapshot.modifiedAt.timeIntervalSince(localModifiedAt)
+
+            if timeDelta > mergeWindow {
                 return remoteSnapshot
             }
 
-            if localModifiedAt.timeIntervalSince(remoteSnapshot.modifiedAt) > 1 {
+            if -timeDelta > mergeWindow {
                 await upload(tasksByDate: localTasksByDate, modifiedAt: localModifiedAt, existingRecord: record)
+                return nil
+            }
+
+            let preferLocal = localModifiedAt >= remoteSnapshot.modifiedAt
+            let mergedTasks = mergeSnapshots(
+                local: localTasksByDate,
+                remote: remoteSnapshot.tasksByDate,
+                preferLocal: preferLocal
+            )
+            let mergedModifiedAt = max(localModifiedAt, remoteSnapshot.modifiedAt)
+
+            if mergedTasks != remoteSnapshot.tasksByDate {
+                await upload(tasksByDate: mergedTasks, modifiedAt: mergedModifiedAt, existingRecord: record)
+            }
+
+            if mergedTasks != localTasksByDate || mergedModifiedAt != localModifiedAt {
+                return TaskCloudSnapshot(tasksByDate: mergedTasks, modifiedAt: mergedModifiedAt)
             }
 
             return nil
@@ -59,8 +79,21 @@ actor TaskCloudSyncManager {
 
         switch remoteRecord {
         case .success(let record):
-            if let remoteSnapshot = decodeSnapshot(from: record),
-               remoteSnapshot.modifiedAt.timeIntervalSince(modifiedAt) > 1 {
+            if let remoteSnapshot = decodeSnapshot(from: record) {
+                let timeDelta = remoteSnapshot.modifiedAt.timeIntervalSince(modifiedAt)
+
+                if timeDelta > mergeWindow {
+                    return
+                }
+
+                let mergedTasks = mergeSnapshots(
+                    local: tasksByDate,
+                    remote: remoteSnapshot.tasksByDate,
+                    preferLocal: modifiedAt >= remoteSnapshot.modifiedAt
+                )
+                let mergedModifiedAt = max(modifiedAt, remoteSnapshot.modifiedAt)
+
+                await upload(tasksByDate: mergedTasks, modifiedAt: mergedModifiedAt, existingRecord: record)
                 return
             }
 
@@ -122,6 +155,63 @@ actor TaskCloudSyncManager {
         }
 
         return TaskCloudSnapshot(tasksByDate: tasksByDate, modifiedAt: modifiedAt)
+    }
+
+    private func mergeSnapshots(
+        local: [Date: [ClockTask]],
+        remote: [Date: [ClockTask]],
+        preferLocal: Bool
+    ) -> [Date: [ClockTask]] {
+        let allDates = Set(local.keys).union(remote.keys)
+        var merged: [Date: [ClockTask]] = [:]
+
+        for date in allDates {
+            let mergedTasks = mergeTasks(
+                local: local[date, default: []],
+                remote: remote[date, default: []],
+                preferLocal: preferLocal
+            )
+
+            if !mergedTasks.isEmpty {
+                merged[date] = mergedTasks
+            }
+        }
+
+        return merged
+    }
+
+    private func mergeTasks(
+        local: [ClockTask],
+        remote: [ClockTask],
+        preferLocal: Bool
+    ) -> [ClockTask] {
+        var mergedByID: [UUID: ClockTask] = [:]
+        let firstPass = preferLocal ? remote : local
+        let secondPass = preferLocal ? local : remote
+
+        for task in firstPass {
+            mergedByID[task.id] = task
+        }
+
+        for task in secondPass {
+            mergedByID[task.id] = task
+        }
+
+        return mergedByID.values.sorted { lhs, rhs in
+            if lhs.startMinutes != rhs.startMinutes {
+                return lhs.startMinutes < rhs.startMinutes
+            }
+
+            if lhs.endMinutes != rhs.endMinutes {
+                return lhs.endMinutes < rhs.endMinutes
+            }
+
+            if lhs.title != rhs.title {
+                return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+            }
+
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
     }
 
     private enum FetchResult {

@@ -1,5 +1,14 @@
 import SwiftUI
 internal import Combine
+import CloudKit
+
+enum AppSupportDefaults {
+    static let userDefaults = UserDefaults(suiteName: "group.reswink.haiku") ?? UserDefaults.standard
+    static let categoriesKey = "userCategories"
+    static let categoriesLastModifiedKey = "userCategoriesLastModified"
+    static let brainDumpTasksKey = "brainDumpTasks"
+    static let brainDumpTasksLastModifiedKey = "brainDumpTasksLastModified"
+}
 
 struct RGB: Codable, Equatable {
     var r: Double
@@ -16,26 +25,390 @@ struct Category: Identifiable, Codable, Equatable {
     var color: Color { rgb.color }
 }
 
-class CategoryManager: ObservableObject {
-    @Published var categories: [Category] = [] {
-        didSet {
-            if let data = try? JSONEncoder().encode(categories) {
-                UserDefaults.standard.set(data, forKey: "userCategories")
+enum AppSupportPersistence {
+    static func defaultCategories() -> [Category] {
+        [
+            Category(name: "Deep Work", icon: "brain.head.profile", rgb: RGB(r: 0.75, g: 0.55, b: 0.45)),
+            Category(name: "Meeting", icon: "person.2.fill", rgb: RGB(r: 0.85, g: 0.78, b: 0.58)),
+            Category(name: "Break", icon: "cup.and.saucer.fill", rgb: RGB(r: 0.35, g: 0.42, b: 0.35)),
+            Category(name: "Study", icon: "book.fill", rgb: RGB(r: 0.45, g: 0.50, b: 0.35))
+        ]
+    }
+
+    static func loadCategories() -> [Category] {
+        guard let data = AppSupportDefaults.userDefaults.data(forKey: AppSupportDefaults.categoriesKey),
+              let decoded = try? JSONDecoder().decode([Category].self, from: data) else {
+            return defaultCategories()
+        }
+
+        return decoded
+    }
+
+    static func loadBrainDumpTasks() -> [BrainDumpTask] {
+        guard let data = AppSupportDefaults.userDefaults.data(forKey: AppSupportDefaults.brainDumpTasksKey),
+              var decoded = try? JSONDecoder().decode([BrainDumpTask].self, from: data) else {
+            return []
+        }
+
+        var modified = false
+        for index in decoded.indices {
+            if decoded[index].isCompleted && decoded[index].completedDate == nil {
+                decoded[index].completedDate = Date()
+                modified = true
             }
         }
+
+        if modified {
+            saveBrainDumpTasks(decoded, modifiedAt: loadBrainDumpTasksLastModifiedAt() ?? Date())
+        }
+
+        return decoded
     }
-    
+
+    static func saveCategories(_ categories: [Category], modifiedAt: Date = Date()) {
+        guard let data = try? JSONEncoder().encode(categories) else { return }
+        AppSupportDefaults.userDefaults.set(data, forKey: AppSupportDefaults.categoriesKey)
+        AppSupportDefaults.userDefaults.set(modifiedAt, forKey: AppSupportDefaults.categoriesLastModifiedKey)
+    }
+
+    static func saveBrainDumpTasks(_ tasks: [BrainDumpTask], modifiedAt: Date = Date()) {
+        guard let data = try? JSONEncoder().encode(tasks) else { return }
+        AppSupportDefaults.userDefaults.set(data, forKey: AppSupportDefaults.brainDumpTasksKey)
+        AppSupportDefaults.userDefaults.set(modifiedAt, forKey: AppSupportDefaults.brainDumpTasksLastModifiedKey)
+    }
+
+    static func loadCategoriesLastModifiedAt() -> Date? {
+        AppSupportDefaults.userDefaults.object(forKey: AppSupportDefaults.categoriesLastModifiedKey) as? Date
+    }
+
+    static func loadBrainDumpTasksLastModifiedAt() -> Date? {
+        AppSupportDefaults.userDefaults.object(forKey: AppSupportDefaults.brainDumpTasksLastModifiedKey) as? Date
+    }
+}
+
+enum AppSupportBootstrap {
+    static var hasStartedInitialSync = false
+}
+
+struct AppSupportCloudSnapshot {
+    let categories: [Category]
+    let brainDumpTasks: [BrainDumpTask]
+    let modifiedAt: Date
+}
+
+actor AppSupportCloudSyncManager {
+    static let shared = AppSupportCloudSyncManager()
+
+    private let container = CKContainer.default()
+    private let recordID = CKRecord.ID(recordName: "app-support-state")
+    private let recordType = "AppSupportState"
+    private let schemaVersion: Int64 = 1
+    private let mergeWindow: TimeInterval = 300
+
+    private var privateDatabase: CKDatabase {
+        container.privateCloudDatabase
+    }
+
+    func synchronize(localSnapshot: AppSupportCloudSnapshot?) async -> AppSupportCloudSnapshot? {
+        guard await isiCloudAvailable() else { return nil }
+
+        let remoteRecord = await fetchRemoteRecord()
+
+        switch remoteRecord {
+        case .success(let record):
+            guard let remoteSnapshot = decodeSnapshot(from: record) else { return nil }
+
+            guard let localSnapshot else {
+                return remoteSnapshot
+            }
+
+            let timeDelta = remoteSnapshot.modifiedAt.timeIntervalSince(localSnapshot.modifiedAt)
+
+            if timeDelta > mergeWindow {
+                return remoteSnapshot
+            }
+
+            if -timeDelta > mergeWindow {
+                await upload(snapshot: localSnapshot, existingRecord: record)
+                return nil
+            }
+
+            let mergedSnapshot = mergeSnapshots(
+                local: localSnapshot,
+                remote: remoteSnapshot,
+                preferLocal: localSnapshot.modifiedAt >= remoteSnapshot.modifiedAt
+            )
+
+            if mergedSnapshot.categories != remoteSnapshot.categories ||
+                mergedSnapshot.brainDumpTasks != remoteSnapshot.brainDumpTasks {
+                await upload(snapshot: mergedSnapshot, existingRecord: record)
+            }
+
+            if mergedSnapshot.categories != localSnapshot.categories ||
+                mergedSnapshot.brainDumpTasks != localSnapshot.brainDumpTasks ||
+                mergedSnapshot.modifiedAt != localSnapshot.modifiedAt {
+                return mergedSnapshot
+            }
+
+            return nil
+
+        case .notFound:
+            if let localSnapshot {
+                await upload(snapshot: localSnapshot, existingRecord: nil)
+            }
+            return nil
+
+        case .failure:
+            return nil
+        }
+    }
+
+    func uploadLocalSnapshot(snapshot: AppSupportCloudSnapshot) async {
+        guard await isiCloudAvailable() else { return }
+
+        let remoteRecord = await fetchRemoteRecord()
+
+        switch remoteRecord {
+        case .success(let record):
+            if let remoteSnapshot = decodeSnapshot(from: record) {
+                let timeDelta = remoteSnapshot.modifiedAt.timeIntervalSince(snapshot.modifiedAt)
+
+                if timeDelta > mergeWindow {
+                    return
+                }
+
+                let mergedSnapshot = mergeSnapshots(
+                    local: snapshot,
+                    remote: remoteSnapshot,
+                    preferLocal: snapshot.modifiedAt >= remoteSnapshot.modifiedAt
+                )
+                await upload(snapshot: mergedSnapshot, existingRecord: record)
+                return
+            }
+
+            await upload(snapshot: snapshot, existingRecord: record)
+
+        case .notFound:
+            await upload(snapshot: snapshot, existingRecord: nil)
+
+        case .failure:
+            return
+        }
+    }
+
+    private func isiCloudAvailable() async -> Bool {
+        do {
+            return try await container.accountStatus() == .available
+        } catch {
+            print("CloudKit: Failed to read iCloud account status for app support sync: \(error)")
+            return false
+        }
+    }
+
+    private func fetchRemoteRecord() async -> FetchResult {
+        do {
+            let record = try await privateDatabase.record(for: recordID)
+            return .success(record)
+        } catch let error as CKError {
+            if error.code == .unknownItem {
+                return .notFound
+            }
+            print("CloudKit: Failed to fetch remote app support state: \(error)")
+            return .failure
+        } catch {
+            print("CloudKit: Failed to fetch remote app support state: \(error)")
+            return .failure
+        }
+    }
+
+    private func upload(snapshot: AppSupportCloudSnapshot, existingRecord: CKRecord?) async {
+        guard let data = encodeSnapshot(snapshot) else { return }
+
+        let record = existingRecord ?? CKRecord(recordType: recordType, recordID: recordID)
+        record["schemaVersion"] = schemaVersion as NSNumber
+        record["modifiedAt"] = snapshot.modifiedAt as NSDate
+        record["payload"] = data as NSData
+
+        do {
+            _ = try await privateDatabase.save(record)
+        } catch {
+            print("CloudKit: Failed to save remote app support state: \(error)")
+        }
+    }
+
+    private func encodeSnapshot(_ snapshot: AppSupportCloudSnapshot) -> Data? {
+        let payload = Payload(categories: snapshot.categories, brainDumpTasks: snapshot.brainDumpTasks)
+        return try? JSONEncoder().encode(payload)
+    }
+
+    private func decodeSnapshot(from record: CKRecord) -> AppSupportCloudSnapshot? {
+        guard let modifiedAt = record["modifiedAt"] as? Date,
+              let payload = record["payload"] as? Data,
+              let decoded = try? JSONDecoder().decode(Payload.self, from: payload) else {
+            return nil
+        }
+
+        return AppSupportCloudSnapshot(
+            categories: decoded.categories,
+            brainDumpTasks: decoded.brainDumpTasks,
+            modifiedAt: modifiedAt
+        )
+    }
+
+    private func mergeSnapshots(
+        local: AppSupportCloudSnapshot,
+        remote: AppSupportCloudSnapshot,
+        preferLocal: Bool
+    ) -> AppSupportCloudSnapshot {
+        AppSupportCloudSnapshot(
+            categories: mergeCategories(local: local.categories, remote: remote.categories, preferLocal: preferLocal),
+            brainDumpTasks: mergeBrainDumpTasks(local: local.brainDumpTasks, remote: remote.brainDumpTasks, preferLocal: preferLocal),
+            modifiedAt: max(local.modifiedAt, remote.modifiedAt)
+        )
+    }
+
+    private func mergeCategories(
+        local: [Category],
+        remote: [Category],
+        preferLocal: Bool
+    ) -> [Category] {
+        var mergedByID: [UUID: Category] = [:]
+        let firstPass = preferLocal ? remote : local
+        let secondPass = preferLocal ? local : remote
+
+        for category in firstPass {
+            mergedByID[category.id] = category
+        }
+
+        for category in secondPass {
+            mergedByID[category.id] = category
+        }
+
+        return mergedByID.values.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    private func mergeBrainDumpTasks(
+        local: [BrainDumpTask],
+        remote: [BrainDumpTask],
+        preferLocal: Bool
+    ) -> [BrainDumpTask] {
+        var mergedByID: [UUID: BrainDumpTask] = [:]
+        let firstPass = preferLocal ? remote : local
+        let secondPass = preferLocal ? local : remote
+
+        for task in firstPass {
+            mergedByID[task.id] = task
+        }
+
+        for task in secondPass {
+            mergedByID[task.id] = task
+        }
+
+        return mergedByID.values.sorted { lhs, rhs in
+            switch (lhs.scheduledDate, rhs.scheduledDate) {
+            case let (left?, right?):
+                if left != right {
+                    return left < right
+                }
+            case (.some, nil):
+                return true
+            case (nil, .some):
+                return false
+            case (nil, nil):
+                break
+            }
+
+            if lhs.isCompleted != rhs.isCompleted {
+                return !lhs.isCompleted && rhs.isCompleted
+            }
+
+            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+        }
+    }
+
+    private enum FetchResult {
+        case success(CKRecord)
+        case notFound
+        case failure
+    }
+
+    private struct Payload: Codable {
+        let categories: [Category]
+        let brainDumpTasks: [BrainDumpTask]
+    }
+}
+
+@MainActor
+class CategoryManager: ObservableObject {
+    static let shared = CategoryManager()
+
+    @Published var categories: [Category] = [] {
+        didSet {
+            guard !isApplyingRemoteSnapshot else { return }
+            persistAndSync()
+        }
+    }
+
+    private var isApplyingRemoteSnapshot = false
+
     init() {
-        if let data = UserDefaults.standard.data(forKey: "userCategories"),
-           let decoded = try? JSONDecoder().decode([Category].self, from: data) {
-            self.categories = decoded
-        } else {
-            self.categories = [
-                Category(name: "Deep Work", icon: "brain.head.profile", rgb: RGB(r: 0.75, g: 0.55, b: 0.45)),
-                Category(name: "Meeting", icon: "person.2.fill", rgb: RGB(r: 0.85, g: 0.78, b: 0.58)),
-                Category(name: "Break", icon: "cup.and.saucer.fill", rgb: RGB(r: 0.35, g: 0.42, b: 0.35)),
-                Category(name: "Study", icon: "book.fill", rgb: RGB(r: 0.45, g: 0.50, b: 0.35))
-            ]
+        self.categories = AppSupportPersistence.loadCategories()
+        startInitialSyncIfNeeded()
+    }
+
+    func applyCloudCategories(_ categories: [Category], modifiedAt: Date) {
+        isApplyingRemoteSnapshot = true
+        self.categories = categories
+        AppSupportPersistence.saveCategories(categories, modifiedAt: modifiedAt)
+        isApplyingRemoteSnapshot = false
+    }
+
+    private func persistAndSync() {
+        let modifiedAt = Date()
+        AppSupportPersistence.saveCategories(categories, modifiedAt: modifiedAt)
+
+        Task {
+            await AppSupportCloudSyncManager.shared.uploadLocalSnapshot(
+                snapshot: AppSupportCloudSnapshot(
+                    categories: AppSupportPersistence.loadCategories(),
+                    brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    modifiedAt: max(
+                        AppSupportPersistence.loadCategoriesLastModifiedAt() ?? modifiedAt,
+                        AppSupportPersistence.loadBrainDumpTasksLastModifiedAt() ?? modifiedAt
+                    )
+                )
+            )
+        }
+    }
+
+    private func startInitialSyncIfNeeded() {
+        guard !AppSupportBootstrap.hasStartedInitialSync else { return }
+        AppSupportBootstrap.hasStartedInitialSync = true
+
+        Task {
+            let localModifiedAt = max(
+                AppSupportPersistence.loadCategoriesLastModifiedAt() ?? .distantPast,
+                AppSupportPersistence.loadBrainDumpTasksLastModifiedAt() ?? .distantPast
+            )
+            let localSnapshot: AppSupportCloudSnapshot? = localModifiedAt == .distantPast
+                ? nil
+                : AppSupportCloudSnapshot(
+                    categories: AppSupportPersistence.loadCategories(),
+                    brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    modifiedAt: localModifiedAt
+                )
+            let snapshot = await AppSupportCloudSyncManager.shared.synchronize(
+                localSnapshot: localSnapshot
+            )
+
+            guard let snapshot else { return }
+
+            await MainActor.run {
+                CategoryManager.shared.applyCloudCategories(snapshot.categories, modifiedAt: snapshot.modifiedAt)
+                BrainDumpManager.shared.applyCloudTasks(snapshot.brainDumpTasks, modifiedAt: snapshot.modifiedAt)
+            }
         }
     }
 }
@@ -130,7 +503,7 @@ let aestheticColors: [RGB] = [
     RGB(r: 0.45, g: 0.45, b: 0.45)  // Dark Grey
 ]
 
-struct BrainDumpTask: Identifiable, Codable {
+struct BrainDumpTask: Identifiable, Codable, Equatable {
     var id = UUID()
     var title: String
     var isCompleted: Bool = false
@@ -138,34 +511,23 @@ struct BrainDumpTask: Identifiable, Codable {
     var completedDate: Date? = nil
 }
 
+@MainActor
 class BrainDumpManager: ObservableObject {
+    static let shared = BrainDumpManager()
+
     @Published var tasks: [BrainDumpTask] = [] {
         didSet {
-            if let data = try? JSONEncoder().encode(tasks) {
-                UserDefaults.standard.set(data, forKey: "brainDumpTasks")
-            }
+            guard !isApplyingRemoteSnapshot else { return }
+            persistAndSync()
         }
     }
-    
+
+    private var isApplyingRemoteSnapshot = false
+
     init() {
-        if let data = UserDefaults.standard.data(forKey: "brainDumpTasks"),
-           var decoded = try? JSONDecoder().decode([BrainDumpTask].self, from: data) {
-            
-            // Migration: Assign today's date to completed tasks missing a completedDate
-            var modified = false
-            for i in 0..<decoded.count {
-                if decoded[i].isCompleted && decoded[i].completedDate == nil {
-                    decoded[i].completedDate = Date()
-                    modified = true
-                }
-            }
-            
-            self.tasks = decoded
-            if modified {
-                save()
-            }
-        }
+        self.tasks = AppSupportPersistence.loadBrainDumpTasks()
         sortTasks()
+        startInitialSyncIfNeeded()
     }
 
     func sortTasks() {
@@ -184,9 +546,62 @@ class BrainDumpManager: ObservableObject {
     }
 
     func save() {
-        if let data = try? JSONEncoder().encode(tasks) {
-            UserDefaults.standard.set(data, forKey: "brainDumpTasks")
-        }
         sortTasks()
+        persistAndSync()
+    }
+
+    func applyCloudTasks(_ tasks: [BrainDumpTask], modifiedAt: Date) {
+        isApplyingRemoteSnapshot = true
+        self.tasks = tasks
+        sortTasks()
+        AppSupportPersistence.saveBrainDumpTasks(self.tasks, modifiedAt: modifiedAt)
+        isApplyingRemoteSnapshot = false
+    }
+
+    private func persistAndSync() {
+        let modifiedAt = Date()
+        AppSupportPersistence.saveBrainDumpTasks(tasks, modifiedAt: modifiedAt)
+
+        Task {
+            await AppSupportCloudSyncManager.shared.uploadLocalSnapshot(
+                snapshot: AppSupportCloudSnapshot(
+                    categories: AppSupportPersistence.loadCategories(),
+                    brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    modifiedAt: max(
+                        AppSupportPersistence.loadCategoriesLastModifiedAt() ?? modifiedAt,
+                        AppSupportPersistence.loadBrainDumpTasksLastModifiedAt() ?? modifiedAt
+                    )
+                )
+            )
+        }
+    }
+
+    private func startInitialSyncIfNeeded() {
+        guard !AppSupportBootstrap.hasStartedInitialSync else { return }
+        AppSupportBootstrap.hasStartedInitialSync = true
+
+        Task {
+            let localModifiedAt = max(
+                AppSupportPersistence.loadCategoriesLastModifiedAt() ?? .distantPast,
+                AppSupportPersistence.loadBrainDumpTasksLastModifiedAt() ?? .distantPast
+            )
+            let localSnapshot: AppSupportCloudSnapshot? = localModifiedAt == .distantPast
+                ? nil
+                : AppSupportCloudSnapshot(
+                    categories: AppSupportPersistence.loadCategories(),
+                    brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    modifiedAt: localModifiedAt
+                )
+            let snapshot = await AppSupportCloudSyncManager.shared.synchronize(
+                localSnapshot: localSnapshot
+            )
+
+            guard let snapshot else { return }
+
+            await MainActor.run {
+                CategoryManager.shared.applyCloudCategories(snapshot.categories, modifiedAt: snapshot.modifiedAt)
+                BrainDumpManager.shared.applyCloudTasks(snapshot.brainDumpTasks, modifiedAt: snapshot.modifiedAt)
+            }
+        }
     }
 }

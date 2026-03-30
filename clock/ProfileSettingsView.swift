@@ -13,6 +13,7 @@ struct ProfileSettingsView: View {
     @Binding var is24HourClock: Bool
     @Binding var showingCustomOffsetAlert: Bool
     @State private var showingPaywall = false
+    private let isGoogleSignInEnabled = AppConfiguration.isGoogleSignInEnabled
 
     private var bgColor: Color { currentTheme.bg }
     private var goldColor: Color { currentTheme.accent }
@@ -266,7 +267,9 @@ struct ProfileSettingsView: View {
 
                             // Google Calendar Block
                             Button(action: {
-                                if isPro {
+                                if !isGoogleSignInEnabled {
+                                    return
+                                } else if isPro {
                                     if googleCalendarManager.isSignedIn {
                                         AnalyticsManager.shared.capture("google_signout_clicked")
                                         googleCalendarManager.signOut()
@@ -283,13 +286,21 @@ struct ProfileSettingsView: View {
                                 }
                             }) {
                                 HStack(spacing: 12) {
-                                    Image(systemName: isPro ? "g.circle.fill" : "lock.fill")
-                                        .foregroundStyle(googleCalendarManager.isSignedIn ? Color.red : goldColor)
-                                    Text(googleCalendarManager.isSignedIn ? "Sign Out of Google" : (isPro ? "Sign In with Google" : "Google Calendar Sync"))
+                                    Image(systemName: !isGoogleSignInEnabled ? "clock.badge.exclamationmark" : (isPro ? "g.circle.fill" : "lock.fill"))
+                                        .foregroundStyle(!isGoogleSignInEnabled ? currentTheme.textForeground.opacity(0.45) : (googleCalendarManager.isSignedIn ? Color.red : goldColor))
+                                    Text(
+                                        !isGoogleSignInEnabled
+                                            ? "Google Calendar Sync Coming Soon"
+                                            : (googleCalendarManager.isSignedIn ? "Sign Out of Google" : (isPro ? "Sign In with Google" : "Google Calendar Sync"))
+                                    )
                                         .font(.system(size: 16, weight: .medium))
                                         .foregroundStyle(currentTheme.textForeground.opacity(0.9))
                                     Spacer()
-                                    if googleCalendarManager.isSignedIn {
+                                    if !isGoogleSignInEnabled {
+                                        Text("Coming Soon")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(goldColor)
+                                    } else if googleCalendarManager.isSignedIn {
                                         Image(systemName: "checkmark.circle.fill")
                                             .foregroundStyle(Color.green)
                                     }
@@ -303,8 +314,9 @@ struct ProfileSettingsView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .disabled(!isGoogleSignInEnabled)
 
-                            Text("Connect Google or iCloud.")
+                            Text(isGoogleSignInEnabled ? "Connect Google or iCloud." : "Google sign-in will unlock once verification is approved.")
                                 .font(.system(size: 11, weight: .regular))
                                 .foregroundStyle(currentTheme.textForeground.opacity(0.6))
                                 .multilineTextAlignment(.center)

@@ -16,8 +16,8 @@ struct AddTaskView: View {
     @State private var startTime = Date()
     @State private var endTime = Date().addingTimeInterval(3600)
     
-    @StateObject private var categoryManager = CategoryManager()
-    @ObservedObject private var brainDumpManager = BrainDumpManager()
+    @StateObject private var categoryManager = CategoryManager.shared
+    @ObservedObject private var brainDumpManager = BrainDumpManager.shared
     @StateObject private var calendarManager = CalendarManager()
     @ObservedObject private var googleCalendarManager = GoogleCalendarManager.shared
     @State private var selectedCategoryId: UUID? = nil

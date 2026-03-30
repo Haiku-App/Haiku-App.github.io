@@ -11,11 +11,16 @@ class StoreManager: ObservableObject {
     @Published private(set) var customerInfo: CustomerInfo?
     @Published private(set) var isSandboxMode: Bool = false
     @Published private(set) var isRevenueCatConfigured: Bool = AppConfiguration.isRevenueCatConfigured
+    @Published private(set) var allowsTesterUnlocks: Bool = AppConfiguration.allowsTesterUnlocks
     private var hasUnlockedFreePro: Bool = false
     
     private let proEntitlementID = "Haiku Pro"
     private let preferredOfferingID = "default"
     private var customerInfoTask: Task<Void, Never>?
+
+    private var canUseTesterUnlocks: Bool {
+        isSandboxMode && allowsTesterUnlocks
+    }
 
     var paywallOffering: Offering? {
         if let preferred = offerings?.offering(identifier: preferredOfferingID) {
@@ -27,7 +32,10 @@ class StoreManager: ObservableObject {
     init() {
         // Initialize from local cache first for instant UI response
         self.isPro = SharedTaskManager.shared.loadIsPro()
-        self.hasUnlockedFreePro = SharedTaskManager.shared.loadHasUnlockedFreePro()
+        self.hasUnlockedFreePro = AppConfiguration.allowsTesterUnlocks && SharedTaskManager.shared.loadHasUnlockedFreePro()
+        if !AppConfiguration.allowsTesterUnlocks {
+            SharedTaskManager.shared.saveHasUnlockedFreePro(false)
+        }
         
         // Check environment
         Task {
@@ -92,7 +100,7 @@ class StoreManager: ObservableObject {
     }
     
     func unlockProForFree() {
-        guard isSandboxMode else { return }
+        guard canUseTesterUnlocks else { return }
         print("StoreManager: Unlocking Pro for free (Sandbox mode).")
         self.hasUnlockedFreePro = true
         SharedTaskManager.shared.saveHasUnlockedFreePro(true)
@@ -140,12 +148,12 @@ class StoreManager: ObservableObject {
         print("RevenueCat: Checking entitlement '\(proEntitlementID)'. Active: \(proActive)")
         
         // LEGACY TESTER GIFT: If they ever unlocked it during TestFlight, keep it forever.
-        if hasUnlockedFreePro {
+        if canUseTesterUnlocks && hasUnlockedFreePro {
             proActive = true
         }
         
         // Keep Pro active for TestFlight/Sandbox even if RevenueCat says otherwise (for initial unlock)
-        if isSandboxMode && hasUnlockedFreePro {
+        if canUseTesterUnlocks && hasUnlockedFreePro {
             proActive = true
         }
         

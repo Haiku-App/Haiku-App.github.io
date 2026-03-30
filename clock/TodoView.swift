@@ -2,7 +2,7 @@ import SwiftUI
 
 struct TodoView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
-    @StateObject private var brainDumpManager = BrainDumpManager()
+    @StateObject private var brainDumpManager = BrainDumpManager.shared
     @State private var newTaskTitle: String = ""
     @FocusState private var isFocused: Bool
     @State private var showingBulkImport = false

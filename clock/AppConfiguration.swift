@@ -16,6 +16,16 @@ enum AppConfiguration {
         plistKey: "RevenueCatAPIKey"
     )
 
+    static let allowsTesterUnlocks = configuredBool(
+        envKey: "ENABLE_TESTER_UNLOCKS",
+        plistKey: "EnableTesterUnlocks"
+    )
+
+    static let isGoogleSignInEnabled = configuredBool(
+        envKey: "ENABLE_GOOGLE_SIGN_IN",
+        plistKey: "EnableGoogleSignIn"
+    )
+
     static var isPostHogConfigured: Bool {
         postHogProjectToken != nil && postHogHost != nil
     }
@@ -40,5 +50,31 @@ enum AppConfiguration {
         }
 
         return nil
+    }
+
+    private static func configuredBool(envKey: String, plistKey: String) -> Bool {
+        if let value = ProcessInfo.processInfo.environment[envKey] {
+            switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "1", "true", "yes", "on":
+                return true
+            default:
+                break
+            }
+        }
+
+        if let value = Bundle.main.object(forInfoDictionaryKey: plistKey) as? Bool {
+            return value
+        }
+
+        if let value = Bundle.main.object(forInfoDictionaryKey: plistKey) as? String {
+            switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "1", "true", "yes", "on":
+                return true
+            default:
+                break
+            }
+        }
+
+        return false
     }
 }

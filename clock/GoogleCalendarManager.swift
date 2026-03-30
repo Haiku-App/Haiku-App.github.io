@@ -13,12 +13,20 @@ class GoogleCalendarManager: ObservableObject {
 
     private let calendarEndpoint = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
     private let calendarScope = "https://www.googleapis.com/auth/calendar.events"
+    private let isSignInEnabled = AppConfiguration.isGoogleSignInEnabled
     
     init() {
         checkStatus()
     }
     
     func checkStatus() {
+        guard isSignInEnabled else {
+            DispatchQueue.main.async {
+                self.isSignedIn = false
+            }
+            return
+        }
+
         GIDSignIn.sharedInstance.restorePreviousSignIn { user, error in
             DispatchQueue.main.async {
                 self.updateSignInStatus(user: user)
@@ -49,6 +57,14 @@ class GoogleCalendarManager: ObservableObject {
     }
     
     func signIn(presenting viewController: UIViewController) {
+        guard isSignInEnabled else {
+            print("Google Sign-In: Disabled by app configuration.")
+            DispatchQueue.main.async {
+                self.isSignedIn = false
+            }
+            return
+        }
+
         let scopes = [calendarScope]
         
         print("Google Sign-In: Starting sign-in flow...")

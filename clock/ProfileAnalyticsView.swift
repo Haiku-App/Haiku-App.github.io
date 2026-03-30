@@ -7,7 +7,7 @@ struct ProfileAnalyticsView: View {
     
     var tasksByDate: [Date: [ClockTask]]
     
-    @StateObject private var categoryManager = CategoryManager()
+    @StateObject private var categoryManager = CategoryManager.shared
     @State private var showingPaywall = false
     @State private var selectedMetricInfo: MetricInfo? = nil
     

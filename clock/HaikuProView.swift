@@ -122,13 +122,13 @@ struct HaikuProView: View {
                         .scaleEffect(appearanceAnimate ? 1 : 0.95)
                     } else if !storeManager.isRevenueCatConfigured {
                         VStack(spacing: 8) {
-                            Image(systemName: storeManager.isSandboxMode ? "wrench.and.screwdriver.fill" : "exclamationmark.triangle.fill")
+                            Image(systemName: storeManager.allowsTesterUnlocks ? "wrench.and.screwdriver.fill" : "exclamationmark.triangle.fill")
                                 .font(.system(size: 20))
                                 .foregroundStyle(currentTheme.accent)
-                            Text(storeManager.isSandboxMode ? "Tester build detected." : "Purchases unavailable in this build.")
+                            Text(storeManager.allowsTesterUnlocks ? "Tester build detected." : "Purchases unavailable in this build.")
                                 .font(.system(size: 13, weight: .semibold, design: .serif))
                                 .foregroundStyle(currentTheme.textForeground)
-                            Text(storeManager.isSandboxMode ? "Use the free tester unlock below to access Pro." : "Add a RevenueCat API key to enable subscriptions.")
+                            Text(storeManager.allowsTesterUnlocks ? "Use the free tester unlock below to access Pro." : "Add a RevenueCat API key to enable subscriptions.")
                                 .font(.system(size: 11, weight: .regular, design: .serif))
                                 .foregroundStyle(currentTheme.textForeground.opacity(0.6))
                                 .multilineTextAlignment(.center)
@@ -140,7 +140,7 @@ struct HaikuProView: View {
                             .onAppear { storeManager.refreshOfferings() }
                     }
                     
-                    if storeManager.isSandboxMode {
+                    if storeManager.allowsTesterUnlocks {
                         Button(action: { 
                             AnalyticsManager.shared.capture("testflight_free_unlock_clicked")
                             storeManager.unlockProForFree() 
@@ -222,7 +222,7 @@ struct HaikuProView: View {
     }
 
     private func buyPro(_ package: Package) {
-        if storeManager.isSandboxMode {
+        if storeManager.allowsTesterUnlocks {
             print("HaikuProView: Sandbox mode detected. Unlocking for free.")
             storeManager.unlockProForFree()
             return
