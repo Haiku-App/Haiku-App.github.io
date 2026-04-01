@@ -13,6 +13,7 @@ struct ProfileSettingsView: View {
     @Binding var is24HourClock: Bool
     @Binding var showingCustomOffsetAlert: Bool
     @State private var showingPaywall = false
+    @State private var paywallFocusFeature: String? = nil
     private let isGoogleSignInEnabled = AppConfiguration.isGoogleSignInEnabled
 
     private var bgColor: Color { currentTheme.bg }
@@ -63,7 +64,8 @@ struct ProfileSettingsView: View {
                 if !isPro {
                     Button(action: { 
                         AnalyticsManager.shared.capture("upgrade_banner_clicked")
-                        showingPaywall = true 
+                        paywallFocusFeature = nil
+                        showingPaywall = true
                     }) {
                         HStack {
                             Image(systemName: "crown.fill")
@@ -144,6 +146,7 @@ struct ProfileSettingsView: View {
                                 } else {
                                     AnalyticsManager.shared.capture("pro_feature_denied", properties: ["feature": "custom_notification"])
                                     AnalyticsManager.shared.capture("upgrade_custom_notification_clicked")
+                                    paywallFocusFeature = "notifications"
                                     showingPaywall = true
                                 }
                             }) {
@@ -231,6 +234,7 @@ struct ProfileSettingsView: View {
                                 } else {
                                     AnalyticsManager.shared.capture("pro_feature_denied", properties: ["feature": "apple_calendar"])
                                     AnalyticsManager.shared.capture("upgrade_apple_calendar_clicked")
+                                    paywallFocusFeature = "calendar"
                                     showingPaywall = true
                                 }
                             }) {
@@ -282,6 +286,7 @@ struct ProfileSettingsView: View {
                                 } else {
                                     AnalyticsManager.shared.capture("pro_feature_denied", properties: ["feature": "google_calendar"])
                                     AnalyticsManager.shared.capture("upgrade_google_signin_clicked")
+                                    paywallFocusFeature = "calendar"
                                     showingPaywall = true
                                 }
                             }) {
@@ -369,7 +374,7 @@ struct ProfileSettingsView: View {
             }
         }
         .sheet(isPresented: $showingPaywall) {
-            HaikuProView()
+            HaikuProView(focusFeature: paywallFocusFeature)
         }
         .onChange(of: currentTheme) { oldTheme, newTheme in
             AnalyticsManager.shared.capture("theme_changed", properties: ["theme_name": newTheme.name])

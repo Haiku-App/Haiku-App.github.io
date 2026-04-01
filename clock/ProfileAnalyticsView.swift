@@ -9,6 +9,7 @@ struct ProfileAnalyticsView: View {
     
     @StateObject private var categoryManager = CategoryManager.shared
     @State private var showingPaywall = false
+    @State private var paywallFocusFeature: String? = nil
     @State private var selectedMetricInfo: MetricInfo? = nil
     
     private var bgColor: Color { currentTheme.bg }
@@ -245,7 +246,10 @@ struct ProfileAnalyticsView: View {
                                     .blur(radius: isPro ? 0 : 8)
                                 
                                 if !isPro {
-                                    Button(action: { showingPaywall = true }) {
+                                    Button(action: {
+                                        paywallFocusFeature = "analytics"
+                                        showingPaywall = true
+                                    }) {
                                         HStack(spacing: 8) {
                                             Image(systemName: "lock.fill")
                                             Text("Unlock Power Hours")
@@ -319,7 +323,10 @@ struct ProfileAnalyticsView: View {
                                     .blur(radius: isPro ? 0 : 8)
                                 
                                 if !isPro {
-                                    Button(action: { showingPaywall = true }) {
+                                    Button(action: {
+                                        paywallFocusFeature = "analytics"
+                                        showingPaywall = true
+                                    }) {
                                         HStack(spacing: 8) {
                                             Image(systemName: "lock.fill")
                                             Text("Unlock Momentum")
@@ -471,7 +478,7 @@ struct ProfileAnalyticsView: View {
             }
         }
         .sheet(isPresented: $showingPaywall) {
-            HaikuProView()
+            HaikuProView(focusFeature: paywallFocusFeature)
         }
     }
 }
