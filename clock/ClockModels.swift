@@ -31,7 +31,9 @@ enum AppSupportPersistence {
             Category(name: "Deep Work", icon: "brain.head.profile", rgb: RGB(r: 0.75, g: 0.55, b: 0.45)),
             Category(name: "Meeting", icon: "person.2.fill", rgb: RGB(r: 0.85, g: 0.78, b: 0.58)),
             Category(name: "Break", icon: "cup.and.saucer.fill", rgb: RGB(r: 0.35, g: 0.42, b: 0.35)),
-            Category(name: "Study", icon: "book.fill", rgb: RGB(r: 0.45, g: 0.50, b: 0.35))
+            Category(name: "Study", icon: "book.fill", rgb: RGB(r: 0.45, g: 0.50, b: 0.35)),
+            Category(name: "Personal", icon: "figure.walk", rgb: RGB(r: 0.45, g: 0.65, b: 0.85)),
+            Category(name: "Routine", icon: "arrow.clockwise", rgb: RGB(r: 0.55, g: 0.72, b: 0.55)),
         ]
     }
 
@@ -354,7 +356,15 @@ class CategoryManager: ObservableObject {
     private var isApplyingRemoteSnapshot = false
 
     init() {
-        self.categories = AppSupportPersistence.loadCategories()
+        var loaded = AppSupportPersistence.loadCategories()
+        // Silently add any default categories that are missing (e.g. after an app update)
+        let existingNames = Set(loaded.map { $0.name.lowercased() })
+        let missing = AppSupportPersistence.defaultCategories().filter { !existingNames.contains($0.name.lowercased()) }
+        if !missing.isEmpty {
+            loaded.append(contentsOf: missing)
+            AppSupportPersistence.saveCategories(loaded)
+        }
+        self.categories = loaded
         startInitialSyncIfNeeded()
     }
 
