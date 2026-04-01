@@ -20,12 +20,6 @@ struct ProfileSettingsView: View {
     private var goldColor: Color { currentTheme.accent }
     private var appVersionText: String {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
-        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
-
-        if let buildNumber, buildNumber != shortVersion {
-            return "Version \(shortVersion) (\(buildNumber))"
-        }
-
         return "Version \(shortVersion)"
     }
 
