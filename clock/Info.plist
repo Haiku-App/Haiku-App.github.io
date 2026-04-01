@@ -22,6 +22,5 @@
 	<key>RevenueCatAPIKey</key>
 	<string>appl_prmQlhmWmtJdjyklqnPdmsbgTaN</string>
 	<key>EnableTesterUnlocks</key>
-	<true/>
-</dict>
+	<false/></dict>
 </plist>

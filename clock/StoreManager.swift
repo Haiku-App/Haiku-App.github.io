@@ -95,11 +95,6 @@ class StoreManager: ObservableObject {
         let finalDetected = detectedSandbox
         await MainActor.run {
             self.isSandboxMode = finalDetected
-            // If we are in sandbox (Reviewer/TestFlight), always allow tester unlocks
-            // to prevent "infinite loading" rejections when products aren't approved yet.
-            if finalDetected {
-                self.allowsTesterUnlocks = true
-            }
         }
         
         if finalDetected {
