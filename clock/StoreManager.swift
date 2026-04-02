@@ -55,6 +55,11 @@ class StoreManager: ObservableObject {
             if let info = try? await Purchases.shared.customerInfo() {
                 self.updateProStatus(info)
             }
+            
+            // Sync purchases to catch App Store promo code redemptions (e.g. lifetime)
+            if let syncedInfo = try? await Purchases.shared.syncPurchases() {
+                self.updateProStatus(syncedInfo)
+            }
         }
 
         // Start listening to customer info updates
