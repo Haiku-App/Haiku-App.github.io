@@ -252,3 +252,164 @@ class CalendarManager: ObservableObject {
         return cal.date(from: comps) ?? date
     }
 }
+
+class ReminderManager: ObservableObject {
+    static let shared = ReminderManager()
+    static let syncEnabledKey = "isAppleRemindersSyncEnabled"
+
+    @Published var eventsDidChange: Bool = false
+
+    static func currentAuthorizationStatus() -> EKAuthorizationStatus {
+        EKEventStore.authorizationStatus(for: .reminder)
+    }
+
+    static func hasReminderAccess(status: EKAuthorizationStatus = ReminderManager.currentAuthorizationStatus()) -> Bool {
+        if #available(iOS 17.0, *) {
+            return status == .fullAccess
+        } else {
+            return status.rawValue == 3
+        }
+    }
+
+    private lazy var eventStore: EKEventStore = {
+        EKEventStore()
+    }()
+
+    init() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(storeChanged(_:)),
+            name: .EKEventStoreChanged,
+            object: nil
+        )
+    }
+
+    @objc private func storeChanged(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.eventsDidChange.toggle()
+        }
+    }
+
+    func requestAccess(completion: @escaping (Bool) -> Void) {
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            completion(true)
+            return
+        }
+
+        let status = EKEventStore.authorizationStatus(for: .reminder)
+        if status == .denied || status == .restricted {
+            completion(false)
+            return
+        }
+
+        if #available(iOS 17.0, *) {
+            eventStore.requestFullAccessToReminders { granted, error in
+                DispatchQueue.main.async {
+                    completion(granted)
+                }
+            }
+        } else {
+            eventStore.requestAccess(to: .reminder) { granted, error in
+                DispatchQueue.main.async {
+                    completion(granted)
+                }
+            }
+        }
+    }
+
+    func fetchTasks(completion: @escaping ([BrainDumpTask]) -> Void) {
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            completion([])
+            return
+        }
+
+        let calendars = eventStore.calendars(for: .reminder)
+        let predicate = eventStore.predicateForReminders(in: calendars)
+
+        eventStore.fetchReminders(matching: predicate) { reminders in
+            let tasks = (reminders ?? []).map { reminder in
+                BrainDumpTask(
+                    title: reminder.title,
+                    isCompleted: reminder.isCompleted,
+                    completedDate: reminder.completionDate,
+                    reminderDueDate: self.date(from: reminder.dueDateComponents),
+                    externalReminderId: reminder.calendarItemIdentifier
+                )
+            }
+
+            DispatchQueue.main.async {
+                completion(tasks)
+            }
+        }
+    }
+
+    func saveTask(_ task: BrainDumpTask, completion: @escaping (String?, Date?) -> Void) {
+        guard let calendar = defaultReminderCalendar() else {
+            completion(nil, nil)
+            return
+        }
+
+        let reminder = EKReminder(eventStore: eventStore)
+        reminder.calendar = calendar
+        apply(task, to: reminder)
+
+        do {
+            try eventStore.save(reminder, commit: true)
+            completion(reminder.calendarItemIdentifier, date(from: reminder.dueDateComponents))
+        } catch {
+            print("Error saving reminder: \(error)")
+            completion(nil, nil)
+        }
+    }
+
+    func updateTask(_ task: BrainDumpTask) {
+        guard let externalReminderId = task.externalReminderId,
+              let reminder = reminder(matching: externalReminderId) else { return }
+
+        apply(task, to: reminder)
+
+        do {
+            try eventStore.save(reminder, commit: true)
+        } catch {
+            print("Error updating reminder: \(error)")
+        }
+    }
+
+    func deleteTask(externalId: String) {
+        guard let reminder = reminder(matching: externalId) else { return }
+
+        do {
+            try eventStore.remove(reminder, commit: true)
+        } catch {
+            print("Error deleting reminder: \(error)")
+        }
+    }
+
+    private func reminder(matching identifier: String) -> EKReminder? {
+        eventStore.calendarItem(withIdentifier: identifier) as? EKReminder
+    }
+
+    private func defaultReminderCalendar() -> EKCalendar? {
+        eventStore.defaultCalendarForNewReminders() ?? eventStore.calendars(for: .reminder).first
+    }
+
+    private func apply(_ task: BrainDumpTask, to reminder: EKReminder) {
+        reminder.title = task.title
+        reminder.isCompleted = task.isCompleted
+        reminder.completionDate = task.isCompleted ? (task.completedDate ?? Date()) : nil
+        reminder.dueDateComponents = dueDateComponents(from: task.reminderDueDate)
+    }
+
+    private func dueDateComponents(from date: Date?) -> DateComponents? {
+        guard let date else { return nil }
+        return Calendar.current.dateComponents(
+            [.calendar, .timeZone, .year, .month, .day, .hour, .minute],
+            from: date
+        )
+    }
+
+    private func date(from components: DateComponents?) -> Date? {
+        guard let components else { return nil }
+        return components.calendar?.date(from: components) ?? Calendar.current.date(from: components)
+    }
+}

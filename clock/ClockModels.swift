@@ -308,26 +308,7 @@ actor AppSupportCloudSyncManager {
             mergedByID[task.id] = task
         }
 
-        return mergedByID.values.sorted { lhs, rhs in
-            switch (lhs.scheduledDate, rhs.scheduledDate) {
-            case let (left?, right?):
-                if left != right {
-                    return left < right
-                }
-            case (.some, nil):
-                return true
-            case (nil, .some):
-                return false
-            case (nil, nil):
-                break
-            }
-
-            if lhs.isCompleted != rhs.isCompleted {
-                return !lhs.isCompleted && rhs.isCompleted
-            }
-
-            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
-        }
+        return sortedBrainDumpTasks(Array(mergedByID.values))
     }
 
     private enum FetchResult {
@@ -519,6 +500,37 @@ struct BrainDumpTask: Identifiable, Codable, Equatable {
     var isCompleted: Bool = false
     var scheduledDate: Date? = nil
     var completedDate: Date? = nil
+    var reminderDueDate: Date? = nil
+    var externalReminderId: String? = nil
+}
+
+private func brainDumpSortDate(for task: BrainDumpTask) -> Date? {
+    task.scheduledDate ?? task.reminderDueDate
+}
+
+private func brainDumpTaskComesBefore(_ lhs: BrainDumpTask, _ rhs: BrainDumpTask) -> Bool {
+    switch (brainDumpSortDate(for: lhs), brainDumpSortDate(for: rhs)) {
+    case let (left?, right?):
+        if left != right {
+            return left < right
+        }
+    case (.some, nil):
+        return true
+    case (nil, .some):
+        return false
+    case (nil, nil):
+        break
+    }
+
+    if lhs.isCompleted != rhs.isCompleted {
+        return !lhs.isCompleted && rhs.isCompleted
+    }
+
+    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+}
+
+private func sortedBrainDumpTasks(_ tasks: [BrainDumpTask]) -> [BrainDumpTask] {
+    tasks.sorted(by: brainDumpTaskComesBefore)
 }
 
 @MainActor
@@ -541,31 +553,103 @@ class BrainDumpManager: ObservableObject {
     }
 
     func sortTasks() {
-        tasks.sort { (t1, t2) -> Bool in
-            switch (t1.scheduledDate, t2.scheduledDate) {
-            case (let d1?, let d2?):
-                return d1 < d2
-            case (.some, nil):
-                return true
-            case (nil, .some):
-                return false
-            case (nil, nil):
-                return false
-            }
-        }
+        tasks = sortedBrainDumpTasks(tasks)
     }
 
     func save() {
-        sortTasks()
-        persistAndSync()
+        tasks = sortedBrainDumpTasks(tasks)
     }
 
     func applyCloudTasks(_ tasks: [BrainDumpTask], modifiedAt: Date) {
         isApplyingRemoteSnapshot = true
-        self.tasks = tasks
-        sortTasks()
+        self.tasks = sortedBrainDumpTasks(tasks)
         AppSupportPersistence.saveBrainDumpTasks(self.tasks, modifiedAt: modifiedAt)
         isApplyingRemoteSnapshot = false
+    }
+
+    func applySyncedReminderTasks(_ reminderTasks: [BrainDumpTask]) {
+        let remoteReminderIDs = Set(reminderTasks.compactMap(\.externalReminderId))
+        var mergedTasks = tasks
+
+        for reminderTask in reminderTasks {
+            if let index = mergedTasks.firstIndex(where: { $0.externalReminderId == reminderTask.externalReminderId }) {
+                var updatedTask = mergedTasks[index]
+                updatedTask.title = reminderTask.title
+                updatedTask.isCompleted = reminderTask.isCompleted
+                updatedTask.completedDate = reminderTask.completedDate
+                updatedTask.reminderDueDate = reminderTask.reminderDueDate
+                updatedTask.externalReminderId = reminderTask.externalReminderId
+                mergedTasks[index] = updatedTask
+                continue
+            }
+
+            if let index = preferredReminderMatchIndex(for: reminderTask, in: mergedTasks) {
+                var matchedTask = mergedTasks[index]
+                matchedTask.title = reminderTask.title
+                matchedTask.isCompleted = reminderTask.isCompleted
+                matchedTask.completedDate = reminderTask.completedDate
+                matchedTask.reminderDueDate = reminderTask.reminderDueDate
+                matchedTask.externalReminderId = reminderTask.externalReminderId
+                mergedTasks[index] = matchedTask
+                continue
+            }
+
+            mergedTasks.append(reminderTask)
+        }
+
+        mergedTasks.removeAll { task in
+            guard let externalReminderId = task.externalReminderId else { return false }
+            return !remoteReminderIDs.contains(externalReminderId)
+        }
+
+        mergedTasks = deduplicatedReminderTasks(mergedTasks)
+        let sortedTasks = sortedBrainDumpTasks(mergedTasks)
+
+        guard sortedTasks != tasks else { return }
+        tasks = sortedTasks
+    }
+
+    func attachReminder(_ externalReminderId: String, dueDate: Date?, to taskID: UUID) {
+        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        tasks[index].externalReminderId = externalReminderId
+        tasks[index].reminderDueDate = dueDate
+        tasks = sortedBrainDumpTasks(tasks)
+    }
+
+    private func preferredReminderMatchIndex(
+        for reminderTask: BrainDumpTask,
+        in tasks: [BrainDumpTask]
+    ) -> Int? {
+        let candidates = tasks.indices.filter { index in
+            let task = tasks[index]
+            guard task.externalReminderId == nil else { return false }
+            guard task.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                .localizedCaseInsensitiveCompare(
+                    reminderTask.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                ) == .orderedSame else {
+                return false
+            }
+            return task.isCompleted == reminderTask.isCompleted
+        }
+
+        return candidates.count == 1 ? candidates.first : nil
+    }
+
+    private func deduplicatedReminderTasks(_ tasks: [BrainDumpTask]) -> [BrainDumpTask] {
+        var seenReminderIDs = Set<String>()
+        var result: [BrainDumpTask] = []
+
+        for task in tasks {
+            guard let externalReminderId = task.externalReminderId else {
+                result.append(task)
+                continue
+            }
+
+            guard seenReminderIDs.insert(externalReminderId).inserted else { continue }
+            result.append(task)
+        }
+
+        return result
     }
 
     private func persistAndSync() {

@@ -5,11 +5,14 @@ struct ProfileSettingsView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     @AppStorage("notificationOffsetsData") private var notificationOffsetsData = ""
     @AppStorage(CalendarSyncProvider.storageKey) private var activeCalendarSyncProvider: CalendarSyncProvider = .none
+    @AppStorage(ReminderManager.syncEnabledKey) private var isAppleRemindersSyncEnabled = false
     @EnvironmentObject var storeManager: StoreManager
     private var isPro: Bool { storeManager.isPro }
     @ObservedObject var googleCalendarManager = GoogleCalendarManager.shared
+    @ObservedObject private var reminderManager = ReminderManager.shared
     @StateObject private var calendarManager = CalendarManager()
     @State private var appleCalendarStatus: EKAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
+    @State private var appleRemindersStatus: EKAuthorizationStatus = ReminderManager.currentAuthorizationStatus()
     
     @Binding var is24HourClock: Bool
     @Binding var showingCustomOffsetAlert: Bool
@@ -49,6 +52,14 @@ struct ProfileSettingsView: View {
         CalendarManager.hasCalendarAccess(status: appleCalendarStatus)
     }
 
+    private var isAppleRemindersAuthorized: Bool {
+        ReminderManager.hasReminderAccess(status: appleRemindersStatus)
+    }
+
+    private var isAppleRemindersConnected: Bool {
+        isAppleRemindersSyncEnabled && isAppleRemindersAuthorized
+    }
+
     private var offsets: [Int] {
         if notificationOffsetsData.isEmpty { return [] }
         return notificationOffsetsData.split(separator: ",").compactMap { Int($0) }
@@ -74,6 +85,14 @@ struct ProfileSettingsView: View {
 
     private func refreshAppleCalendarStatus() {
         appleCalendarStatus = CalendarManager.currentAuthorizationStatus()
+    }
+
+    private func refreshAppleRemindersStatus() {
+        appleRemindersStatus = ReminderManager.currentAuthorizationStatus()
+        if !ReminderManager.hasReminderAccess(status: appleRemindersStatus),
+           appleRemindersStatus == .denied || appleRemindersStatus == .restricted {
+            isAppleRemindersSyncEnabled = false
+        }
     }
 
     private func toggleAppleCalendarConnection() {
@@ -111,6 +130,23 @@ struct ProfileSettingsView: View {
                 guard didSignIn else { return }
                 activeCalendarSyncProvider = .google
             }
+        }
+    }
+
+    private func toggleAppleRemindersConnection() {
+        if isAppleRemindersSyncEnabled {
+            isAppleRemindersSyncEnabled = false
+            AnalyticsManager.shared.capture("apple_reminders_disconnected")
+            return
+        }
+
+        reminderManager.requestAccess { granted in
+            refreshAppleRemindersStatus()
+
+            guard granted else { return }
+
+            isAppleRemindersSyncEnabled = true
+            AnalyticsManager.shared.capture("apple_reminders_connected")
         }
     }
 
@@ -392,6 +428,57 @@ struct ProfileSettingsView: View {
                         .opacity(isPro ? 1.0 : 0.6)
                     }
 
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("REMINDERS")
+                            .font(.system(size: 12, weight: .regular, design: .serif))
+                            .foregroundStyle(goldColor)
+                            .tracking(1)
+                            .padding(.horizontal, 4)
+
+                        Button(action: {
+                            if isPro {
+                                toggleAppleRemindersConnection()
+                            } else {
+                                AnalyticsManager.shared.capture("pro_feature_denied", properties: ["feature": "apple_reminders"])
+                                AnalyticsManager.shared.capture("upgrade_apple_reminders_clicked")
+                                paywallFocusFeature = "calendar"
+                                showingPaywall = true
+                            }
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: isPro ? "checklist" : "lock.fill")
+                                    .foregroundStyle(
+                                        !isPro ? goldColor : (isAppleRemindersConnected ? Color.red : goldColor)
+                                    )
+                                Text(
+                                    isAppleRemindersConnected
+                                        ? "Disconnect Apple Reminders"
+                                        : (isPro ? "Connect Apple Reminders" : "Apple Reminders Sync")
+                                )
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.9))
+                                Spacer()
+                                if isAppleRemindersConnected {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(Color.green)
+                                } else if isAppleRemindersAuthorized {
+                                    Text("Ready")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(goldColor.opacity(0.8))
+                                }
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(currentTheme.fieldBg)
+                                    .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
+                                    .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .opacity(isPro ? 1.0 : 0.6)
+
                     if storeManager.allowsTesterUnlocks && AppConfiguration.isTestingMode {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("TESTING")
@@ -469,6 +556,7 @@ struct ProfileSettingsView: View {
         }
         .onAppear {
             refreshAppleCalendarStatus()
+            refreshAppleRemindersStatus()
         }
         .onChange(of: currentTheme) { oldTheme, newTheme in
             AnalyticsManager.shared.capture("theme_changed", properties: ["theme_name": newTheme.name])
@@ -480,6 +568,9 @@ struct ProfileSettingsView: View {
             if !newValue && activeCalendarSyncProvider == .google {
                 activeCalendarSyncProvider = .none
             }
+        }
+        .onChange(of: reminderManager.eventsDidChange) { _, _ in
+            refreshAppleRemindersStatus()
         }
     }
 }

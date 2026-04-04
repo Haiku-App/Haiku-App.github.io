@@ -2,7 +2,11 @@ import SwiftUI
 
 struct TodoView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
+    @AppStorage(ReminderManager.syncEnabledKey) private var isAppleRemindersSyncEnabled = false
+    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject var storeManager: StoreManager
     @StateObject private var brainDumpManager = BrainDumpManager.shared
+    @ObservedObject private var reminderManager = ReminderManager.shared
     @State private var newTaskTitle: String = ""
     @FocusState private var isFocused: Bool
     @State private var showingBulkImport = false
@@ -23,6 +27,9 @@ struct TodoView: View {
     
     private var bgColor: Color { currentTheme.bg }
     private var goldColor: Color { currentTheme.accent }
+    private var isAppleReminderSyncActive: Bool {
+        storeManager.isPro && isAppleRemindersSyncEnabled && ReminderManager.hasReminderAccess()
+    }
 
     var filteredTasks: [BrainDumpTask] {
         let cal = Calendar.current
@@ -166,6 +173,7 @@ struct TodoView: View {
                                 isCompleted: task.isCompleted,
                                 scheduledDate: task.scheduledDate,
                                 completedDate: task.completedDate,
+                                reminderDueDate: task.reminderDueDate,
                                 isSelected: selectedTaskIds.contains(task.id),
                                 isSelectionMode: isSelectionMode,
                                 onToggle: {
@@ -196,6 +204,8 @@ struct TodoView: View {
                                                 AnalyticsManager.shared.capture("brain_dump_task_reactivated")
                                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                             }
+
+                                            syncTaskToAppleRemindersIfNeeded(brainDumpManager.tasks[index])
                                         }
                                     }
                                 }
@@ -206,9 +216,13 @@ struct TodoView: View {
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
                                     if let index = brainDumpManager.tasks.firstIndex(where: { $0.id == task.id }) {
+                                        let externalReminderId = brainDumpManager.tasks[index].externalReminderId
                                         AnalyticsManager.shared.capture("brain_dump_task_deleted")
                                         withAnimation(.easeInOut) {
                                             _ = brainDumpManager.tasks.remove(at: index)
+                                        }
+                                        if isAppleReminderSyncActive, let externalReminderId {
+                                            reminderManager.deleteTask(externalId: externalReminderId)
                                         }
                                     }
                                 } label: {
@@ -293,14 +307,34 @@ struct TodoView: View {
         } message: {
             Text("Are you sure you want to clear your done list? This action cannot be undone.")
         }
+        .onAppear {
+            syncAppleRemindersIfNeeded()
+        }
+        .onChange(of: reminderManager.eventsDidChange) { _, _ in
+            syncAppleRemindersIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            syncAppleRemindersIfNeeded()
+        }
+        .onChange(of: isAppleRemindersSyncEnabled) { _, newValue in
+            guard newValue else { return }
+            syncAppleRemindersIfNeeded()
+        }
+        .onChange(of: storeManager.isPro) { _, newValue in
+            guard newValue else { return }
+            syncAppleRemindersIfNeeded()
+        }
     }
     
     private func addTask() {
         guard !newTaskTitle.isEmpty else { return }
+        let newTask = BrainDumpTask(title: newTaskTitle)
         withAnimation {
-            brainDumpManager.tasks.insert(BrainDumpTask(title: newTaskTitle), at: 0)
+            brainDumpManager.tasks.insert(newTask, at: 0)
         }
         AnalyticsManager.shared.capture("brain_dump_task_added")
+        syncTaskToAppleRemindersIfNeeded(newTask)
         newTaskTitle = ""
         isFocused = true
     }
@@ -310,9 +344,38 @@ struct TodoView: View {
     }
 
     private func clearCurrentFilter() {
+        let reminderIDsToDelete = filteredTasks.compactMap(\.externalReminderId)
         let idsToRemove = Set(filteredTasks.map { $0.id })
         withAnimation {
             brainDumpManager.tasks.removeAll { idsToRemove.contains($0.id) }
+        }
+        if isAppleReminderSyncActive {
+            for reminderID in reminderIDsToDelete {
+                reminderManager.deleteTask(externalId: reminderID)
+            }
+        }
+    }
+
+    private func syncAppleRemindersIfNeeded() {
+        guard isAppleReminderSyncActive else { return }
+
+        reminderManager.fetchTasks { reminderTasks in
+            guard isAppleReminderSyncActive else { return }
+            brainDumpManager.applySyncedReminderTasks(reminderTasks)
+        }
+    }
+
+    private func syncTaskToAppleRemindersIfNeeded(_ task: BrainDumpTask) {
+        guard isAppleReminderSyncActive else { return }
+
+        if task.externalReminderId != nil {
+            reminderManager.updateTask(task)
+            return
+        }
+
+        reminderManager.saveTask(task) { externalReminderId, dueDate in
+            guard let externalReminderId else { return }
+            brainDumpManager.attachReminder(externalReminderId, dueDate: dueDate, to: task.id)
         }
     }
 }
@@ -323,6 +386,7 @@ struct BrainDumpRow: View {
     var isCompleted: Bool
     var scheduledDate: Date? = nil
     var completedDate: Date? = nil
+    var reminderDueDate: Date? = nil
     var isSelected: Bool = false
     var isSelectionMode: Bool = false
     var onToggle: () -> Void
@@ -358,6 +422,10 @@ struct BrainDumpRow: View {
                             .foregroundStyle(currentTheme.textForeground.opacity(0.4) as Color)
                     } else if let scheduledDate = scheduledDate {
                         Text("Scheduled on \(formatDate(scheduledDate))")
+                            .font(.system(size: 11, weight: .light))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.4) as Color)
+                    } else if let reminderDueDate = reminderDueDate {
+                        Text("Due on \(formatDate(reminderDueDate))")
                             .font(.system(size: 11, weight: .light))
                             .foregroundStyle(currentTheme.textForeground.opacity(0.4) as Color)
                     }

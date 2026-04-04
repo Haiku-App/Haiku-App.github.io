@@ -426,6 +426,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Haiku;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Haiku needs access to your calendar to read, create, update, and delete synced events.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Haiku needs access to your calendar to read, create, update, and delete synced events.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Haiku needs access to your reminders to sync your To-Do tab with Apple Reminders.";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "Haiku needs access to your reminders to sync your To-Do tab with Apple Reminders.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -466,6 +468,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Haiku;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Haiku needs access to your calendar to read, create, update, and delete synced events.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Haiku needs access to your calendar to read, create, update, and delete synced events.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Haiku needs access to your reminders to sync your To-Do tab with Apple Reminders.";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "Haiku needs access to your reminders to sync your To-Do tab with Apple Reminders.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
