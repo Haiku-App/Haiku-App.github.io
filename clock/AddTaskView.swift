@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AddTaskView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
@@ -25,6 +26,7 @@ struct AddTaskView: View {
     
     @State private var showingNewCategory = false
     @State private var newCategoryName = ""
+    @State private var draggedCategory: Category?
     
     @State private var selectedColorIndex: Int
     
@@ -144,16 +146,63 @@ struct AddTaskView: View {
                                 .padding(.horizontal, 4)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(categoryManager.categories) { cat in
+                                ScrollViewReader { proxy in
+                                    HStack(spacing: 16) {
+                                        ForEach(categoryManager.categories) { cat in
+                                            Button(action: {
+                                                selectedCategoryId = cat.id
+                                            }) {
+                                                VStack(spacing: 12) {
+                                                    Image(systemName: cat.icon)
+                                                        .font(.system(size: 24))
+                                                        .foregroundStyle(cat.color)
+                                                    Text(cat.name)
+                                                        .font(.system(size: 12, weight: .medium))
+                                                        .foregroundStyle(currentTheme.textForeground.opacity(0.8))
+                                                }
+                                                .frame(width: 100, height: 100)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 16)
+                                                        .fill(fieldBgColor)
+                                                        .overlay(
+                                                            RoundedRectangle(cornerRadius: 16)
+                                                                .stroke(selectedCategoryId == cat.id ? cat.color : Color.clear, lineWidth: 2)
+                                                        )
+                                                        .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
+                                                        .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
+                                                )
+                                            }
+                                            .id(cat.id)
+                                            .buttonStyle(.plain)
+                                            .contextMenu {
+                                                Button(role: .destructive, action: {
+                                                    if let index = categoryManager.categories.firstIndex(where: { $0.id == cat.id }) {
+                                                        AnalyticsManager.shared.capture("category_deleted", properties: ["name": cat.name])
+                                                        categoryManager.categories.remove(at: index)
+                                                        if selectedCategoryId == cat.id {
+                                                            selectedCategoryId = nil
+                                                        }
+                                                    }
+                                                }) {
+                                                    Label("Delete Category", systemImage: "trash")
+                                                }
+                                            }
+                                            .onDrag {
+                                                self.draggedCategory = cat
+                                                return NSItemProvider(object: cat.id.uuidString as NSString)
+                                            }
+                                            .onDrop(of: [.text], delegate: CategoryDropDelegate(item: cat, items: $categoryManager.categories, draggedItem: $draggedCategory, proxy: proxy))
+                                        }
+                                        
+                                        // Add new category button
                                         Button(action: {
-                                            selectedCategoryId = cat.id
+                                            showingNewCategory = true
                                         }) {
                                             VStack(spacing: 12) {
-                                                Image(systemName: cat.icon)
+                                                Image(systemName: "plus")
                                                     .font(.system(size: 24))
-                                                    .foregroundStyle(cat.color)
-                                                Text(cat.name)
+                                                    .foregroundStyle(goldColor)
+                                                Text("New")
                                                     .font(.system(size: 12, weight: .medium))
                                                     .foregroundStyle(currentTheme.textForeground.opacity(0.8))
                                             }
@@ -161,54 +210,15 @@ struct AddTaskView: View {
                                             .background(
                                                 RoundedRectangle(cornerRadius: 16)
                                                     .fill(fieldBgColor)
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 16)
-                                                            .stroke(selectedCategoryId == cat.id ? cat.color : Color.clear, lineWidth: 2)
-                                                    )
                                                     .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
                                                     .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
                                             )
                                         }
                                         .buttonStyle(.plain)
-                                        .contextMenu {
-                                            Button(role: .destructive, action: {
-                                                if let index = categoryManager.categories.firstIndex(where: { $0.id == cat.id }) {
-                                                    AnalyticsManager.shared.capture("category_deleted", properties: ["name": cat.name])
-                                                    categoryManager.categories.remove(at: index)
-                                                    if selectedCategoryId == cat.id {
-                                                        selectedCategoryId = nil
-                                                    }
-                                                }
-                                            }) {
-                                                Label("Delete Category", systemImage: "trash")
-                                            }
-                                        }
                                     }
-                                    
-                                    // Add new category button
-                                    Button(action: {
-                                        showingNewCategory = true
-                                    }) {
-                                        VStack(spacing: 12) {
-                                            Image(systemName: "plus")
-                                                .font(.system(size: 24))
-                                                .foregroundStyle(goldColor)
-                                            Text("New")
-                                                .font(.system(size: 12, weight: .medium))
-                                                .foregroundStyle(currentTheme.textForeground.opacity(0.8))
-                                        }
-                                        .frame(width: 100, height: 100)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .fill(fieldBgColor)
-                                                .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
-                                                .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 8)
                                 }
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 8)
                             }
                         }
                         
@@ -511,6 +521,34 @@ struct TaskRow: View {
                 .foregroundStyle(currentTheme.textForeground.opacity(0.9))
             
             Spacer()
+        }
+    }
+}
+
+struct CategoryDropDelegate: DropDelegate {
+    let item: Category
+    var items: Binding<[Category]>
+    @Binding var draggedItem: Category?
+    let proxy: ScrollViewProxy
+    
+    func performDrop(info: DropInfo) -> Bool {
+        self.draggedItem = nil
+        return true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggedItem = self.draggedItem,
+              let from = items.wrappedValue.firstIndex(where: { $0.id == draggedItem.id }),
+              let to = items.wrappedValue.firstIndex(where: { $0.id == item.id }),
+              from != to else { return }
+        
+        withAnimation {
+            items.wrappedValue.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+        }
+        
+        // Auto-scroll to the new position
+        withAnimation {
+            proxy.scrollTo(item.id, anchor: .center)
         }
     }
 }
