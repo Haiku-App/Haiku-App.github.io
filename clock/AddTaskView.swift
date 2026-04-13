@@ -27,6 +27,7 @@ struct AddTaskView: View {
     @State private var showingNewCategory = false
     @State private var newCategoryName = ""
     @State private var draggedCategory: Category?
+    @State private var repeatFrequency: RepeatFrequency = .never
     
     @State private var selectedColorIndex: Int
     
@@ -43,6 +44,7 @@ struct AddTaskView: View {
         if let toEdit = taskToEdit {
             self._title = State(initialValue: toEdit.title)
             self._selectedCategoryId = State(initialValue: toEdit.categoryId)
+            self._repeatFrequency = State(initialValue: toEdit.repeatFrequency)
             
             let cal = Calendar.current
             let dayStart = cal.startOfDay(for: initialDate)
@@ -105,6 +107,28 @@ struct AddTaskView: View {
                                         .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
                                         .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
                                 )
+                        }
+
+                        // Repeat Selection
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("REPEAT")
+                                .font(.system(size: 12, weight: .regular, design: .serif))
+                                .foregroundStyle(goldColor)
+                                .tracking(1)
+                            
+                            Picker("Repeat", selection: $repeatFrequency) {
+                                ForEach(RepeatFrequency.allCases) { freq in
+                                    Text(freq.rawValue).tag(freq)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .padding(4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(fieldBgColor)
+                                    .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
+                                    .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
+                            )
                         }
 
                         // Time Selection
@@ -357,6 +381,9 @@ struct AddTaskView: View {
         let isPro = storeManager.isPro
         
         if let toEdit = taskToEdit {
+            // Update single task or all future? Let's just update this one for now to keep it simple,
+            // but update the repeat frequency for future reference.
+            
             // Remove old version if date changed
             if cal.startOfDay(for: selectedDate) != day {
                 tasksByDate[selectedDate]?.removeAll { $0.id == toEdit.id }
@@ -369,6 +396,7 @@ struct AddTaskView: View {
             updatedTask.color = colorToUse
             updatedTask.categoryId = categoryId
             updatedTask.categoryName = categoryName
+            updatedTask.repeatFrequency = repeatFrequency
             
             // Sync update to Apple Calendar or Google Calendar if Pro
             if isPro {
@@ -396,50 +424,66 @@ struct AddTaskView: View {
             // PostHog: Track task update
             AnalyticsManager.shared.capture("task_updated", properties: [
                 "duration_minutes": updatedTask.normalizedEndMinutes - updatedTask.startMinutes,
-                "category": categoryName ?? "None"
+                "category": categoryName ?? "None",
+                "repeat": repeatFrequency.rawValue
             ])
 
         } else {
-            var newTask = ClockTask(
+            // Create the first instance
+            let firstTask = ClockTask(
                 title: title.isEmpty ? "New Task" : title,
                 startMinutes: sMin,
                 endMinutes: normalizedEndMinutes,
                 color: colorToUse,
                 categoryId: categoryId,
-                categoryName: categoryName
+                categoryName: categoryName,
+                repeatFrequency: repeatFrequency
             )
             
-            // Push to external calendars if Pro
-            if isPro {
-                switch activeCalendarSyncProvider {
-                case .google:
-                    googleCalendarManager.saveTask(newTask, date: day) { extId in
-                        if let extId = extId {
-                            DispatchQueue.main.async {
-                                if let idx = tasksByDate[day]?.firstIndex(where: { $0.id == newTask.id }) {
-                                    tasksByDate[day]?[idx].externalEventId = extId
-                                }
-                            }
-                        }
+            saveTaskInstance(firstTask, on: day)
+            
+            // Handle repetition
+            if repeatFrequency != .never {
+                let limit: Int
+                let component: Calendar.Component
+                
+                switch repeatFrequency {
+                case .daily:
+                    limit = 30
+                    component = .day
+                case .weekly:
+                    limit = 12
+                    component = .weekOfYear
+                case .monthly:
+                    limit = 6
+                    component = .month
+                case .never:
+                    limit = 0
+                    component = .day
+                }
+                
+                for i in 1...limit {
+                    if let futureDate = cal.date(byAdding: component, value: i, to: day) {
+                        let taskInstance = ClockTask(
+                            id: UUID(), // Each instance gets a new ID to be safe in the local store
+                            title: firstTask.title,
+                            startMinutes: firstTask.startMinutes,
+                            endMinutes: firstTask.endMinutes,
+                            color: firstTask.color,
+                            categoryId: firstTask.categoryId,
+                            categoryName: firstTask.categoryName,
+                            repeatFrequency: firstTask.repeatFrequency
+                        )
+                        saveTaskInstance(taskInstance, on: futureDate)
                     }
-                case .apple:
-                    if let extId = calendarManager.saveTask(newTask, date: day) {
-                        newTask.externalEventId = extId
-                    }
-                case .none:
-                    break
                 }
             }
-            
-            var dayTasks = tasksByDate[day, default: []]
-            dayTasks.append(newTask)
-            dayTasks.sort { $0.startMinutes < $1.startMinutes }
-            tasksByDate[day] = dayTasks
 
             // PostHog: Track task creation
             AnalyticsManager.shared.capture("task_created", properties: [
-                "duration_minutes": newTask.normalizedEndMinutes - newTask.startMinutes,
+                "duration_minutes": firstTask.normalizedEndMinutes - firstTask.startMinutes,
                 "from_brain_dump": brainDumpTaskId != nil,
+                "repeat": repeatFrequency.rawValue
             ])
 
             // Update BrainDumpTask if needed
@@ -457,6 +501,38 @@ struct AddTaskView: View {
         }
         
         dismiss()
+    }
+
+    private func saveTaskInstance(_ task: ClockTask, on day: Date) {
+        var mutableTask = task
+        let isPro = storeManager.isPro
+        
+        // Push to external calendars if Pro
+        if isPro {
+            switch activeCalendarSyncProvider {
+            case .google:
+                googleCalendarManager.saveTask(mutableTask, date: day) { extId in
+                    if let extId = extId {
+                        DispatchQueue.main.async {
+                            if let idx = tasksByDate[day]?.firstIndex(where: { $0.id == mutableTask.id }) {
+                                tasksByDate[day]?[idx].externalEventId = extId
+                            }
+                        }
+                    }
+                }
+            case .apple:
+                if let extId = calendarManager.saveTask(mutableTask, date: day) {
+                    mutableTask.externalEventId = extId
+                }
+            case .none:
+                break
+            }
+        }
+        
+        var dayTasks = tasksByDate[day, default: []]
+        dayTasks.append(mutableTask)
+        dayTasks.sort { $0.startMinutes < $1.startMinutes }
+        tasksByDate[day] = dayTasks
     }
 
     private func connectTaskToActiveCalendar(_ task: ClockTask, on day: Date) -> String? {
@@ -486,6 +562,7 @@ struct TaskRow: View {
     var title: String
     var color: Color
     var icon: String = "leaf.fill"
+    var isRepeating: Bool = false
     
     var body: some View {
         HStack(spacing: 16) {
@@ -513,9 +590,17 @@ struct TaskRow: View {
                 .frame(minHeight: 30)
             
             // Icon
-            Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundStyle(color)
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                
+                if isRepeating {
+                    Image(systemName: "repeat")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(color.opacity(0.8))
+                }
+            }
+            .foregroundStyle(color)
             
             Text(title)
                 .font(.system(size: 16, weight: .regular))

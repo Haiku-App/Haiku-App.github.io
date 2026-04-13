@@ -31,6 +31,15 @@ enum CalendarSyncProvider: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum RepeatFrequency: String, CaseIterable, Codable, Identifiable {
+    case never = "Never"
+    case daily = "Daily"
+    case weekly = "Weekly"
+    case monthly = "Monthly"
+
+    var id: String { rawValue }
+}
+
 /// A simple model representing a task/meeting on a clock.
 /// Times are in minutes from midnight (0...1440). For a 12-hour clock, values wrap every 720 minutes.
 struct ClockTask: Identifiable, Hashable, Codable {
@@ -44,6 +53,7 @@ struct ClockTask: Identifiable, Hashable, Codable {
     var externalEventId: String? = nil
     var categoryId: UUID? = nil
     var categoryName: String? = nil
+    var repeatFrequency: RepeatFrequency = .never
 
     /// Normalize to 12h range in minutes [0, 720)
     var start12h: Double { Double(startMinutes % 720) }
@@ -64,7 +74,7 @@ struct ClockTask: Identifiable, Hashable, Codable {
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, title, startMinutes, endMinutes, color, isCompleted, url, externalEventId, categoryId, categoryName
+        case id, title, startMinutes, endMinutes, color, isCompleted, url, externalEventId, categoryId, categoryName, repeatFrequency
     }
 
     struct ColorData: Codable {
@@ -82,6 +92,7 @@ struct ClockTask: Identifiable, Hashable, Codable {
         try container.encodeIfPresent(externalEventId, forKey: .externalEventId)
         try container.encodeIfPresent(categoryId, forKey: .categoryId)
         try container.encodeIfPresent(categoryName, forKey: .categoryName)
+        try container.encode(repeatFrequency, forKey: .repeatFrequency)
         
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
@@ -89,7 +100,7 @@ struct ClockTask: Identifiable, Hashable, Codable {
         try container.encode(cd, forKey: .color)
     }
 
-    init(id: UUID = UUID(), title: String, startMinutes: Int, endMinutes: Int, color: Color, isCompleted: Bool = false, url: URL? = nil, externalEventId: String? = nil, categoryId: UUID? = nil, categoryName: String? = nil) {
+    init(id: UUID = UUID(), title: String, startMinutes: Int, endMinutes: Int, color: Color, isCompleted: Bool = false, url: URL? = nil, externalEventId: String? = nil, categoryId: UUID? = nil, categoryName: String? = nil, repeatFrequency: RepeatFrequency = .never) {
         self.id = id
         self.title = title
         self.startMinutes = startMinutes
@@ -100,6 +111,7 @@ struct ClockTask: Identifiable, Hashable, Codable {
         self.externalEventId = externalEventId
         self.categoryId = categoryId
         self.categoryName = categoryName
+        self.repeatFrequency = repeatFrequency
     }
 
     init(from decoder: Decoder) throws {
@@ -113,6 +125,7 @@ struct ClockTask: Identifiable, Hashable, Codable {
         self.externalEventId = try container.decodeIfPresent(String.self, forKey: .externalEventId)
         self.categoryId = try container.decodeIfPresent(UUID.self, forKey: .categoryId)
         self.categoryName = try container.decodeIfPresent(String.self, forKey: .categoryName)
+        self.repeatFrequency = try container.decodeIfPresent(RepeatFrequency.self, forKey: .repeatFrequency) ?? .never
         
         if let cd = try? container.decode(ColorData.self, forKey: .color) {
             self.color = Color(red: cd.r, green: cd.g, blue: cd.b, opacity: cd.a)

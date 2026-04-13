@@ -33,13 +33,21 @@ struct TodoView: View {
 
     var filteredTasks: [BrainDumpTask] {
         let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
 
         switch selectedFilter {
         case .active:
             return brainDumpManager.tasks.filter { task in
-                guard task.isCompleted else { return true }
-                guard let completedDate = task.completedDate else { return false }
-                return cal.isDateInToday(completedDate)
+                if task.isCompleted {
+                    guard let completedDate = task.completedDate else { return false }
+                    return cal.isDateInToday(completedDate)
+                } else {
+                    // Hide tasks scheduled for the future
+                    if let date = task.scheduledDate ?? task.reminderDueDate {
+                        return cal.startOfDay(for: date) <= today
+                    }
+                    return true
+                }
             }
         case .completed:
             return brainDumpManager.tasks.filter { task in
@@ -176,6 +184,7 @@ struct TodoView: View {
                                 reminderDueDate: task.reminderDueDate,
                                 isSelected: selectedTaskIds.contains(task.id),
                                 isSelectionMode: isSelectionMode,
+                                repeatFrequency: task.repeatFrequency,
                                 onToggle: {
                                     if isSelectionMode {
                                         if selectedTaskIds.contains(task.id) {
@@ -190,6 +199,44 @@ struct TodoView: View {
                                                 brainDumpManager.tasks[index].isCompleted.toggle()
                                                 if brainDumpManager.tasks[index].isCompleted {
                                                     brainDumpManager.tasks[index].completedDate = Date()
+                                                    
+                                                    // Handle repetition
+                                                    let originalTask = brainDumpManager.tasks[index]
+                                                    let freq = originalTask.repeatFrequency
+                                                    if freq != .never {
+                                                        let cal = Calendar.current
+                                                        let component: Calendar.Component = {
+                                                            switch freq {
+                                                            case .daily: return .day
+                                                            case .weekly: return .weekOfYear
+                                                            case .monthly: return .month
+                                                            case .never: return .day
+                                                            }
+                                                        }()
+                                                        
+                                                        // Always base the NEXT task on TODAY to ensure it stays hidden until the future
+                                                        let today = cal.startOfDay(for: Date())
+                                                        if let nextDate = cal.date(byAdding: component, value: 1, to: today) {
+                                                            var newTask = BrainDumpTask(title: originalTask.title)
+                                                            newTask.repeatFrequency = freq
+                                                            
+                                                            // Always schedule repeating tasks so they can be filtered out until they are due
+                                                            newTask.scheduledDate = nextDate
+                                                            
+                                                            // Avoid duplicates for the same day
+                                                            let exists = brainDumpManager.tasks.contains { t in
+                                                                !t.isCompleted && 
+                                                                t.title == newTask.title && 
+                                                                t.scheduledDate == newTask.scheduledDate &&
+                                                                t.repeatFrequency == newTask.repeatFrequency
+                                                            }
+                                                            
+                                                            if !exists {
+                                                                brainDumpManager.tasks.append(newTask)
+                                                                brainDumpManager.sortTasks()
+                                                            }
+                                                        }
+                                                    }
                                                 } else {
                                                     brainDumpManager.tasks[index].completedDate = nil
                                                 }
@@ -207,6 +254,12 @@ struct TodoView: View {
 
                                             syncTaskToAppleRemindersIfNeeded(brainDumpManager.tasks[index])
                                         }
+                                    }
+                                },
+                                onSetRepeat: { freq in
+                                    if let index = brainDumpManager.tasks.firstIndex(where: { $0.id == task.id }) {
+                                        brainDumpManager.tasks[index].repeatFrequency = freq
+                                        AnalyticsManager.shared.capture("brain_dump_task_repeat_set", properties: ["frequency": freq.rawValue])
                                     }
                                 }
                             )
@@ -389,7 +442,9 @@ struct BrainDumpRow: View {
     var reminderDueDate: Date? = nil
     var isSelected: Bool = false
     var isSelectionMode: Bool = false
+    var repeatFrequency: RepeatFrequency = .never
     var onToggle: () -> Void
+    var onSetRepeat: (RepeatFrequency) -> Void = { _ in }
     
     @State private var confettiCounter = 0
 
@@ -423,10 +478,18 @@ struct BrainDumpRow: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(currentTheme.textForeground.opacity(isCompleted ? 0.4 : 0.9) as Color)
-                        .strikethrough(isCompleted && !isSelectionMode, color: (currentTheme.textForeground.opacity(0.4) as Color))
+                    HStack(spacing: 6) {
+                        Text(title)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(currentTheme.textForeground.opacity(isCompleted ? 0.4 : 0.9) as Color)
+                            .strikethrough(isCompleted && !isSelectionMode, color: (currentTheme.textForeground.opacity(0.4) as Color))
+                        
+                        if repeatFrequency != .never {
+                            Image(systemName: "repeat")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(currentTheme.accent.opacity(0.8))
+                        }
+                    }
                     
                     if isCompleted, let completedDate = completedDate {
                         Text("Completed on \(formatDate(completedDate))")
@@ -447,6 +510,22 @@ struct BrainDumpRow: View {
             }
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if !isSelectionMode {
+                Menu("Repeat") {
+                    ForEach(RepeatFrequency.allCases) { freq in
+                        Button(action: { onSetRepeat(freq) }) {
+                            HStack {
+                                Text(freq.rawValue)
+                                if repeatFrequency == freq {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

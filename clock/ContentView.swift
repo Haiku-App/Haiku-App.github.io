@@ -861,7 +861,8 @@ struct ContentView: View {
                                     time: timeString,
                                     title: task.title,
                                     color: task.color,
-                                    icon: categoryManager.categories.first { $0.id == task.categoryId }?.icon ?? "leaf.fill"
+                                    icon: categoryManager.categories.first { $0.id == task.categoryId }?.icon ?? "leaf.fill",
+                                    isRepeating: task.repeatFrequency != .never
                                 )
                             }
                             .buttonStyle(.plain)

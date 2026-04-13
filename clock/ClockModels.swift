@@ -502,6 +502,7 @@ struct BrainDumpTask: Identifiable, Codable, Equatable {
     var completedDate: Date? = nil
     var reminderDueDate: Date? = nil
     var externalReminderId: String? = nil
+    var repeatFrequency: RepeatFrequency = .never
 }
 
 private func brainDumpSortDate(for task: BrainDumpTask) -> Date? {
