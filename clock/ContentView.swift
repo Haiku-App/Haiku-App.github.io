@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var selectedDate = Calendar.current.startOfDay(for: Date())
     @StateObject private var calendarManager = CalendarManager()
     @ObservedObject private var googleCalendarManager = GoogleCalendarManager.shared
+    @ObservedObject private var categoryManager = CategoryManager.shared
     @State private var saveDebounceTask: Task<Void, Never>? = nil
     @State private var liveClockTasks: [ClockTask]? = nil
     @State private var isApplyingCloudSnapshot = false
@@ -859,7 +860,8 @@ struct ContentView: View {
                                 TaskRow(
                                     time: timeString,
                                     title: task.title,
-                                    color: task.color
+                                    color: task.color,
+                                    icon: categoryManager.categories.first { $0.id == task.categoryId }?.icon ?? "leaf.fill"
                                 )
                             }
                             .buttonStyle(.plain)

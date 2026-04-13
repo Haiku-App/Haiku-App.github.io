@@ -485,6 +485,7 @@ struct TaskRow: View {
     var time: String
     var title: String
     var color: Color
+    var icon: String = "leaf.fill"
     
     var body: some View {
         HStack(spacing: 16) {
@@ -511,8 +512,8 @@ struct TaskRow: View {
                 .frame(width: 1)
                 .frame(minHeight: 30)
             
-            // Colored Leaf icon
-            Image(systemName: "leaf.fill")
+            // Icon
+            Image(systemName: icon)
                 .font(.system(size: 14))
                 .foregroundStyle(color)
             

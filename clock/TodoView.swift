@@ -390,6 +390,8 @@ struct BrainDumpRow: View {
     var isSelected: Bool = false
     var isSelectionMode: Bool = false
     var onToggle: () -> Void
+    
+    @State private var confettiCounter = 0
 
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
@@ -398,16 +400,26 @@ struct BrainDumpRow: View {
     }
 
     var body: some View {
-        Button(action: onToggle) {
+        Button(action: {
+            if !isCompleted && !isSelectionMode {
+                confettiCounter += 1
+            }
+            onToggle()
+        }) {
             HStack(spacing: 16) {
-                if isSelectionMode {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 22, weight: .light))
-                        .foregroundStyle(isSelected ? currentTheme.accent : (currentTheme.textForeground.opacity(0.3) as Color))
-                } else {
-                    Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 22, weight: .light))
-                        .foregroundStyle(isCompleted ? (currentTheme.textForeground.opacity(0.3) as Color) : currentTheme.accent)
+                ZStack {
+                    if isSelectionMode {
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 22, weight: .light))
+                            .foregroundStyle(isSelected ? currentTheme.accent : (currentTheme.textForeground.opacity(0.3) as Color))
+                    } else {
+                        Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 22, weight: .light))
+                            .foregroundStyle(isCompleted ? (currentTheme.textForeground.opacity(0.3) as Color) : currentTheme.accent)
+                        
+                        ConfettiView(counter: confettiCounter)
+                            .allowsHitTesting(false)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -435,5 +447,72 @@ struct BrainDumpRow: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct ConfettiView: View {
+    let counter: Int
+    @State private var pieces: [ConfettiPieceModel] = []
+    
+    var body: some View {
+        ZStack {
+            ForEach(pieces) { piece in
+                ConfettiPiece(model: piece)
+            }
+        }
+        .onChange(of: counter) { _, _ in
+            spawnConfetti()
+        }
+    }
+    
+    private func spawnConfetti() {
+        let newPieces = (0..<16).map { _ in ConfettiPieceModel() }
+        pieces.append(contentsOf: newPieces)
+        
+        // Clean up old pieces after 1 second
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            if pieces.count >= 16 {
+                pieces.removeFirst(16)
+            }
+        }
+    }
+}
+
+struct ConfettiPieceModel: Identifiable {
+    let id = UUID()
+    let color: Color = [.red, .blue, .green, .yellow, .pink, .purple, .orange, .cyan].randomElement()!
+    let size = CGFloat.random(in: 4...9)
+    let angle = Double.random(in: 0...360)
+    let distance = Double.random(in: 35...80)
+    let rotation = Double.random(in: 0...360)
+}
+
+struct ConfettiPiece: View {
+    let model: ConfettiPieceModel
+    @State private var offset = CGSize.zero
+    @State private var opacity = 1.0
+    @State private var scale = 1.0
+    @State private var rotation = 0.0
+    
+    var body: some View {
+        Rectangle()
+            .fill(model.color)
+            .frame(width: model.size, height: model.size)
+            .rotationEffect(.degrees(model.rotation + rotation))
+            .offset(offset)
+            .opacity(opacity)
+            .scaleEffect(scale)
+            .onAppear {
+                let radians = model.angle * .pi / 180
+                withAnimation(.easeOut(duration: 0.7)) {
+                    offset = CGSize(
+                        width: cos(radians) * model.distance,
+                        height: sin(radians) * model.distance
+                    )
+                    opacity = 0
+                    scale = 0.4
+                    rotation = Double.random(in: 90...360)
+                }
+            }
     }
 }
