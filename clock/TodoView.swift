@@ -19,12 +19,12 @@ struct TodoView: View {
     @State private var selectedFilter: Filter = .active
 
     @State private var showingClearAlert = false
-    @State private var showingEndRoutineAlert = false
+    @State private var routineSessionPendingEnd: RoutineSession?
     
     init(onSchedule: @escaping (String, UUID) -> Void) {
         self.onSchedule = onSchedule
         // Automatically switch to routine tab if one is active
-        if BrainDumpManager.shared.activeRoutineName != nil {
+        if BrainDumpManager.shared.hasActiveRoutineSessions {
             _selectedFilter = State(initialValue: .routine)
         }
     }
@@ -39,6 +39,12 @@ struct TodoView: View {
     private var goldColor: Color { currentTheme.accent }
     private var isAppleReminderSyncActive: Bool {
         storeManager.isPro && isAppleRemindersSyncEnabled && ReminderManager.hasReminderAccess()
+    }
+    private var hasAutoScheduledRoutineToday: Bool {
+        let today = Calendar.current.startOfDay(for: Date())
+        return RoutineManager.shared.routines.contains { routine in
+            routine.autoScheduleDays.contains(where: { $0.rawValue == Calendar.current.component(.weekday, from: today) })
+        }
     }
 
     var filteredTasks: [BrainDumpTask] {
@@ -84,7 +90,7 @@ struct TodoView: View {
                     ForEach(Filter.allCases, id: \.self) { filter in
                         let label: String = {
                             if filter == .routine {
-                                return (brainDumpManager.activeRoutineName ?? "Routine").uppercased()
+                                return "ROUTINES"
                             }
                             return filter.rawValue.uppercased()
                         }()
@@ -182,7 +188,7 @@ struct TodoView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 if selectedFilter == .routine {
-                    if let _ = brainDumpManager.activeRoutineName {
+                    if brainDumpManager.hasActiveRoutineSessions {
                         routineTasksListView
                     } else {
                         noActiveRoutineView
@@ -404,6 +410,11 @@ struct TodoView: View {
             guard newValue else { return }
             syncAppleRemindersIfNeeded()
         }
+        .onChange(of: brainDumpManager.activeRoutineSessions) { _, newValue in
+            if newValue.isEmpty, selectedFilter == .routine {
+                selectedFilter = .active
+            }
+        }
     }
     
     private func addTask() {
@@ -562,6 +573,43 @@ struct BrainDumpRow: View {
     }
 }
 
+struct RoutineSessionRow: View {
+    @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
+    var title: String
+    var isCompleted: Bool
+    var onToggle: () -> Void
+
+    @State private var confettiCounter = 0
+
+    var body: some View {
+        Button(action: {
+            if !isCompleted {
+                confettiCounter += 1
+            }
+            onToggle()
+        }) {
+            HStack(spacing: 16) {
+                ZStack {
+                    Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22, weight: .light))
+                        .foregroundStyle(isCompleted ? (currentTheme.textForeground.opacity(0.3) as Color) : currentTheme.accent)
+
+                    ConfettiView(counter: confettiCounter)
+                        .allowsHitTesting(false)
+                }
+
+                Text(title)
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(currentTheme.textForeground.opacity(isCompleted ? 0.4 : 0.9) as Color)
+                    .strikethrough(isCompleted, color: (currentTheme.textForeground.opacity(0.4) as Color))
+
+                Spacer()
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct ConfettiView: View {
     let counter: Int
     @State private var pieces: [ConfettiPieceModel] = []
@@ -631,83 +679,107 @@ struct ConfettiPiece: View {
 
 extension TodoView {
     private var routineTasksListView: some View {
-        VStack(spacing: 0) {
-            HStack {
-                let progress = brainDumpManager.activeRoutineTasks.isEmpty ? 0 : Double(brainDumpManager.activeRoutineTasks.filter(\.isCompleted).count) / Double(brainDumpManager.activeRoutineTasks.count)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("PROGRESS")
-                        .font(.system(size: 10, weight: .bold, design: .serif))
+        ScrollView {
+            VStack(spacing: 18) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Active routine checklists")
+                        .font(.system(size: 12, weight: .bold, design: .serif))
                         .foregroundStyle(goldColor)
                         .tracking(1)
-                    
-                    ProgressView(value: progress)
-                        .tint(goldColor)
-                        .scaleEffect(x: 1, y: 1.5, anchor: .center)
+
+                    Text(hasAutoScheduledRoutineToday ? "Started routines stay here as live checklists while their scheduled blocks stay in sync on the clock." : "Started routines stay here as live checklists until you finish or end them.")
+                        .font(.system(size: 12, weight: .light))
+                        .foregroundStyle(currentTheme.textForeground.opacity(0.55))
                 }
-                
-                Spacer(minLength: 40)
-                
-                Button(action: { showingEndRoutineAlert = true }) {
-                    Text("END")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(currentTheme.bg)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.red.opacity(0.8))
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 20)
-            
-            List {
-                ForEach(brainDumpManager.activeRoutineTasks) { item in
-                    Button(action: {
-                        let wasCompleted = item.isCompleted
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                            brainDumpManager.toggleRoutineItem(item.id)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+                .padding(.top, 4)
+
+                ForEach(brainDumpManager.activeRoutineSessions) { session in
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(alignment: .center) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(session.name.uppercased())
+                                    .font(.system(size: 12, weight: .bold, design: .serif))
+                                    .foregroundStyle(goldColor)
+                                    .tracking(1)
+
+                                Text("\(session.items.filter(\.isCompleted).count) of \(session.items.count) done")
+                                    .font(.system(size: 12, weight: .light))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.55))
+
+                                ProgressView(value: session.progress)
+                                    .tint(goldColor)
+                                    .scaleEffect(x: 1, y: 1.35, anchor: .center)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
+                            Spacer(minLength: 20)
+
+                            Button(action: {
+                                routineSessionPendingEnd = session
+                            }) {
+                                Text("END")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(currentTheme.bg)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(Color.red.opacity(0.8))
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
                         }
-                        if !wasCompleted {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            SoundManager.shared.playBing()
-                        } else {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        }
-                    }) {
-                        HStack(spacing: 16) {
-                            Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 22, weight: .light))
-                                .foregroundStyle(item.isCompleted ? (currentTheme.textForeground.opacity(0.3) as Color) : currentTheme.accent)
-                            
-                            Text(item.title)
-                                .font(.system(size: 16, weight: .regular))
-                                .foregroundStyle(currentTheme.textForeground.opacity(item.isCompleted ? 0.4 : 0.9) as Color)
-                                .strikethrough(item.isCompleted, color: (currentTheme.textForeground.opacity(0.4) as Color))
-                            
-                            Spacer()
+                        .padding(.horizontal, 22)
+                        .padding(.top, 20)
+                        .padding(.bottom, 18)
+
+                        ForEach(session.items) { item in
+                            RoutineSessionRow(
+                                title: item.title,
+                                isCompleted: item.isCompleted,
+                                onToggle: {
+                                    handleRoutineItemToggle(item, in: session)
+                                }
+                            )
+                            .padding(.horizontal, 22)
+                            .padding(.vertical, 14)
+
+                            if item.id != session.items.last?.id {
+                                Rectangle()
+                                    .fill(currentTheme.textForeground.opacity(0.08))
+                                    .frame(height: 1)
+                                    .padding(.horizontal, 22)
+                            }
                         }
                     }
-                    .buttonStyle(.plain)
-                    .listRowBackground(SwiftUI.Color.clear.opacity(0.001) as Color)
-                    .listRowInsets(EdgeInsets(top: 14, leading: 40, bottom: 14, trailing: 40))
-                    .listRowSeparator(.hidden)
+                    .background(
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(currentTheme.fieldBg)
+                    )
                 }
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 28)
         }
-        .alert("End Routine?", isPresented: $showingEndRoutineAlert) {
+        .alert("End Routine?", isPresented: Binding(
+            get: { routineSessionPendingEnd != nil },
+            set: { isPresented in
+                if !isPresented {
+                    routineSessionPendingEnd = nil
+                }
+            }
+        )) {
             Button("Keep Active", role: .cancel) { }
             Button("End Routine", role: .destructive) {
-                withAnimation {
-                    brainDumpManager.clearActiveRoutine()
-                    selectedFilter = .active
+                if let session = routineSessionPendingEnd {
+                    withAnimation {
+                        brainDumpManager.clearRoutineSession(session.id)
+                    }
                 }
+                routineSessionPendingEnd = nil
             }
         } message: {
-            Text("This will remove the current checklist from your To-Do tab.")
+            Text("This will remove this checklist from your To-Do routines tab.")
         }
     }
     
@@ -721,10 +793,34 @@ extension TodoView {
                 .font(.system(size: 14, weight: .light))
                 .foregroundStyle(currentTheme.textForeground.opacity(0.5) as Color)
             
-            Text("Go to the Routine tab to start one.")
+            Text("Go to the Routine tab to start one. Started routines appear here as active checklists.")
                 .font(.system(size: 12))
                 .foregroundStyle(currentTheme.textForeground.opacity(0.4) as Color)
             Spacer()
+        }
+    }
+
+    private func handleRoutineItemToggle(_ item: SessionItem, in session: RoutineSession) {
+        let wasCompleted = item.isCompleted
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+            brainDumpManager.toggleRoutineItem(item.id, in: session.id)
+        }
+
+        if !wasCompleted {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            SoundManager.shared.playBing()
+        } else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            guard let refreshedSession = brainDumpManager.session(for: session.id) else { return }
+            guard !refreshedSession.items.isEmpty else { return }
+            guard refreshedSession.items.allSatisfy(\.isCompleted) else { return }
+
+            withAnimation(.easeInOut(duration: 0.25)) {
+                brainDumpManager.clearRoutineSession(refreshedSession.id)
+            }
         }
     }
 }

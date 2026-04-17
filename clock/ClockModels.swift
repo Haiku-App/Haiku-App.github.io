@@ -640,6 +640,7 @@ struct RoutineSession: Identifiable, Codable, Equatable {
 
 struct SessionItem: Identifiable, Codable, Equatable {
     var id = UUID()
+    var sourceStepId: UUID? = nil
     var title: String
     var isCompleted: Bool = false
 }
@@ -700,11 +701,10 @@ class BrainDumpManager: ObservableObject {
             persistAndSync()
         }
     }
-    
-    @Published var activeRoutineName: String? = nil
-    @Published var activeRoutineTasks: [SessionItem] = [] {
+
+    @Published var activeRoutineSessions: [RoutineSession] = [] {
         didSet {
-            persistActiveRoutine()
+            persistActiveRoutineSessions()
         }
     }
 
@@ -712,40 +712,113 @@ class BrainDumpManager: ObservableObject {
 
     init() {
         self.tasks = AppSupportPersistence.loadBrainDumpTasks()
-        loadActiveRoutine()
+        loadActiveRoutineSessions()
         sortTasks()
         startInitialSyncIfNeeded()
     }
-    
+
+    var hasActiveRoutineSessions: Bool {
+        !activeRoutineSessions.isEmpty
+    }
+
     func startRoutine(_ routine: Routine) {
-        activeRoutineName = routine.name
-        activeRoutineTasks = routine.steps.map { SessionItem(title: $0.title) }
+        let session = RoutineSession(
+            routineId: routine.id,
+            name: routine.name,
+            items: routine.steps.map { SessionItem(sourceStepId: $0.id, title: $0.title) },
+            createdAt: Date()
+        )
+        activeRoutineSessions.removeAll { $0.routineId == routine.id }
+        activeRoutineSessions.append(session)
+        activeRoutineSessions.sort { $0.createdAt < $1.createdAt }
     }
-    
-    func toggleRoutineItem(_ itemId: UUID) {
-        if let index = activeRoutineTasks.firstIndex(where: { $0.id == itemId }) {
-            activeRoutineTasks[index].isCompleted.toggle()
+
+    func toggleRoutineItem(_ itemId: UUID, in sessionId: UUID) {
+        guard let sessionIndex = activeRoutineSessions.firstIndex(where: { $0.id == sessionId }),
+              let itemIndex = activeRoutineSessions[sessionIndex].items.firstIndex(where: { $0.id == itemId }) else {
+            return
+        }
+
+        activeRoutineSessions[sessionIndex].items[itemIndex].isCompleted.toggle()
+    }
+
+    func clearRoutineSession(_ sessionId: UUID) {
+        activeRoutineSessions.removeAll { $0.id == sessionId }
+    }
+
+    func clearAllRoutineSessions() {
+        activeRoutineSessions = []
+    }
+
+    func removeActiveRoutineSessions(for routineId: UUID) {
+        activeRoutineSessions.removeAll { $0.routineId == routineId }
+    }
+
+    func removeOrphanedRoutineSessions(validRoutineIDs: Set<UUID>) {
+        activeRoutineSessions.removeAll { !validRoutineIDs.contains($0.routineId) }
+    }
+
+    func session(for sessionId: UUID) -> RoutineSession? {
+        activeRoutineSessions.first(where: { $0.id == sessionId })
+    }
+
+    func refreshActiveRoutineSessions(for routine: Routine) {
+        var didChange = false
+        for index in activeRoutineSessions.indices {
+            guard activeRoutineSessions[index].routineId == routine.id else { continue }
+            activeRoutineSessions[index].name = routine.name
+            activeRoutineSessions[index].items = routine.steps.map { step in
+                let existingCompletion = activeRoutineSessions[index].items
+                    .first(where: { $0.sourceStepId == step.id })?
+                    .isCompleted ?? false
+                return SessionItem(sourceStepId: step.id, title: step.title, isCompleted: existingCompletion)
+            }
+            didChange = true
+        }
+
+        if didChange {
+            activeRoutineSessions.sort { $0.createdAt < $1.createdAt }
         }
     }
-    
-    func clearActiveRoutine() {
-        activeRoutineName = nil
-        activeRoutineTasks = []
-    }
-    
-    private func persistActiveRoutine() {
-        AppSupportDefaults.userDefaults.set(activeRoutineName, forKey: "activeRoutineName")
-        if let data = try? JSONEncoder().encode(activeRoutineTasks) {
-            AppSupportDefaults.userDefaults.set(data, forKey: "activeRoutineTasks")
+
+    private func persistActiveRoutineSessions() {
+        if let data = try? JSONEncoder().encode(activeRoutineSessions) {
+            AppSupportDefaults.userDefaults.set(data, forKey: "activeRoutineSessions")
+        } else {
+            AppSupportDefaults.userDefaults.removeObject(forKey: "activeRoutineSessions")
         }
     }
-    
-    private func loadActiveRoutine() {
-        activeRoutineName = AppSupportDefaults.userDefaults.string(forKey: "activeRoutineName")
+
+    private func loadActiveRoutineSessions() {
+        if let data = AppSupportDefaults.userDefaults.data(forKey: "activeRoutineSessions"),
+           let decoded = try? JSONDecoder().decode([RoutineSession].self, from: data) {
+            activeRoutineSessions = decoded.sorted { $0.createdAt < $1.createdAt }
+            return
+        }
+
+        // Migrate from the original single-active-routine storage if present.
+        let legacyName = AppSupportDefaults.userDefaults.string(forKey: "activeRoutineName")
         if let data = AppSupportDefaults.userDefaults.data(forKey: "activeRoutineTasks"),
-           let decoded = try? JSONDecoder().decode([SessionItem].self, from: data) {
-            activeRoutineTasks = decoded
+           let legacyItems = try? JSONDecoder().decode([SessionItem].self, from: data),
+           let legacyName,
+           !legacyItems.isEmpty {
+            let matchedRoutineId = AppSupportPersistence.loadRoutines()
+                .first(where: { $0.name.localizedCaseInsensitiveCompare(legacyName) == .orderedSame })?
+                .id ?? UUID()
+            activeRoutineSessions = [
+                RoutineSession(
+                    routineId: matchedRoutineId,
+                    name: legacyName,
+                    items: legacyItems,
+                    createdAt: Date()
+                )
+            ]
+        } else {
+            activeRoutineSessions = []
         }
+
+        AppSupportDefaults.userDefaults.removeObject(forKey: "activeRoutineName")
+        AppSupportDefaults.userDefaults.removeObject(forKey: "activeRoutineTasks")
     }
 
     func sortTasks() {
@@ -919,9 +992,11 @@ class RoutineManager: ObservableObject {
             routines.append(normalized)
         }
         routines = sortedRoutines(routines)
+        BrainDumpManager.shared.refreshActiveRoutineSessions(for: normalized)
     }
 
     func deleteRoutine(_ routine: Routine) {
+        BrainDumpManager.shared.removeActiveRoutineSessions(for: routine.id)
         routines.removeAll { $0.id == routine.id }
     }
 
@@ -930,6 +1005,7 @@ class RoutineManager: ObservableObject {
         self.routines = sortedRoutines(routines.map(normalize))
         AppSupportPersistence.saveRoutines(self.routines, modifiedAt: modifiedAt)
         isApplyingRemoteSnapshot = false
+        BrainDumpManager.shared.removeOrphanedRoutineSessions(validRoutineIDs: Set(self.routines.map(\.id)))
     }
 
     private func normalize(_ routine: Routine) -> Routine {

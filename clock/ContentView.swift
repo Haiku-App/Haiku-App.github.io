@@ -1102,6 +1102,7 @@ struct ContentView: View {
         let startMinutes = roundedCurrentRoutineStartMinutes()
 
         resetClockInteractionState()
+        replaceTodaysAutoScheduledRoutineOccurrenceIfNeeded(for: routine, anchorDay: today)
         applyRoutine(routine, anchorDay: today, startMinutes: startMinutes, autoScheduled: false)
 
         withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
@@ -1349,6 +1350,39 @@ struct ContentView: View {
         let remainder = rawMinutes % 5
         if remainder == 0 { return rawMinutes }
         return min(rawMinutes + (5 - remainder), 1435)
+    }
+
+    private func replaceTodaysAutoScheduledRoutineOccurrenceIfNeeded(for routine: Routine, anchorDay: Date) {
+        let calendar = Calendar.current
+        let normalizedAnchorDay = calendar.startOfDay(for: anchorDay)
+
+        var datesToUpdate = Set<Date>()
+        for (date, tasks) in tasksByDate {
+            let matches = tasks.filter {
+                $0.isRoutineAutoScheduled &&
+                $0.routineSourceId == routine.id &&
+                calendar.startOfDay(for: $0.routineAnchorDate ?? date) == normalizedAnchorDay
+            }
+
+            guard !matches.isEmpty else { continue }
+
+            for task in matches {
+                deleteTaskFromCalendarIfNeeded(task)
+            }
+
+            let remainingTasks = tasks.filter {
+                !($0.isRoutineAutoScheduled &&
+                  $0.routineSourceId == routine.id &&
+                  calendar.startOfDay(for: $0.routineAnchorDate ?? date) == normalizedAnchorDay)
+            }
+
+            tasksByDate[date] = remainingTasks.isEmpty ? nil : remainingTasks
+            datesToUpdate.insert(date)
+        }
+
+        if !datesToUpdate.isEmpty {
+            taskListResetToken = UUID()
+        }
     }
 
     private func resetClockInteractionState() {
