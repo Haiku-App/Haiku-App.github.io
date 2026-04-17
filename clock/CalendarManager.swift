@@ -284,9 +284,15 @@ class ReminderManager: ObservableObject {
         )
     }
 
+    private var updateTimer: Timer?
+
     @objc private func storeChanged(_ notification: Notification) {
         DispatchQueue.main.async {
-            self.eventsDidChange.toggle()
+            self.updateTimer?.invalidate()
+            self.updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
+                self?.eventStore.reset()
+                self?.eventsDidChange.toggle()
+            }
         }
     }
 
@@ -304,12 +310,14 @@ class ReminderManager: ObservableObject {
 
         if #available(iOS 17.0, *) {
             eventStore.requestFullAccessToReminders { granted, error in
+                if granted { self.eventStore.reset() }
                 DispatchQueue.main.async {
                     completion(granted)
                 }
             }
         } else {
             eventStore.requestAccess(to: .reminder) { granted, error in
+                if granted { self.eventStore.reset() }
                 DispatchQueue.main.async {
                     completion(granted)
                 }
@@ -322,14 +330,15 @@ class ReminderManager: ObservableObject {
             completion([])
             return
         }
+        
+        eventStore.refreshSourcesIfNecessary()
 
-        let calendars = eventStore.calendars(for: .reminder)
-        let predicate = eventStore.predicateForReminders(in: calendars)
+        let predicate = eventStore.predicateForReminders(in: nil)
 
         eventStore.fetchReminders(matching: predicate) { reminders in
             let tasks = (reminders ?? []).map { reminder in
                 BrainDumpTask(
-                    title: reminder.title,
+                    title: reminder.title ?? "",
                     isCompleted: reminder.isCompleted,
                     completedDate: reminder.completionDate,
                     reminderDueDate: self.date(from: reminder.dueDateComponents),

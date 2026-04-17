@@ -29,7 +29,7 @@ struct ProfileSettingsView: View {
         )
     }
     private var appVersionText: String {
-        return "Version 1.5"
+        return "Version 1.7"
     }
 
     private var isAppleConnected: Bool {

@@ -247,6 +247,7 @@ struct TodoView: View {
                                             if !wasCompleted && nowCompleted {
                                                 AnalyticsManager.shared.capture("brain_dump_task_completed")
                                                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                                SoundManager.shared.playBing()
                                             } else if wasCompleted && !nowCompleted {
                                                 AnalyticsManager.shared.capture("brain_dump_task_reactivated")
                                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -415,6 +416,13 @@ struct TodoView: View {
         reminderManager.fetchTasks { reminderTasks in
             guard isAppleReminderSyncActive else { return }
             brainDumpManager.applySyncedReminderTasks(reminderTasks)
+            
+            // After applying remote changes, upload any local tasks that don't have a remote counterpart
+            for task in brainDumpManager.tasks {
+                if task.externalReminderId == nil {
+                    syncTaskToAppleRemindersIfNeeded(task)
+                }
+            }
         }
     }
 
