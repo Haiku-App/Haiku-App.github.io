@@ -8,6 +8,8 @@ enum AppSupportDefaults {
     static let categoriesLastModifiedKey = "userCategoriesLastModified"
     static let brainDumpTasksKey = "brainDumpTasks"
     static let brainDumpTasksLastModifiedKey = "brainDumpTasksLastModified"
+    static let routinesKey = "savedRoutines"
+    static let routinesLastModifiedKey = "savedRoutinesLastModified"
 }
 
 struct RGB: Codable, Equatable {
@@ -15,6 +17,16 @@ struct RGB: Codable, Equatable {
     var g: Double
     var b: Double
     var color: Color { Color(red: r, green: g, blue: b) }
+}
+
+private func latestAppSupportModifiedAt(fallback: Date) -> Date {
+    max(
+        max(
+            AppSupportPersistence.loadCategoriesLastModifiedAt() ?? fallback,
+            AppSupportPersistence.loadBrainDumpTasksLastModifiedAt() ?? fallback
+        ),
+        AppSupportPersistence.loadRoutinesLastModifiedAt() ?? fallback
+    )
 }
 
 struct Category: Identifiable, Codable, Equatable {
@@ -67,6 +79,15 @@ enum AppSupportPersistence {
         return decoded
     }
 
+    static func loadRoutines() -> [Routine] {
+        guard let data = AppSupportDefaults.userDefaults.data(forKey: AppSupportDefaults.routinesKey),
+              let decoded = try? JSONDecoder().decode([Routine].self, from: data) else {
+            return []
+        }
+
+        return decoded
+    }
+
     static func saveCategories(_ categories: [Category], modifiedAt: Date = Date()) {
         guard let data = try? JSONEncoder().encode(categories) else { return }
         AppSupportDefaults.userDefaults.set(data, forKey: AppSupportDefaults.categoriesKey)
@@ -79,12 +100,22 @@ enum AppSupportPersistence {
         AppSupportDefaults.userDefaults.set(modifiedAt, forKey: AppSupportDefaults.brainDumpTasksLastModifiedKey)
     }
 
+    static func saveRoutines(_ routines: [Routine], modifiedAt: Date = Date()) {
+        guard let data = try? JSONEncoder().encode(routines) else { return }
+        AppSupportDefaults.userDefaults.set(data, forKey: AppSupportDefaults.routinesKey)
+        AppSupportDefaults.userDefaults.set(modifiedAt, forKey: AppSupportDefaults.routinesLastModifiedKey)
+    }
+
     static func loadCategoriesLastModifiedAt() -> Date? {
         AppSupportDefaults.userDefaults.object(forKey: AppSupportDefaults.categoriesLastModifiedKey) as? Date
     }
 
     static func loadBrainDumpTasksLastModifiedAt() -> Date? {
         AppSupportDefaults.userDefaults.object(forKey: AppSupportDefaults.brainDumpTasksLastModifiedKey) as? Date
+    }
+
+    static func loadRoutinesLastModifiedAt() -> Date? {
+        AppSupportDefaults.userDefaults.object(forKey: AppSupportDefaults.routinesLastModifiedKey) as? Date
     }
 }
 
@@ -95,6 +126,7 @@ enum AppSupportBootstrap {
 struct AppSupportCloudSnapshot {
     let categories: [Category]
     let brainDumpTasks: [BrainDumpTask]
+    let routines: [Routine]
     let modifiedAt: Date
 }
 
@@ -142,12 +174,14 @@ actor AppSupportCloudSyncManager {
             )
 
             if mergedSnapshot.categories != remoteSnapshot.categories ||
-                mergedSnapshot.brainDumpTasks != remoteSnapshot.brainDumpTasks {
+                mergedSnapshot.brainDumpTasks != remoteSnapshot.brainDumpTasks ||
+                mergedSnapshot.routines != remoteSnapshot.routines {
                 await upload(snapshot: mergedSnapshot, existingRecord: record)
             }
 
             if mergedSnapshot.categories != localSnapshot.categories ||
                 mergedSnapshot.brainDumpTasks != localSnapshot.brainDumpTasks ||
+                mergedSnapshot.routines != localSnapshot.routines ||
                 mergedSnapshot.modifiedAt != localSnapshot.modifiedAt {
                 return mergedSnapshot
             }
@@ -239,7 +273,7 @@ actor AppSupportCloudSyncManager {
     }
 
     private func encodeSnapshot(_ snapshot: AppSupportCloudSnapshot) -> Data? {
-        let payload = Payload(categories: snapshot.categories, brainDumpTasks: snapshot.brainDumpTasks)
+        let payload = Payload(categories: snapshot.categories, brainDumpTasks: snapshot.brainDumpTasks, routines: snapshot.routines)
         return try? JSONEncoder().encode(payload)
     }
 
@@ -253,6 +287,7 @@ actor AppSupportCloudSyncManager {
         return AppSupportCloudSnapshot(
             categories: decoded.categories,
             brainDumpTasks: decoded.brainDumpTasks,
+            routines: decoded.routines,
             modifiedAt: modifiedAt
         )
     }
@@ -265,6 +300,7 @@ actor AppSupportCloudSyncManager {
         AppSupportCloudSnapshot(
             categories: mergeCategories(local: local.categories, remote: remote.categories, preferLocal: preferLocal),
             brainDumpTasks: mergeBrainDumpTasks(local: local.brainDumpTasks, remote: remote.brainDumpTasks, preferLocal: preferLocal),
+            routines: mergeRoutines(local: local.routines, remote: remote.routines, preferLocal: preferLocal),
             modifiedAt: max(local.modifiedAt, remote.modifiedAt)
         )
     }
@@ -308,7 +344,51 @@ actor AppSupportCloudSyncManager {
             mergedByID[task.id] = task
         }
 
-        return sortedBrainDumpTasks(Array(mergedByID.values))
+        return Array(mergedByID.values).sorted { lhs, rhs in
+            let leftDate = lhs.scheduledDate ?? lhs.reminderDueDate
+            let rightDate = rhs.scheduledDate ?? rhs.reminderDueDate
+
+            switch (leftDate, rightDate) {
+            case let (left?, right?):
+                if left != right {
+                    return left < right
+                }
+            case (.some, nil):
+                return true
+            case (nil, .some):
+                return false
+            case (nil, nil):
+                break
+            }
+
+            if lhs.isCompleted != rhs.isCompleted {
+                return !lhs.isCompleted && rhs.isCompleted
+            }
+
+            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+        }
+    }
+
+    private func mergeRoutines(
+        local: [Routine],
+        remote: [Routine],
+        preferLocal: Bool
+    ) -> [Routine] {
+        var mergedByID: [UUID: Routine] = [:]
+        let firstPass = preferLocal ? remote : local
+        let secondPass = preferLocal ? local : remote
+
+        for routine in firstPass {
+            mergedByID[routine.id] = routine
+        }
+
+        for routine in secondPass {
+            mergedByID[routine.id] = routine
+        }
+
+        return Array(mergedByID.values).sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
     }
 
     private enum FetchResult {
@@ -320,6 +400,7 @@ actor AppSupportCloudSyncManager {
     private struct Payload: Codable {
         let categories: [Category]
         let brainDumpTasks: [BrainDumpTask]
+        let routines: [Routine]
     }
 }
 
@@ -365,10 +446,8 @@ class CategoryManager: ObservableObject {
                 snapshot: AppSupportCloudSnapshot(
                     categories: AppSupportPersistence.loadCategories(),
                     brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
-                    modifiedAt: max(
-                        AppSupportPersistence.loadCategoriesLastModifiedAt() ?? modifiedAt,
-                        AppSupportPersistence.loadBrainDumpTasksLastModifiedAt() ?? modifiedAt
-                    )
+                    routines: AppSupportPersistence.loadRoutines(),
+                    modifiedAt: latestAppSupportModifiedAt(fallback: modifiedAt)
                 )
             )
         }
@@ -379,15 +458,13 @@ class CategoryManager: ObservableObject {
         AppSupportBootstrap.hasStartedInitialSync = true
 
         Task {
-            let localModifiedAt = max(
-                AppSupportPersistence.loadCategoriesLastModifiedAt() ?? .distantPast,
-                AppSupportPersistence.loadBrainDumpTasksLastModifiedAt() ?? .distantPast
-            )
+            let localModifiedAt = latestAppSupportModifiedAt(fallback: .distantPast)
             let localSnapshot: AppSupportCloudSnapshot? = localModifiedAt == .distantPast
                 ? nil
                 : AppSupportCloudSnapshot(
                     categories: AppSupportPersistence.loadCategories(),
                     brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    routines: AppSupportPersistence.loadRoutines(),
                     modifiedAt: localModifiedAt
                 )
             let snapshot = await AppSupportCloudSyncManager.shared.synchronize(
@@ -399,6 +476,7 @@ class CategoryManager: ObservableObject {
             await MainActor.run {
                 CategoryManager.shared.applyCloudCategories(snapshot.categories, modifiedAt: snapshot.modifiedAt)
                 BrainDumpManager.shared.applyCloudTasks(snapshot.brainDumpTasks, modifiedAt: snapshot.modifiedAt)
+                RoutineManager.shared.applyCloudRoutines(snapshot.routines, modifiedAt: snapshot.modifiedAt)
             }
         }
     }
@@ -494,6 +572,84 @@ let aestheticColors: [RGB] = [
     RGB(r: 0.45, g: 0.45, b: 0.45)  // Dark Grey
 ]
 
+enum RoutineWeekday: Int, CaseIterable, Codable, Identifiable, Comparable {
+    case sunday = 1
+    case monday = 2
+    case tuesday = 3
+    case wednesday = 4
+    case thursday = 5
+    case friday = 6
+    case saturday = 7
+
+    var id: Int { rawValue }
+
+    var shortLabel: String {
+        let index = max(0, min(rawValue - 1, Calendar.current.shortWeekdaySymbols.count - 1))
+        return Calendar.current.shortWeekdaySymbols[index]
+    }
+
+    var symbol: String {
+        let index = max(0, min(rawValue - 1, Calendar.current.weekdaySymbols.count - 1))
+        return Calendar.current.weekdaySymbols[index]
+    }
+
+    static func < (lhs: RoutineWeekday, rhs: RoutineWeekday) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
+
+struct RoutineStep: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var title: String
+    var durationMinutes: Int
+    var rgb: RGB
+    var categoryId: UUID? = nil
+    var categoryName: String? = nil
+
+    var color: Color { rgb.color }
+}
+
+struct Routine: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var name: String
+    var preferredStartMinutes: Int = 8 * 60
+    var autoScheduleDays: [RoutineWeekday] = []
+    var steps: [RoutineStep]
+
+    var totalDurationMinutes: Int {
+        steps.reduce(0) { $0 + $1.durationMinutes }
+    }
+
+    var isAutoScheduleEnabled: Bool {
+        !autoScheduleDays.isEmpty
+    }
+}
+
+struct RoutineSession: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var routineId: UUID
+    var name: String
+    var items: [SessionItem]
+    var createdAt: Date
+    
+    var progress: Double {
+        guard !items.isEmpty else { return 0 }
+        return Double(items.filter(\.isCompleted).count) / Double(items.count)
+    }
+}
+
+struct SessionItem: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var title: String
+    var isCompleted: Bool = false
+}
+
+private func sortedRoutines(_ routines: [Routine]) -> [Routine] {
+    routines.sorted {
+        $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+    }
+}
+
 struct BrainDumpTask: Identifiable, Codable, Equatable {
     var id = UUID()
     var title: String
@@ -544,13 +700,52 @@ class BrainDumpManager: ObservableObject {
             persistAndSync()
         }
     }
+    
+    @Published var activeRoutineName: String? = nil
+    @Published var activeRoutineTasks: [SessionItem] = [] {
+        didSet {
+            persistActiveRoutine()
+        }
+    }
 
     private var isApplyingRemoteSnapshot = false
 
     init() {
         self.tasks = AppSupportPersistence.loadBrainDumpTasks()
+        loadActiveRoutine()
         sortTasks()
         startInitialSyncIfNeeded()
+    }
+    
+    func startRoutine(_ routine: Routine) {
+        activeRoutineName = routine.name
+        activeRoutineTasks = routine.steps.map { SessionItem(title: $0.title) }
+    }
+    
+    func toggleRoutineItem(_ itemId: UUID) {
+        if let index = activeRoutineTasks.firstIndex(where: { $0.id == itemId }) {
+            activeRoutineTasks[index].isCompleted.toggle()
+        }
+    }
+    
+    func clearActiveRoutine() {
+        activeRoutineName = nil
+        activeRoutineTasks = []
+    }
+    
+    private func persistActiveRoutine() {
+        AppSupportDefaults.userDefaults.set(activeRoutineName, forKey: "activeRoutineName")
+        if let data = try? JSONEncoder().encode(activeRoutineTasks) {
+            AppSupportDefaults.userDefaults.set(data, forKey: "activeRoutineTasks")
+        }
+    }
+    
+    private func loadActiveRoutine() {
+        activeRoutineName = AppSupportDefaults.userDefaults.string(forKey: "activeRoutineName")
+        if let data = AppSupportDefaults.userDefaults.data(forKey: "activeRoutineTasks"),
+           let decoded = try? JSONDecoder().decode([SessionItem].self, from: data) {
+            activeRoutineTasks = decoded
+        }
     }
 
     func sortTasks() {
@@ -662,10 +857,8 @@ class BrainDumpManager: ObservableObject {
                 snapshot: AppSupportCloudSnapshot(
                     categories: AppSupportPersistence.loadCategories(),
                     brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
-                    modifiedAt: max(
-                        AppSupportPersistence.loadCategoriesLastModifiedAt() ?? modifiedAt,
-                        AppSupportPersistence.loadBrainDumpTasksLastModifiedAt() ?? modifiedAt
-                    )
+                    routines: AppSupportPersistence.loadRoutines(),
+                    modifiedAt: latestAppSupportModifiedAt(fallback: modifiedAt)
                 )
             )
         }
@@ -676,15 +869,13 @@ class BrainDumpManager: ObservableObject {
         AppSupportBootstrap.hasStartedInitialSync = true
 
         Task {
-            let localModifiedAt = max(
-                AppSupportPersistence.loadCategoriesLastModifiedAt() ?? .distantPast,
-                AppSupportPersistence.loadBrainDumpTasksLastModifiedAt() ?? .distantPast
-            )
+            let localModifiedAt = latestAppSupportModifiedAt(fallback: .distantPast)
             let localSnapshot: AppSupportCloudSnapshot? = localModifiedAt == .distantPast
                 ? nil
                 : AppSupportCloudSnapshot(
                     categories: AppSupportPersistence.loadCategories(),
                     brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    routines: AppSupportPersistence.loadRoutines(),
                     modifiedAt: localModifiedAt
                 )
             let snapshot = await AppSupportCloudSyncManager.shared.synchronize(
@@ -696,6 +887,108 @@ class BrainDumpManager: ObservableObject {
             await MainActor.run {
                 CategoryManager.shared.applyCloudCategories(snapshot.categories, modifiedAt: snapshot.modifiedAt)
                 BrainDumpManager.shared.applyCloudTasks(snapshot.brainDumpTasks, modifiedAt: snapshot.modifiedAt)
+                RoutineManager.shared.applyCloudRoutines(snapshot.routines, modifiedAt: snapshot.modifiedAt)
+            }
+        }
+    }
+}
+
+@MainActor
+class RoutineManager: ObservableObject {
+    static let shared = RoutineManager()
+
+    @Published var routines: [Routine] = [] {
+        didSet {
+            guard !isApplyingRemoteSnapshot else { return }
+            persistAndSync()
+        }
+    }
+
+    private var isApplyingRemoteSnapshot = false
+
+    init() {
+        self.routines = sortedRoutines(AppSupportPersistence.loadRoutines())
+        startInitialSyncIfNeeded()
+    }
+
+    func saveRoutine(_ routine: Routine) {
+        let normalized = normalize(routine)
+        if let index = routines.firstIndex(where: { $0.id == normalized.id }) {
+            routines[index] = normalized
+        } else {
+            routines.append(normalized)
+        }
+        routines = sortedRoutines(routines)
+    }
+
+    func deleteRoutine(_ routine: Routine) {
+        routines.removeAll { $0.id == routine.id }
+    }
+
+    func applyCloudRoutines(_ routines: [Routine], modifiedAt: Date) {
+        isApplyingRemoteSnapshot = true
+        self.routines = sortedRoutines(routines.map(normalize))
+        AppSupportPersistence.saveRoutines(self.routines, modifiedAt: modifiedAt)
+        isApplyingRemoteSnapshot = false
+    }
+
+    private func normalize(_ routine: Routine) -> Routine {
+        var copy = routine
+        copy.name = routine.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        copy.preferredStartMinutes = min(max(copy.preferredStartMinutes, 0), 1435)
+        copy.autoScheduleDays = Array(Set(copy.autoScheduleDays)).sorted()
+        copy.steps = copy.steps.compactMap { step in
+            let trimmedTitle = step.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedTitle.isEmpty else { return nil }
+
+            var normalizedStep = step
+            normalizedStep.title = trimmedTitle
+            normalizedStep.durationMinutes = min(max(step.durationMinutes, 5), 240)
+            return normalizedStep
+        }
+        return copy
+    }
+
+    private func persistAndSync() {
+        let modifiedAt = Date()
+        AppSupportPersistence.saveRoutines(routines, modifiedAt: modifiedAt)
+
+        Task {
+            await AppSupportCloudSyncManager.shared.uploadLocalSnapshot(
+                snapshot: AppSupportCloudSnapshot(
+                    categories: AppSupportPersistence.loadCategories(),
+                    brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    routines: AppSupportPersistence.loadRoutines(),
+                    modifiedAt: latestAppSupportModifiedAt(fallback: modifiedAt)
+                )
+            )
+        }
+    }
+
+    private func startInitialSyncIfNeeded() {
+        guard !AppSupportBootstrap.hasStartedInitialSync else { return }
+        AppSupportBootstrap.hasStartedInitialSync = true
+
+        Task {
+            let localModifiedAt = latestAppSupportModifiedAt(fallback: .distantPast)
+            let localSnapshot: AppSupportCloudSnapshot? = localModifiedAt == .distantPast
+                ? nil
+                : AppSupportCloudSnapshot(
+                    categories: AppSupportPersistence.loadCategories(),
+                    brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    routines: AppSupportPersistence.loadRoutines(),
+                    modifiedAt: localModifiedAt
+                )
+            let snapshot = await AppSupportCloudSyncManager.shared.synchronize(
+                localSnapshot: localSnapshot
+            )
+
+            guard let snapshot else { return }
+
+            await MainActor.run {
+                CategoryManager.shared.applyCloudCategories(snapshot.categories, modifiedAt: snapshot.modifiedAt)
+                BrainDumpManager.shared.applyCloudTasks(snapshot.brainDumpTasks, modifiedAt: snapshot.modifiedAt)
+                RoutineManager.shared.applyCloudRoutines(snapshot.routines, modifiedAt: snapshot.modifiedAt)
             }
         }
     }

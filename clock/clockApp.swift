@@ -64,6 +64,7 @@ struct clockApp: App {
             .task {
                 _ = CategoryManager.shared
                 _ = BrainDumpManager.shared
+                _ = RoutineManager.shared
             }
             .onOpenURL { url in
                 GIDSignIn.sharedInstance.handle(url)

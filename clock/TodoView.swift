@@ -14,10 +14,20 @@ struct TodoView: View {
     enum Filter: String, CaseIterable {
         case active = "Inbox"
         case completed = "Done"
+        case routine = "Routine"
     }
     @State private var selectedFilter: Filter = .active
 
     @State private var showingClearAlert = false
+    @State private var showingEndRoutineAlert = false
+    
+    init(onSchedule: @escaping (String, UUID) -> Void) {
+        self.onSchedule = onSchedule
+        // Automatically switch to routine tab if one is active
+        if BrainDumpManager.shared.activeRoutineName != nil {
+            _selectedFilter = State(initialValue: .routine)
+        }
+    }
     
     // Selection for scheduling
     @State private var isSelectionMode = false
@@ -54,6 +64,8 @@ struct TodoView: View {
                 guard task.isCompleted, let completedDate = task.completedDate else { return false }
                 return !cal.isDateInToday(completedDate)
             }
+        case .routine:
+            return []
         }
     }
 
@@ -67,19 +79,27 @@ struct TodoView: View {
                     .padding(.top, 40)
                     .padding(.bottom, 24)
 
-                // Main Filter Picker (Inbox / Done)
+                // Main Filter Picker (Inbox / Done / Routine)
                 HStack(spacing: 0) {
                     ForEach(Filter.allCases, id: \.self) { filter in
+                        let label: String = {
+                            if filter == .routine {
+                                return (brainDumpManager.activeRoutineName ?? "Routine").uppercased()
+                            }
+                            return filter.rawValue.uppercased()
+                        }()
+                        
                         Button(action: {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 selectedFilter = filter
                             }
                         }) {
                             VStack(spacing: 8) {
-                                Text(filter.rawValue.uppercased())
+                                Text(label)
                                     .font(.system(size: 12, weight: .medium, design: .serif))
                                     .foregroundStyle(selectedFilter == filter ? goldColor : (currentTheme.textForeground.opacity(0.4) as Color))
                                     .tracking(1)
+                                    .lineLimit(1)
                                 
                                 Rectangle()
                                     .fill(selectedFilter == filter ? goldColor : (SwiftUI.Color.clear.opacity(0.001) as Color))
@@ -161,8 +181,13 @@ struct TodoView: View {
                     .padding(.bottom, 20)
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
-                
-                if filteredTasks.isEmpty {
+                if selectedFilter == .routine {
+                    if let _ = brainDumpManager.activeRoutineName {
+                        routineTasksListView
+                    } else {
+                        noActiveRoutineView
+                    }
+                } else if filteredTasks.isEmpty {
                     Spacer()
                     VStack(spacing: 12) {
                         Image(systemName: selectedFilter == .active ? "brain.head.profile" : "checkmark.seal")
@@ -601,5 +626,105 @@ struct ConfettiPiece: View {
                     rotation = Double.random(in: 90...360)
                 }
             }
+    }
+}
+
+extension TodoView {
+    private var routineTasksListView: some View {
+        VStack(spacing: 0) {
+            HStack {
+                let progress = brainDumpManager.activeRoutineTasks.isEmpty ? 0 : Double(brainDumpManager.activeRoutineTasks.filter(\.isCompleted).count) / Double(brainDumpManager.activeRoutineTasks.count)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("PROGRESS")
+                        .font(.system(size: 10, weight: .bold, design: .serif))
+                        .foregroundStyle(goldColor)
+                        .tracking(1)
+                    
+                    ProgressView(value: progress)
+                        .tint(goldColor)
+                        .scaleEffect(x: 1, y: 1.5, anchor: .center)
+                }
+                
+                Spacer(minLength: 40)
+                
+                Button(action: { showingEndRoutineAlert = true }) {
+                    Text("END")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(currentTheme.bg)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.red.opacity(0.8))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 40)
+            .padding(.bottom, 20)
+            
+            List {
+                ForEach(brainDumpManager.activeRoutineTasks) { item in
+                    Button(action: {
+                        let wasCompleted = item.isCompleted
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                            brainDumpManager.toggleRoutineItem(item.id)
+                        }
+                        if !wasCompleted {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            SoundManager.shared.playBing()
+                        } else {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }
+                    }) {
+                        HStack(spacing: 16) {
+                            Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 22, weight: .light))
+                                .foregroundStyle(item.isCompleted ? (currentTheme.textForeground.opacity(0.3) as Color) : currentTheme.accent)
+                            
+                            Text(item.title)
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(currentTheme.textForeground.opacity(item.isCompleted ? 0.4 : 0.9) as Color)
+                                .strikethrough(item.isCompleted, color: (currentTheme.textForeground.opacity(0.4) as Color))
+                            
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(SwiftUI.Color.clear.opacity(0.001) as Color)
+                    .listRowInsets(EdgeInsets(top: 14, leading: 40, bottom: 14, trailing: 40))
+                    .listRowSeparator(.hidden)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+        }
+        .alert("End Routine?", isPresented: $showingEndRoutineAlert) {
+            Button("Keep Active", role: .cancel) { }
+            Button("End Routine", role: .destructive) {
+                withAnimation {
+                    brainDumpManager.clearActiveRoutine()
+                    selectedFilter = .active
+                }
+            }
+        } message: {
+            Text("This will remove the current checklist from your To-Do tab.")
+        }
+    }
+    
+    private var noActiveRoutineView: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            Image(systemName: "play.circle")
+                .font(.system(size: 32))
+                .foregroundStyle(goldColor.opacity(0.5) as Color)
+            Text("No active routine")
+                .font(.system(size: 14, weight: .light))
+                .foregroundStyle(currentTheme.textForeground.opacity(0.5) as Color)
+            
+            Text("Go to the Routine tab to start one.")
+                .font(.system(size: 12))
+                .foregroundStyle(currentTheme.textForeground.opacity(0.4) as Color)
+            Spacer()
+        }
     }
 }

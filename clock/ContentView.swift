@@ -20,6 +20,7 @@ struct ContentView: View {
     @StateObject private var calendarManager = CalendarManager()
     @ObservedObject private var googleCalendarManager = GoogleCalendarManager.shared
     @ObservedObject private var categoryManager = CategoryManager.shared
+    @ObservedObject private var routineManager = RoutineManager.shared
     @State private var saveDebounceTask: Task<Void, Never>? = nil
     @State private var liveClockTasks: [ClockTask]? = nil
     @State private var isApplyingCloudSnapshot = false
@@ -55,7 +56,7 @@ struct ContentView: View {
     private var goldColor: Color { currentTheme.accent }
 
     enum Tab {
-        case clock, weekly, todo, analytics, profile
+        case clock, weekly, todo, routines, analytics, profile
     }
     @State private var selectedTab: Tab = .clock
     @State private var showingAddTask = false
@@ -73,6 +74,7 @@ struct ContentView: View {
     @AppStorage("is24HourClock") private var is24HourClock = true
     @AppStorage("notificationOffsetsData") private var notificationOffsetsData = ""
     private let googleCalendarRefreshInterval: TimeInterval = 30
+    private let routineAutoScheduleWindowDays = 28
 
     private var notificationOffsets: [Int] {
         if notificationOffsetsData.isEmpty { return [] }
@@ -130,6 +132,9 @@ struct ContentView: View {
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 handleScenePhaseChange(oldPhase: oldPhase, newPhase: newPhase)
+            }
+            .onChange(of: routineManager.routines) { oldRoutines, newRoutines in
+                handleRoutinesChanged(oldRoutines: oldRoutines, newRoutines: newRoutines)
             }
             .onChange(of: notificationOffsetsData) {
                 NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: tasksByDate, offsets: notificationOffsets)
@@ -260,6 +265,7 @@ struct ContentView: View {
         SharedTaskManager.shared.save(is24HourClock: is24HourClock)
         SharedTaskManager.shared.save(theme: currentTheme)
         NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: tasksByDate, offsets: notificationOffsets)
+        reconcileAutoScheduledRoutines()
         refreshVisibleCalendar(force: true)
         Task {
             await syncTasksWithCloud()
@@ -293,6 +299,11 @@ struct ContentView: View {
         }
     }
 
+    private func handleRoutinesChanged(oldRoutines: [Routine], newRoutines: [Routine]) {
+        guard oldRoutines != newRoutines else { return }
+        reconcileAutoScheduledRoutines()
+    }
+
     private func handleTasksChanged(oldTasks: [Date: [ClockTask]], newTasks: [Date: [ClockTask]]) {
         let isCloudUpdate = isApplyingCloudSnapshot
         saveDebounceTask?.cancel()
@@ -311,6 +322,7 @@ struct ContentView: View {
 
     private func handleScenePhaseChange(oldPhase: ScenePhase, newPhase: ScenePhase) {
         if newPhase == .active {
+            reconcileAutoScheduledRoutines()
             refreshVisibleCalendar(force: true)
             Task {
                 await syncTasksWithCloud()
@@ -422,6 +434,16 @@ struct ContentView: View {
                     taskToEdit = nil
                     showingAddTask = true
                 })
+            } else if selectedTab == .routines {
+                RoutinesView(
+                    selectedDate: $selectedDate,
+                    onStartNow: { routine in
+                        startRoutineNow(routine)
+                    },
+                    onApplyPreferredTime: { routine in
+                        applyRoutineToSelectedDate(routine)
+                    }
+                )
             } else if selectedTab == .analytics {
                 ProfileAnalyticsView(tasksByDate: tasksByDate)
             } else if selectedTab == .profile {
@@ -446,6 +468,10 @@ struct ContentView: View {
                 selectedTab = .todo
             }
             Spacer()
+            TabBarButton(icon: "rectangle.stack.badge.plus", text: "Routines", isSelected: selectedTab == .routines) {
+                selectedTab = .routines
+            }
+            Spacer()
             TabBarButton(icon: "chart.pie", text: "Analytics", isSelected: selectedTab == .analytics) {
                 selectedTab = .analytics
             }
@@ -454,7 +480,7 @@ struct ContentView: View {
                 selectedTab = .profile
             }
         }
-        .padding(.horizontal, 40)
+        .padding(.horizontal, 22)
         .padding(.top, 16)
         .padding(.bottom, 12)
         .background(
@@ -1046,6 +1072,8 @@ struct ContentView: View {
     }
 
     private func syncTaskToActiveCalendarProvider(_ task: ClockTask, on day: Date) {
+        guard isPro else { return }
+
         switch activeCalendarSyncProvider {
         case .none:
             return
@@ -1069,6 +1097,260 @@ struct ContentView: View {
         tasksByDate[day]?[taskIndex].externalEventId = externalEventId
     }
 
+    private func startRoutineNow(_ routine: Routine) {
+        let today = Calendar.current.startOfDay(for: now)
+        let startMinutes = roundedCurrentRoutineStartMinutes()
+
+        resetClockInteractionState()
+        applyRoutine(routine, anchorDay: today, startMinutes: startMinutes, autoScheduled: false)
+
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+            selectedDate = today
+            selectedTab = .todo
+            isFlowState = false
+        }
+
+        AnalyticsManager.shared.capture("routine_started_now", properties: [
+            "routine_name": routine.name,
+            "step_count": routine.steps.count
+        ])
+    }
+
+    private func applyRoutineToSelectedDate(_ routine: Routine) {
+        let day = Calendar.current.startOfDay(for: selectedDate)
+
+        resetClockInteractionState()
+        applyRoutine(routine, anchorDay: day, startMinutes: routine.preferredStartMinutes, autoScheduled: false)
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            selectedDate = day
+            selectedTab = .clock
+        }
+
+        AnalyticsManager.shared.capture("routine_applied_to_day", properties: [
+            "routine_name": routine.name,
+            "step_count": routine.steps.count
+        ])
+    }
+
+    private func applyRoutine(_ routine: Routine, anchorDay: Date, startMinutes: Int, autoScheduled: Bool) {
+        let entries = plannedRoutineEntries(for: routine, anchorDay: anchorDay, startMinutes: startMinutes, autoScheduled: autoScheduled)
+
+        for (day, task) in entries {
+            upsertRoutineTask(task, on: day, allowManagedUpdate: autoScheduled)
+        }
+    }
+
+    private func reconcileAutoScheduledRoutines() {
+        let calendar = Calendar.current
+        let windowStart = calendar.startOfDay(for: now)
+        guard let windowEnd = calendar.date(byAdding: .day, value: routineAutoScheduleWindowDays, to: windowStart),
+              let cleanupEnd = calendar.date(byAdding: .day, value: routineAutoScheduleWindowDays + 2, to: windowStart) else {
+            return
+        }
+
+        var expectedTasksByDay: [Date: [ClockTask]] = [:]
+        var expectedKeys = Set<String>()
+
+        var anchorDay = windowStart
+        while anchorDay < windowEnd {
+            let weekdayValue = calendar.component(.weekday, from: anchorDay)
+            let weekday = RoutineWeekday(rawValue: weekdayValue)
+
+            for routine in routineManager.routines where weekday.map(routine.autoScheduleDays.contains) == true {
+                let entries = plannedRoutineEntries(
+                    for: routine,
+                    anchorDay: anchorDay,
+                    startMinutes: routine.preferredStartMinutes,
+                    autoScheduled: true
+                )
+
+                for (taskDay, task) in entries {
+                    let normalizedTaskDay = calendar.startOfDay(for: taskDay)
+                    guard normalizedTaskDay < cleanupEnd else { continue }
+                    expectedTasksByDay[normalizedTaskDay, default: []].append(task)
+                    expectedKeys.insert(routineTaskKey(for: task, on: normalizedTaskDay))
+                }
+            }
+
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: anchorDay) else { break }
+            anchorDay = nextDay
+        }
+
+        var day = windowStart
+        while day < cleanupEnd {
+            let normalizedDay = calendar.startOfDay(for: day)
+            var dayTasks = tasksByDate[normalizedDay, default: []]
+
+            let obsoleteTasks = dayTasks.filter { task in
+                task.isRoutineAutoScheduled && !expectedKeys.contains(routineTaskKey(for: task, on: normalizedDay))
+            }
+
+            if !obsoleteTasks.isEmpty {
+                for task in obsoleteTasks {
+                    deleteTaskFromCalendarIfNeeded(task)
+                }
+
+                dayTasks.removeAll { task in
+                    task.isRoutineAutoScheduled && !expectedKeys.contains(routineTaskKey(for: task, on: normalizedDay))
+                }
+                dayTasks.sort { $0.startMinutes < $1.startMinutes }
+                tasksByDate[normalizedDay] = dayTasks.isEmpty ? nil : dayTasks
+            }
+
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: normalizedDay) else { break }
+            day = nextDay
+        }
+
+        for (day, tasks) in expectedTasksByDay {
+            for task in tasks.sorted(by: { $0.startMinutes < $1.startMinutes }) {
+                upsertRoutineTask(task, on: day, allowManagedUpdate: true)
+            }
+        }
+    }
+
+    private func plannedRoutineEntries(
+        for routine: Routine,
+        anchorDay: Date,
+        startMinutes: Int,
+        autoScheduled: Bool
+    ) -> [(Date, ClockTask)] {
+        let calendar = Calendar.current
+        let normalizedAnchorDay = calendar.startOfDay(for: anchorDay)
+        var runningMinutes = max(startMinutes, 0)
+        var entries: [(Date, ClockTask)] = []
+
+        for step in routine.steps {
+            let dayOffset = max(0, runningMinutes / 1440)
+            let taskDay = calendar.date(byAdding: .day, value: dayOffset, to: normalizedAnchorDay) ?? normalizedAnchorDay
+            let taskStart = runningMinutes % 1440
+            let taskEnd = taskStart + step.durationMinutes
+
+            let task = ClockTask(
+                title: step.title,
+                startMinutes: taskStart,
+                endMinutes: taskEnd,
+                color: step.color,
+                categoryId: step.categoryId,
+                categoryName: step.categoryName,
+                routineSourceId: routine.id,
+                routineSourceStepId: step.id,
+                routineSourceName: routine.name,
+                routineAnchorDate: normalizedAnchorDay,
+                isRoutineAutoScheduled: autoScheduled
+            )
+
+            entries.append((taskDay, task))
+            runningMinutes += step.durationMinutes
+        }
+
+        return entries
+    }
+
+    private func upsertRoutineTask(_ task: ClockTask, on day: Date, allowManagedUpdate: Bool) {
+        let normalizedDay = Calendar.current.startOfDay(for: day)
+        var dayTasks = tasksByDate[normalizedDay, default: []]
+
+        if allowManagedUpdate,
+           let existingIndex = dayTasks.firstIndex(where: { routineTasksShareIdentity($0, task) && $0.isRoutineAutoScheduled }) {
+            var existing = dayTasks[existingIndex]
+            let needsUpdate = routineTaskNeedsUpdate(existing, comparedTo: task)
+
+            existing.title = task.title
+            existing.startMinutes = task.startMinutes
+            existing.endMinutes = task.endMinutes
+            existing.color = task.color
+            existing.categoryId = task.categoryId
+            existing.categoryName = task.categoryName
+            existing.routineSourceName = task.routineSourceName
+            existing.routineAnchorDate = task.routineAnchorDate
+            existing.isRoutineAutoScheduled = true
+
+            dayTasks[existingIndex] = existing
+            dayTasks.sort { $0.startMinutes < $1.startMinutes }
+            tasksByDate[normalizedDay] = dayTasks
+
+            if needsUpdate {
+                updateTaskOnCalendarIfNeeded(existing, on: normalizedDay)
+            } else if existing.externalEventId == nil {
+                syncTaskToActiveCalendarProvider(existing, on: normalizedDay)
+            }
+            return
+        }
+
+        let alreadyExists = dayTasks.contains { existingTask in
+            routineTasksShareIdentity(existingTask, task) &&
+            existingTask.startMinutes == task.startMinutes &&
+            existingTask.endMinutes == task.endMinutes
+        }
+
+        guard !alreadyExists else { return }
+
+        dayTasks.append(task)
+        dayTasks.sort { $0.startMinutes < $1.startMinutes }
+        tasksByDate[normalizedDay] = dayTasks
+        syncTaskToActiveCalendarProvider(task, on: normalizedDay)
+    }
+
+    private func updateTaskOnCalendarIfNeeded(_ task: ClockTask, on day: Date) {
+        guard isPro else { return }
+
+        switch task.calendarSyncProvider {
+        case .google:
+            GoogleCalendarManager.shared.updateTask(task, date: day)
+        case .apple:
+            calendarManager.updateTask(task, date: day)
+        case .none:
+            syncTaskToActiveCalendarProvider(task, on: day)
+        }
+    }
+
+    private func deleteTaskFromCalendarIfNeeded(_ task: ClockTask) {
+        guard isPro, let externalEventId = task.externalEventId else { return }
+
+        deletedExternalIds.insert(externalEventId)
+        if externalEventId.hasPrefix("google_") {
+            GoogleCalendarManager.shared.deleteTask(externalId: externalEventId)
+        } else {
+            calendarManager.deleteTask(externalId: externalEventId)
+        }
+    }
+
+    private func routineTasksShareIdentity(_ lhs: ClockTask, _ rhs: ClockTask) -> Bool {
+        lhs.routineSourceId == rhs.routineSourceId &&
+        lhs.routineSourceStepId == rhs.routineSourceStepId &&
+        lhs.routineAnchorDate == rhs.routineAnchorDate
+    }
+
+    private func routineTaskNeedsUpdate(_ current: ClockTask, comparedTo expected: ClockTask) -> Bool {
+        current.title != expected.title ||
+        current.startMinutes != expected.startMinutes ||
+        current.endMinutes != expected.endMinutes ||
+        current.categoryId != expected.categoryId ||
+        current.categoryName != expected.categoryName ||
+        current.color != expected.color ||
+        current.isRoutineAutoScheduled != expected.isRoutineAutoScheduled
+    }
+
+    private func routineTaskKey(for task: ClockTask, on day: Date) -> String {
+        let anchorTime = Int((task.routineAnchorDate ?? day).timeIntervalSince1970)
+        let dayTime = Int(day.timeIntervalSince1970)
+        return [
+            String(dayTime),
+            task.routineSourceId?.uuidString ?? "none",
+            task.routineSourceStepId?.uuidString ?? "none",
+            String(anchorTime)
+        ].joined(separator: "|")
+    }
+
+    private func roundedCurrentRoutineStartMinutes() -> Int {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: now)
+        let rawMinutes = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+        let remainder = rawMinutes % 5
+        if remainder == 0 { return rawMinutes }
+        return min(rawMinutes + (5 - remainder), 1435)
+    }
+
     private func resetClockInteractionState() {
         liveClockTasks = nil
         isFlowState = false
@@ -1083,6 +1365,7 @@ struct ContentView: View {
         WidgetCenter.shared.reloadAllTimelines()
         NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: snapshot.tasksByDate, offsets: notificationOffsets)
         isApplyingCloudSnapshot = false
+        reconcileAutoScheduledRoutines()
     }
 
     private func syncTasksWithCloud() async {

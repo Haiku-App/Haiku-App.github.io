@@ -54,6 +54,11 @@ struct ClockTask: Identifiable, Hashable, Codable {
     var categoryId: UUID? = nil
     var categoryName: String? = nil
     var repeatFrequency: RepeatFrequency = .never
+    var routineSourceId: UUID? = nil
+    var routineSourceStepId: UUID? = nil
+    var routineSourceName: String? = nil
+    var routineAnchorDate: Date? = nil
+    var isRoutineAutoScheduled: Bool = false
 
     /// Normalize to 12h range in minutes [0, 720)
     var start12h: Double { Double(startMinutes % 720) }
@@ -74,7 +79,7 @@ struct ClockTask: Identifiable, Hashable, Codable {
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, title, startMinutes, endMinutes, color, isCompleted, url, externalEventId, categoryId, categoryName, repeatFrequency
+        case id, title, startMinutes, endMinutes, color, isCompleted, url, externalEventId, categoryId, categoryName, repeatFrequency, routineSourceId, routineSourceStepId, routineSourceName, routineAnchorDate, isRoutineAutoScheduled
     }
 
     struct ColorData: Codable {
@@ -93,6 +98,11 @@ struct ClockTask: Identifiable, Hashable, Codable {
         try container.encodeIfPresent(categoryId, forKey: .categoryId)
         try container.encodeIfPresent(categoryName, forKey: .categoryName)
         try container.encode(repeatFrequency, forKey: .repeatFrequency)
+        try container.encodeIfPresent(routineSourceId, forKey: .routineSourceId)
+        try container.encodeIfPresent(routineSourceStepId, forKey: .routineSourceStepId)
+        try container.encodeIfPresent(routineSourceName, forKey: .routineSourceName)
+        try container.encodeIfPresent(routineAnchorDate, forKey: .routineAnchorDate)
+        try container.encode(isRoutineAutoScheduled, forKey: .isRoutineAutoScheduled)
         
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
@@ -100,7 +110,7 @@ struct ClockTask: Identifiable, Hashable, Codable {
         try container.encode(cd, forKey: .color)
     }
 
-    init(id: UUID = UUID(), title: String, startMinutes: Int, endMinutes: Int, color: Color, isCompleted: Bool = false, url: URL? = nil, externalEventId: String? = nil, categoryId: UUID? = nil, categoryName: String? = nil, repeatFrequency: RepeatFrequency = .never) {
+    init(id: UUID = UUID(), title: String, startMinutes: Int, endMinutes: Int, color: Color, isCompleted: Bool = false, url: URL? = nil, externalEventId: String? = nil, categoryId: UUID? = nil, categoryName: String? = nil, repeatFrequency: RepeatFrequency = .never, routineSourceId: UUID? = nil, routineSourceStepId: UUID? = nil, routineSourceName: String? = nil, routineAnchorDate: Date? = nil, isRoutineAutoScheduled: Bool = false) {
         self.id = id
         self.title = title
         self.startMinutes = startMinutes
@@ -112,6 +122,11 @@ struct ClockTask: Identifiable, Hashable, Codable {
         self.categoryId = categoryId
         self.categoryName = categoryName
         self.repeatFrequency = repeatFrequency
+        self.routineSourceId = routineSourceId
+        self.routineSourceStepId = routineSourceStepId
+        self.routineSourceName = routineSourceName
+        self.routineAnchorDate = routineAnchorDate
+        self.isRoutineAutoScheduled = isRoutineAutoScheduled
     }
 
     init(from decoder: Decoder) throws {
@@ -126,6 +141,11 @@ struct ClockTask: Identifiable, Hashable, Codable {
         self.categoryId = try container.decodeIfPresent(UUID.self, forKey: .categoryId)
         self.categoryName = try container.decodeIfPresent(String.self, forKey: .categoryName)
         self.repeatFrequency = try container.decodeIfPresent(RepeatFrequency.self, forKey: .repeatFrequency) ?? .never
+        self.routineSourceId = try container.decodeIfPresent(UUID.self, forKey: .routineSourceId)
+        self.routineSourceStepId = try container.decodeIfPresent(UUID.self, forKey: .routineSourceStepId)
+        self.routineSourceName = try container.decodeIfPresent(String.self, forKey: .routineSourceName)
+        self.routineAnchorDate = try container.decodeIfPresent(Date.self, forKey: .routineAnchorDate)
+        self.isRoutineAutoScheduled = try container.decodeIfPresent(Bool.self, forKey: .isRoutineAutoScheduled) ?? false
         
         if let cd = try? container.decode(ColorData.self, forKey: .color) {
             self.color = Color(red: cd.r, green: cd.g, blue: cd.b, opacity: cd.a)
