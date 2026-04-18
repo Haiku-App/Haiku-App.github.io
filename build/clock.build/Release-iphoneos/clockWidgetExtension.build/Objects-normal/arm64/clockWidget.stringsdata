@@ -1,0 +1,240 @@
+{
+  "source": "/Users/reswin/Desktop/clock/clockWidget/clockWidget.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Haiku Pro",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 194
+        }
+      },
+      {
+        "comment": "",
+        "key": "Widget is a Pro feature",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 197
+        }
+      },
+      {
+        "comment": "",
+        "key": "No tasks",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 254
+        }
+      },
+      {
+        "comment": "",
+        "key": "+%lld more",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 282
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ - %@",
+        "location": {
+          "startingColumn": 50,
+          "startingLine": 274
+        }
+      },
+      {
+        "comment": "",
+        "key": "• %@",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 376
+        }
+      },
+      {
+        "comment": "",
+        "key": "UP",
+        "location": {
+          "startingColumn": 51,
+          "startingLine": 396
+        }
+      },
+      {
+        "comment": "",
+        "key": "NOW",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 396
+        }
+      },
+      {
+        "comment": "",
+        "key": "A soft nudge before the day shifts.",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 447
+        }
+      },
+      {
+        "comment": "",
+        "key": "Living on the clock, not in a list.",
+        "location": {
+          "startingColumn": 95,
+          "startingLine": 447
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clock with Tasks",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 533
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your beautifully minimal clock with your agenda.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 534
+        }
+      },
+      {
+        "comment": "",
+        "key": "Large Aesthetic Clock",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 554
+        }
+      },
+      {
+        "comment": "",
+        "key": "A larger view of just the minimal clock face.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 555
+        }
+      },
+      {
+        "comment": "",
+        "key": "Haiku Lock Screen",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 574
+        }
+      },
+      {
+        "comment": "",
+        "key": "A calm lock screen glance for what matters next.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 575
+        }
+      },
+      {
+        "comment": "",
+        "key": "Complete To-Do Item",
+        "location": {
+          "startingColumn": 49,
+          "startingLine": 596
+        }
+      },
+      {
+        "comment": "",
+        "key": "Task ID"
+      },
+      {
+        "comment": "",
+        "key": "Completed"
+      },
+      {
+        "comment": "",
+        "key": "Task ID"
+      },
+      {
+        "comment": "",
+        "key": "Completed"
+      },
+      {
+        "comment": "",
+        "key": "Complete Routine Item",
+        "location": {
+          "startingColumn": 49,
+          "startingLine": 623
+        }
+      },
+      {
+        "comment": "",
+        "key": "Session ID"
+      },
+      {
+        "comment": "",
+        "key": "Item ID"
+      },
+      {
+        "comment": "",
+        "key": "Completed"
+      },
+      {
+        "comment": "",
+        "key": "Session ID"
+      },
+      {
+        "comment": "",
+        "key": "Item ID"
+      },
+      {
+        "comment": "",
+        "key": "Completed"
+      },
+      {
+        "comment": "",
+        "key": "Live checklists from To-Do.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 1019
+        }
+      },
+      {
+        "comment": "",
+        "key": "The checklists you are moving through right now.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 1038
+        }
+      },
+      {
+        "comment": "",
+        "key": "To-Do List",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 1166
+        }
+      },
+      {
+        "comment": "",
+        "key": "See your Brain Dump tasks at a glance.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 1167
+        }
+      },
+      {
+        "comment": "",
+        "key": "Routine Checklist",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 1187
+        }
+      },
+      {
+        "comment": "",
+        "key": "Track the routines you have started from To-Do.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 1188
+        }
+      }
+    ]
+  },
+  "version": 1
+}

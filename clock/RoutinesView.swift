@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RoutinesView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
+    @EnvironmentObject var storeManager: StoreManager
     @ObservedObject private var routineManager = RoutineManager.shared
     @Binding var selectedDate: Date
 
@@ -9,13 +10,18 @@ struct RoutinesView: View {
     var onApplyPreferredTime: (Routine) -> Void
 
     @State private var showingEditor = false
+    @State private var showingPaywall = false
     @State private var routineToEdit: Routine?
+    private let freeRoutineLimit = 2
 
     private var bgColor: Color { currentTheme.bg }
     private var fieldBgColor: Color { currentTheme.fieldBg }
     private var goldColor: Color { currentTheme.accent }
     private var shadowLight: Color { currentTheme.shadowLight }
     private var shadowDark: Color { currentTheme.shadowDark }
+    private var canCreateRoutine: Bool {
+        storeManager.isPro || routineManager.routines.count < freeRoutineLimit
+    }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -33,6 +39,12 @@ struct RoutinesView: View {
                         Text("Build reusable bundles, then start them now or drop them onto \(selectedDateLabel).")
                             .font(.system(size: 14, weight: .light))
                             .foregroundStyle(currentTheme.textForeground.opacity(0.65))
+
+                        if !storeManager.isPro {
+                            Text("Free plan: up to \(freeRoutineLimit) saved routines.")
+                                .font(.system(size: 11, weight: .medium, design: .serif))
+                                .foregroundStyle(goldColor.opacity(0.85))
+                        }
                     }
                     .padding(.horizontal, 28)
 
@@ -71,8 +83,7 @@ struct RoutinesView: View {
             }
 
             Button(action: {
-                routineToEdit = nil
-                showingEditor = true
+                presentRoutineCreator()
             }) {
                 ZStack {
                     Circle()
@@ -91,8 +102,16 @@ struct RoutinesView: View {
         }
         .sheet(isPresented: $showingEditor) {
             RoutineEditorView(routine: routineToEdit) { savedRoutine in
-                routineManager.saveRoutine(savedRoutine)
+                if routineToEdit != nil || canCreateRoutine {
+                    routineManager.saveRoutine(savedRoutine)
+                } else {
+                    showingPaywall = true
+                }
             }
+        }
+        .sheet(isPresented: $showingPaywall) {
+            HaikuProView(focusFeature: "routines")
+                .environmentObject(storeManager)
         }
     }
 
@@ -113,8 +132,7 @@ struct RoutinesView: View {
                 .multilineTextAlignment(.center)
 
             Button(action: {
-                routineToEdit = nil
-                showingEditor = true
+                presentRoutineCreator()
             }) {
                 Text("Create Routine")
                     .font(.system(size: 15, weight: .bold, design: .serif))
@@ -144,6 +162,18 @@ struct RoutinesView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
         return formatter.string(from: selectedDate)
+    }
+
+    private func presentRoutineCreator() {
+        guard canCreateRoutine else {
+            AnalyticsManager.shared.capture("pro_feature_denied", properties: ["feature": "routines"])
+            AnalyticsManager.shared.capture("upgrade_routines_clicked")
+            showingPaywall = true
+            return
+        }
+
+        routineToEdit = nil
+        showingEditor = true
     }
 }
 

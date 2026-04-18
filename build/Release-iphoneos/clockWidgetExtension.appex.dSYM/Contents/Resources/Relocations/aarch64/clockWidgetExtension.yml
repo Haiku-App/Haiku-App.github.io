@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/reswin/Desktop/clock/build/Release-iphoneos/clockWidgetExtension.appex/clockWidgetExtension'
+relocations:     []
+...

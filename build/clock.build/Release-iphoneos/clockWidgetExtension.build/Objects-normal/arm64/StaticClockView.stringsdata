@@ -1,0 +1,40 @@
+{
+  "source": "/Users/reswin/Desktop/clock/clock/StaticClockView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "AM",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 116
+        }
+      },
+      {
+        "comment": "",
+        "key": "PM",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 125
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 220
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lldm",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 233
+        }
+      }
+    ]
+  },
+  "version": 1
+}

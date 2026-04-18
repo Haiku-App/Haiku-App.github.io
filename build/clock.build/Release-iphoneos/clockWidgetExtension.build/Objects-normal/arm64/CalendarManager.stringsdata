@@ -1,0 +1,56 @@
+{
+  "source": "/Users/reswin/Desktop/clock/clock/CalendarManager.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Task ID",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 425
+        }
+      },
+      {
+        "comment": "",
+        "key": "Completed",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 425
+        }
+      },
+      {
+        "comment": "",
+        "key": "Session ID",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 425
+        }
+      },
+      {
+        "comment": "",
+        "key": "Item ID",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 425
+        }
+      },
+      {
+        "comment": "",
+        "key": "Completed",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 425
+        }
+      },
+      {
+        "comment": "",
+        "key": "Timer is running",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 425
+        }
+      }
+    ]
+  },
+  "version": 1
+}

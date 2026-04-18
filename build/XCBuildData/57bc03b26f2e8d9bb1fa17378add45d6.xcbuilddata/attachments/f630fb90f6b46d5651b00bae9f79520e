@@ -1,0 +1,66 @@
+{
+  "" : {
+    "const-values" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-primary.swiftconstvalues",
+    "dependencies" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-primary.d",
+    "diagnostics" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-primary.dia",
+    "emit-module-dependencies" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-primary-emit-module.dia",
+    "pch" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-primary.swiftdeps"
+  },
+  "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.o"
+  },
+  "/Users/reswin/Desktop/clock/clock/CalendarManager.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/CalendarManager.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/CalendarManager.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/CalendarManager.o"
+  },
+  "/Users/reswin/Desktop/clock/clock/ClockDrawing.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/ClockDrawing.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/ClockDrawing.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/ClockDrawing.o"
+  },
+  "/Users/reswin/Desktop/clock/clock/ClockModels.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/ClockModels.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/ClockModels.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/ClockModels.o"
+  },
+  "/Users/reswin/Desktop/clock/clock/ClockTask.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/ClockTask.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/ClockTask.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/ClockTask.o"
+  },
+  "/Users/reswin/Desktop/clock/clock/HaikuLiveActivityAttributes.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/HaikuLiveActivityAttributes.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/HaikuLiveActivityAttributes.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/HaikuLiveActivityAttributes.o"
+  },
+  "/Users/reswin/Desktop/clock/clock/StaticClockView.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/StaticClockView.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/StaticClockView.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/StaticClockView.o"
+  },
+  "/Users/reswin/Desktop/clock/clockWidget/clockWidget.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidget.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidget.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidget.o"
+  },
+  "/Users/reswin/Desktop/clock/clockWidget/clockWidgetBundle.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetBundle.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetBundle.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetBundle.o"
+  },
+  "/Users/reswin/Desktop/clock/clockWidget/clockWidgetControl.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetControl.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetControl.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetControl.o"
+  },
+  "/Users/reswin/Desktop/clock/clockWidget/clockWidgetLiveActivity.swift" : {
+    "index-unit-output-path" : "/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetLiveActivity.o",
+    "llvm-bc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetLiveActivity.bc",
+    "object" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetLiveActivity.o"
+  }
+}

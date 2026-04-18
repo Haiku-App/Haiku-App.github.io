@@ -1,0 +1,32 @@
+{
+  "source": "/Users/reswin/Desktop/clock/clock/ClockDrawing.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "AM",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 192
+        }
+      },
+      {
+        "comment": "",
+        "key": "PM",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 202
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 269
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -48,28 +48,11 @@ struct TodoView: View {
     }
 
     var filteredTasks: [BrainDumpTask] {
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-
         switch selectedFilter {
         case .active:
-            return brainDumpManager.tasks.filter { task in
-                if task.isCompleted {
-                    guard let completedDate = task.completedDate else { return false }
-                    return cal.isDateInToday(completedDate)
-                } else {
-                    // Hide tasks scheduled for the future
-                    if let date = task.scheduledDate ?? task.reminderDueDate {
-                        return cal.startOfDay(for: date) <= today
-                    }
-                    return true
-                }
-            }
+            return brainDumpInboxTasks(from: brainDumpManager.tasks)
         case .completed:
-            return brainDumpManager.tasks.filter { task in
-                guard task.isCompleted, let completedDate = task.completedDate else { return false }
-                return !cal.isDateInToday(completedDate)
-            }
+            return brainDumpCompletedArchiveTasks(from: brainDumpManager.tasks)
         case .routine:
             return []
         }
@@ -393,6 +376,7 @@ struct TodoView: View {
             Text("Are you sure you want to clear your done list? This action cannot be undone.")
         }
         .onAppear {
+            brainDumpManager.reloadFromSharedStoreIfNeeded()
             syncAppleRemindersIfNeeded()
         }
         .onChange(of: reminderManager.eventsDidChange) { _, _ in
@@ -400,6 +384,7 @@ struct TodoView: View {
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
+            brainDumpManager.reloadFromSharedStoreIfNeeded()
             syncAppleRemindersIfNeeded()
         }
         .onChange(of: isAppleRemindersSyncEnabled) { _, newValue in

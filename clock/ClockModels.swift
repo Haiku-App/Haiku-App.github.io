@@ -1,6 +1,9 @@
 import SwiftUI
 internal import Combine
 import CloudKit
+import WidgetKit
+import Foundation
+import AppIntents
 
 enum AppSupportDefaults {
     static let userDefaults = UserDefaults(suiteName: "group.reswink.haiku") ?? UserDefaults.standard
@@ -10,6 +13,12 @@ enum AppSupportDefaults {
     static let brainDumpTasksLastModifiedKey = "brainDumpTasksLastModified"
     static let routinesKey = "savedRoutines"
     static let routinesLastModifiedKey = "savedRoutinesLastModified"
+    static let activeRoutineSessionsKey = "activeRoutineSessions"
+}
+
+enum AppSupportNotifications {
+    static let brainDumpTasksDidChange = "group.reswink.haiku.brainDumpTasksDidChange"
+    static let activeRoutineSessionsDidChange = "group.reswink.haiku.activeRoutineSessionsDidChange"
 }
 
 struct RGB: Codable, Equatable {
@@ -88,6 +97,15 @@ enum AppSupportPersistence {
         return decoded
     }
 
+    static func loadActiveRoutineSessions() -> [RoutineSession] {
+        guard let data = AppSupportDefaults.userDefaults.data(forKey: AppSupportDefaults.activeRoutineSessionsKey),
+              let decoded = try? JSONDecoder().decode([RoutineSession].self, from: data) else {
+            return []
+        }
+
+        return decoded.sorted { $0.createdAt < $1.createdAt }
+    }
+
     static func saveCategories(_ categories: [Category], modifiedAt: Date = Date()) {
         guard let data = try? JSONEncoder().encode(categories) else { return }
         AppSupportDefaults.userDefaults.set(data, forKey: AppSupportDefaults.categoriesKey)
@@ -98,12 +116,40 @@ enum AppSupportPersistence {
         guard let data = try? JSONEncoder().encode(tasks) else { return }
         AppSupportDefaults.userDefaults.set(data, forKey: AppSupportDefaults.brainDumpTasksKey)
         AppSupportDefaults.userDefaults.set(modifiedAt, forKey: AppSupportDefaults.brainDumpTasksLastModifiedKey)
+        WidgetCenter.shared.reloadAllTimelines()
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(AppSupportNotifications.brainDumpTasksDidChange as CFString),
+            nil,
+            nil,
+            true
+        )
     }
 
     static func saveRoutines(_ routines: [Routine], modifiedAt: Date = Date()) {
         guard let data = try? JSONEncoder().encode(routines) else { return }
         AppSupportDefaults.userDefaults.set(data, forKey: AppSupportDefaults.routinesKey)
         AppSupportDefaults.userDefaults.set(modifiedAt, forKey: AppSupportDefaults.routinesLastModifiedKey)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    static func saveActiveRoutineSessions(_ sessions: [RoutineSession]) {
+        let sortedSessions = sessions.sorted { $0.createdAt < $1.createdAt }
+
+        if let data = try? JSONEncoder().encode(sortedSessions) {
+            AppSupportDefaults.userDefaults.set(data, forKey: AppSupportDefaults.activeRoutineSessionsKey)
+        } else {
+            AppSupportDefaults.userDefaults.removeObject(forKey: AppSupportDefaults.activeRoutineSessionsKey)
+        }
+
+        WidgetCenter.shared.reloadAllTimelines()
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(AppSupportNotifications.activeRoutineSessionsDidChange as CFString),
+            nil,
+            nil,
+            true
+        )
     }
 
     static func loadCategoriesLastModifiedAt() -> Date? {
@@ -116,6 +162,60 @@ enum AppSupportPersistence {
 
     static func loadRoutinesLastModifiedAt() -> Date? {
         AppSupportDefaults.userDefaults.object(forKey: AppSupportDefaults.routinesLastModifiedKey) as? Date
+    }
+
+    static func toggleBrainDumpTaskCompletion(id: UUID) {
+        var tasks = loadBrainDumpTasks()
+        guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
+
+        tasks[index].isCompleted.toggle()
+        tasks[index].completedDate = tasks[index].isCompleted ? Date() : nil
+
+        saveBrainDumpTasks(sortedBrainDumpTasks(tasks))
+    }
+
+    static func setBrainDumpTaskCompletion(id: UUID, isCompleted: Bool) {
+        var tasks = loadBrainDumpTasks()
+        guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
+        guard tasks[index].isCompleted != isCompleted else { return }
+
+        tasks[index].isCompleted = isCompleted
+        tasks[index].completedDate = isCompleted ? Date() : nil
+
+        saveBrainDumpTasks(sortedBrainDumpTasks(tasks))
+    }
+
+    static func toggleRoutineSessionItem(sessionId: UUID, itemId: UUID) {
+        var sessions = loadActiveRoutineSessions()
+        guard let sessionIndex = sessions.firstIndex(where: { $0.id == sessionId }),
+              let itemIndex = sessions[sessionIndex].items.firstIndex(where: { $0.id == itemId }) else {
+            return
+        }
+
+        sessions[sessionIndex].items[itemIndex].isCompleted.toggle()
+
+        if !sessions[sessionIndex].items.isEmpty && sessions[sessionIndex].items.allSatisfy(\.isCompleted) {
+            sessions.removeAll { $0.id == sessionId }
+        }
+
+        saveActiveRoutineSessions(sessions)
+    }
+
+    static func setRoutineSessionItemCompletion(sessionId: UUID, itemId: UUID, isCompleted: Bool) {
+        var sessions = loadActiveRoutineSessions()
+        guard let sessionIndex = sessions.firstIndex(where: { $0.id == sessionId }),
+              let itemIndex = sessions[sessionIndex].items.firstIndex(where: { $0.id == itemId }) else {
+            return
+        }
+        guard sessions[sessionIndex].items[itemIndex].isCompleted != isCompleted else { return }
+
+        sessions[sessionIndex].items[itemIndex].isCompleted = isCompleted
+
+        if !sessions[sessionIndex].items.isEmpty && sessions[sessionIndex].items.allSatisfy(\.isCompleted) {
+            sessions.removeAll { $0.id == sessionId }
+        }
+
+        saveActiveRoutineSessions(sessions)
     }
 }
 
@@ -691,30 +791,116 @@ private func sortedBrainDumpTasks(_ tasks: [BrainDumpTask]) -> [BrainDumpTask] {
     tasks.sorted(by: brainDumpTaskComesBefore)
 }
 
+func brainDumpInboxTasks(from tasks: [BrainDumpTask], now: Date = Date()) -> [BrainDumpTask] {
+    let calendar = Calendar.current
+    let today = calendar.startOfDay(for: now)
+
+    return tasks.filter { task in
+        if task.isCompleted {
+            guard let completedDate = task.completedDate else { return false }
+            return calendar.isDateInToday(completedDate)
+        }
+
+        if let date = task.scheduledDate ?? task.reminderDueDate {
+            return calendar.startOfDay(for: date) <= today
+        }
+
+        return true
+    }
+}
+
+func brainDumpCompletedArchiveTasks(from tasks: [BrainDumpTask], now: Date = Date()) -> [BrainDumpTask] {
+    let calendar = Calendar.current
+
+    return tasks.filter { task in
+        guard task.isCompleted, let completedDate = task.completedDate else { return false }
+        return !calendar.isDateInToday(completedDate)
+    }
+}
+
+struct ToggleBrainDumpTaskIntent: AppIntent {
+    static let title: LocalizedStringResource = "Toggle To-Do Item"
+
+    @Parameter(title: "Task ID")
+    var taskID: String
+
+    init() {}
+
+    init(taskID: String) {
+        self.taskID = taskID
+    }
+
+    func perform() async throws -> some IntentResult {
+        guard let uuid = UUID(uuidString: taskID) else {
+            return .result()
+        }
+
+        AppSupportPersistence.toggleBrainDumpTaskCompletion(id: uuid)
+        return .result()
+    }
+}
+
+struct ToggleRoutineSessionItemIntent: AppIntent {
+    static let title: LocalizedStringResource = "Toggle Routine Item"
+
+    @Parameter(title: "Session ID")
+    var sessionID: String
+
+    @Parameter(title: "Item ID")
+    var itemID: String
+
+    init() {}
+
+    init(sessionID: String, itemID: String) {
+        self.sessionID = sessionID
+        self.itemID = itemID
+    }
+
+    func perform() async throws -> some IntentResult {
+        guard let sessionUUID = UUID(uuidString: sessionID),
+              let itemUUID = UUID(uuidString: itemID) else {
+            return .result()
+        }
+
+        AppSupportPersistence.toggleRoutineSessionItem(sessionId: sessionUUID, itemId: itemUUID)
+        return .result()
+    }
+}
+
 @MainActor
 class BrainDumpManager: ObservableObject {
     static let shared = BrainDumpManager()
 
     @Published var tasks: [BrainDumpTask] = [] {
         didSet {
-            guard !isApplyingRemoteSnapshot else { return }
+            guard !isApplyingRemoteSnapshot, !isSynchronizingSharedState else { return }
             persistAndSync()
         }
     }
 
     @Published var activeRoutineSessions: [RoutineSession] = [] {
         didSet {
+            guard !isSynchronizingSharedState else { return }
             persistActiveRoutineSessions()
         }
     }
 
     private var isApplyingRemoteSnapshot = false
+    private var isSynchronizingSharedState = false
 
     init() {
         self.tasks = AppSupportPersistence.loadBrainDumpTasks()
         loadActiveRoutineSessions()
         sortTasks()
+        startObservingSharedStore()
         startInitialSyncIfNeeded()
+    }
+
+    deinit {
+        CFNotificationCenterRemoveEveryObserver(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            Unmanaged.passUnretained(self).toOpaque()
+        )
     }
 
     var hasActiveRoutineSessions: Bool {
@@ -782,17 +968,13 @@ class BrainDumpManager: ObservableObject {
     }
 
     private func persistActiveRoutineSessions() {
-        if let data = try? JSONEncoder().encode(activeRoutineSessions) {
-            AppSupportDefaults.userDefaults.set(data, forKey: "activeRoutineSessions")
-        } else {
-            AppSupportDefaults.userDefaults.removeObject(forKey: "activeRoutineSessions")
-        }
+        AppSupportPersistence.saveActiveRoutineSessions(activeRoutineSessions)
     }
 
     private func loadActiveRoutineSessions() {
-        if let data = AppSupportDefaults.userDefaults.data(forKey: "activeRoutineSessions"),
-           let decoded = try? JSONDecoder().decode([RoutineSession].self, from: data) {
-            activeRoutineSessions = decoded.sorted { $0.createdAt < $1.createdAt }
+        let savedSessions = AppSupportPersistence.loadActiveRoutineSessions()
+        if !savedSessions.isEmpty {
+            activeRoutineSessions = savedSessions
             return
         }
 
@@ -819,6 +1001,22 @@ class BrainDumpManager: ObservableObject {
 
         AppSupportDefaults.userDefaults.removeObject(forKey: "activeRoutineName")
         AppSupportDefaults.userDefaults.removeObject(forKey: "activeRoutineTasks")
+    }
+
+    func reloadFromSharedStoreIfNeeded() {
+        let sharedTasks = AppSupportPersistence.loadBrainDumpTasks()
+        let sharedSessions = AppSupportPersistence.loadActiveRoutineSessions()
+
+        guard sharedTasks != tasks || sharedSessions != activeRoutineSessions else { return }
+
+        isSynchronizingSharedState = true
+        if sharedTasks != tasks {
+            tasks = sharedTasks
+        }
+        if sharedSessions != activeRoutineSessions {
+            activeRoutineSessions = sharedSessions
+        }
+        isSynchronizingSharedState = false
     }
 
     func sortTasks() {
@@ -963,6 +1161,35 @@ class BrainDumpManager: ObservableObject {
                 RoutineManager.shared.applyCloudRoutines(snapshot.routines, modifiedAt: snapshot.modifiedAt)
             }
         }
+    }
+
+    private func startObservingSharedStore() {
+        let observer = Unmanaged.passUnretained(self).toOpaque()
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        let callback: CFNotificationCallback = { _, observer, _, _, _ in
+            guard let observer else { return }
+            let manager = Unmanaged<BrainDumpManager>.fromOpaque(observer).takeUnretainedValue()
+            Task { @MainActor in
+                manager.reloadFromSharedStoreIfNeeded()
+            }
+        }
+
+        CFNotificationCenterAddObserver(
+            center,
+            observer,
+            callback,
+            AppSupportNotifications.brainDumpTasksDidChange as CFString,
+            nil,
+            .deliverImmediately
+        )
+        CFNotificationCenterAddObserver(
+            center,
+            observer,
+            callback,
+            AppSupportNotifications.activeRoutineSessionsDidChange as CFString,
+            nil,
+            .deliverImmediately
+        )
     }
 }
 

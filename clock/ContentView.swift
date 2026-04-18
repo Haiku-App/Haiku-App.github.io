@@ -256,6 +256,7 @@ struct ContentView: View {
 
     private func handleOnAppear() {
         migrateLegacyCalendarSyncProviderIfNeeded()
+        BrainDumpManager.shared.reloadFromSharedStoreIfNeeded()
         if hasCompletedOnboarding && !hasSeenTutorial {
             withAnimation(.easeInOut(duration: 0.4)) {
                 showingTutorial = true
@@ -322,6 +323,7 @@ struct ContentView: View {
 
     private func handleScenePhaseChange(oldPhase: ScenePhase, newPhase: ScenePhase) {
         if newPhase == .active {
+            BrainDumpManager.shared.reloadFromSharedStoreIfNeeded()
             reconcileAutoScheduledRoutines()
             refreshVisibleCalendar(force: true)
             Task {

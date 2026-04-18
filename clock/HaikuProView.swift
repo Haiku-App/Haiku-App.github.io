@@ -9,13 +9,10 @@ struct HaikuProView: View {
     @State private var isPurchasing = false
     @State private var showingCustomerCenter = false
     @State private var appearanceAnimate = false
-    @State private var selectedPlan: PlanType = .annual
     @State private var showDismissButton = false
 
-    /// Pass to highlight the feature that triggered this paywall (e.g. "analytics", "calendar", "notifications", "widgets")
+    /// Pass to highlight the feature that triggered this paywall (e.g. "analytics", "calendar", "notifications", "routines")
     var focusFeature: String? = nil
-
-    enum PlanType { case monthly, annual }
 
     var body: some View {
         ZStack {
@@ -53,10 +50,14 @@ struct HaikuProView: View {
                             .foregroundStyle(currentTheme.accent)
                             .tracking(8)
 
-                        Text("The focus layer your calendar is missing.")
+                        Text("Unlock everything in Haiku Pro.")
                             .font(.system(size: 14, weight: .light, design: .serif))
                             .foregroundStyle(currentTheme.textForeground.opacity(0.7))
                             .multilineTextAlignment(.center)
+
+                        Text("Pay once. Keep it for life.")
+                            .font(.system(size: 12, weight: .medium, design: .serif))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.45))
                     }
                     .padding(.top, 52)
                     .opacity(appearanceAnimate ? 1 : 0)
@@ -69,7 +70,7 @@ struct HaikuProView: View {
                                 .font(.system(size: 10))
                                 .foregroundStyle(currentTheme.accent)
                         }
-                        Text("Loved by intentional planners")
+                        Text("Future Pro updates included.")
                             .font(.system(size: 12, design: .serif))
                             .foregroundStyle(currentTheme.textForeground.opacity(0.45))
                     }
@@ -79,32 +80,39 @@ struct HaikuProView: View {
                     // MARK: Features
                     VStack(alignment: .leading, spacing: 14) {
                         ProFeatureRow(
-                            icon: "chart.bar.fill",
-                            title: "Power Hours Analytics",
-                            description: "See exactly where your hours go.",
-                            highlight: focusFeature == "analytics",
+                            icon: "rectangle.stack.badge.plus",
+                            title: "Unlimited Routines",
+                            description: "Free includes 2 saved routines. Pro removes the cap.",
+                            highlight: focusFeature == "routines",
                             delay: 0.1, animate: appearanceAnimate
                         )
                         ProFeatureRow(
                             icon: "bell.badge.fill",
                             title: "Custom Notifications",
-                            description: "Never miss a task start time.",
+                            description: "Get flexible reminders before your day drifts.",
                             highlight: focusFeature == "notifications",
                             delay: 0.2, animate: appearanceAnimate
                         )
                         ProFeatureRow(
                             icon: "calendar.badge.plus",
-                            title: "2-Way Calendar Sync",
-                            description: "Your calendar and tasks, always aligned.",
+                            title: "Apple + Google Calendar Sync",
+                            description: "Keep your clock aligned with the calendar you already use.",
                             highlight: focusFeature == "calendar",
                             delay: 0.3, animate: appearanceAnimate
                         )
                         ProFeatureRow(
-                            icon: "square.grid.2x2.fill",
-                            title: "Aesthetic Widgets",
-                            description: "Your day at a glance, without opening the app.",
-                            highlight: focusFeature == "widgets",
+                            icon: "checklist",
+                            title: "Apple Reminders Sync",
+                            description: "Turn brain-dump tasks into reminders without leaving Haiku.",
+                            highlight: false,
                             delay: 0.4, animate: appearanceAnimate
+                        )
+                        ProFeatureRow(
+                            icon: "chart.pie.fill",
+                            title: "Insights",
+                            description: "Unlock analytics like peak focus windows and momentum trends.",
+                            highlight: focusFeature == "analytics",
+                            delay: 0.5, animate: appearanceAnimate
                         )
                     }
                     .padding(.horizontal, 36)
@@ -196,33 +204,20 @@ struct HaikuProView: View {
         }
     }
 
-    // MARK: - Plan selector
+    // MARK: - Paywall card
 
     @ViewBuilder
     private func planSelector(offering: Offering) -> some View {
         VStack(spacing: 12) {
-            if let annual = offering.annual {
-                PlanOptionRow(
-                    title: "Annual",
-                    price: annual.localizedPriceString + "/yr",
-                    perMonth: monthlyEquivalent(for: annual),
-                    badge: "BEST VALUE · SAVE 58%",
-                    trialLabel: trialLabel(for: annual),
-                    isSelected: selectedPlan == .annual,
+            if let package = primaryPackage(from: offering) {
+                LifetimeOfferCard(
+                    title: package.packageType == .lifetime ? "Lifetime Access" : fallbackTitle(for: package),
+                    price: package.localizedPriceString,
+                    eyebrow: package.packageType == .lifetime ? "ONE-TIME PURCHASE" : "CURRENT APP STORE OFFER",
+                    subtitle: package.packageType == .lifetime ? "Everything in Haiku Pro, unlocked forever." : fallbackSubtitle(for: package),
+                    footnote: package.packageType == .lifetime ? "Future Pro updates included." : fallbackFootnote(for: package),
                     theme: currentTheme
-                ) { selectedPlan = .annual }
-            }
-
-            if let monthly = offering.monthly {
-                PlanOptionRow(
-                    title: "Monthly",
-                    price: monthly.localizedPriceString + "/mo",
-                    perMonth: nil,
-                    badge: nil,
-                    trialLabel: trialLabel(for: monthly),
-                    isSelected: selectedPlan == .monthly,
-                    theme: currentTheme
-                ) { selectedPlan = .monthly }
+                )
             }
 
             // Primary CTA
@@ -249,21 +244,21 @@ struct HaikuProView: View {
     }
 
     private func ctaTitle(offering: Offering) -> String {
-        let pkg = selectedPlan == .annual ? offering.annual : offering.monthly
-        let hasTrial = pkg.flatMap { trialLabel(for: $0) } != nil
-        switch selectedPlan {
-        case .annual: return hasTrial ? "Start Free Trial" : "Start Annual Plan"
-        case .monthly: return hasTrial ? "Start Free Trial" : "Start Monthly Plan"
+        guard let package = primaryPackage(from: offering) else { return "Unlock Pro" }
+        if package.packageType == .lifetime {
+            return "Unlock Pro for \(package.localizedPriceString)"
         }
+        let hasTrial = trialLabel(for: package) != nil
+        return hasTrial ? "Start Free Trial" : "Unlock Pro"
     }
 
     private func ctaSubtitle(offering: Offering) -> String? {
-        let pkg = selectedPlan == .annual ? offering.annual : offering.monthly
-        guard let pkg else { return "Cancel anytime." }
-        if let trial = trialLabel(for: pkg) {
-            let price = pkg.localizedPriceString
-            let period = selectedPlan == .annual ? "/yr" : "/mo"
-            return "\(trial) free, then \(price)\(period). Cancel anytime."
+        guard let package = primaryPackage(from: offering) else { return nil }
+        if package.packageType == .lifetime {
+            return "No subscription."
+        }
+        if let trial = trialLabel(for: package) {
+            return "\(trial) free, then \(package.localizedPriceString)\(periodSuffix(for: package)). Cancel anytime."
         }
         return "Cancel anytime."
     }
@@ -280,19 +275,15 @@ struct HaikuProView: View {
         }
     }
 
-    private func monthlyEquivalent(for package: Package) -> String? {
-        guard package.packageType == .annual else { return nil }
-        let monthly = package.storeProduct.price / 12
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = package.storeProduct.currencyCode ?? "USD"
-        formatter.maximumFractionDigits = 2
-        guard let formatted = formatter.string(from: monthly as NSDecimalNumber) else { return nil }
-        return "\(formatted)/mo"
+    private func primaryPackage(from offering: Offering) -> Package? {
+        if let lifetime = offering.availablePackages.first(where: { $0.packageType == .lifetime }) {
+            return lifetime
+        }
+        return offering.annual ?? offering.monthly ?? offering.availablePackages.first
     }
 
     private func purchaseSelected(offering: Offering) {
-        let pkg: Package? = selectedPlan == .annual ? offering.annual : offering.monthly
+        let pkg = primaryPackage(from: offering)
         guard let pkg else { return }
         buyPro(pkg)
     }
@@ -301,7 +292,7 @@ struct HaikuProView: View {
         AnalyticsManager.shared.capture("purchase_initiated", properties: [
             "package_identifier": package.identifier,
             "price": package.localizedPriceString,
-            "plan_type": selectedPlan == .annual ? "annual" : "monthly",
+            "plan_type": packageTypeLabel(for: package),
         ])
         isPurchasing = true
         Task {
@@ -311,6 +302,57 @@ struct HaikuProView: View {
                 AnalyticsManager.shared.capture("purchase_failed", properties: ["error": error.localizedDescription])
             }
             isPurchasing = false
+        }
+    }
+
+    private func periodSuffix(for package: Package) -> String {
+        switch package.packageType {
+        case .annual:
+            return "/yr"
+        case .monthly:
+            return "/mo"
+        default:
+            return ""
+        }
+    }
+
+    private func packageTypeLabel(for package: Package) -> String {
+        switch package.packageType {
+        case .lifetime:
+            return "lifetime"
+        case .annual:
+            return "annual"
+        case .monthly:
+            return "monthly"
+        default:
+            return package.identifier
+        }
+    }
+
+    private func fallbackTitle(for package: Package) -> String {
+        switch package.packageType {
+        case .annual:
+            return "Annual Access"
+        case .monthly:
+            return "Monthly Access"
+        default:
+            return "Haiku Pro"
+        }
+    }
+
+    private func fallbackSubtitle(for package: Package) -> String {
+        if let trial = trialLabel(for: package) {
+            return "\(trial) free, then \(package.localizedPriceString)\(periodSuffix(for: package))."
+        }
+        return "Unlock all Haiku Pro features."
+    }
+
+    private func fallbackFootnote(for package: Package) -> String {
+        switch package.packageType {
+        case .annual, .monthly:
+            return "Subscription manages through your Apple ID. Cancel anytime."
+        default:
+            return "Future Pro updates included."
         }
     }
 
@@ -356,7 +398,7 @@ struct HaikuProView: View {
             Text(storeManager.allowsTesterUnlocks ? "Tester build detected." : "Purchases unavailable in this build.")
                 .font(.system(size: 13, weight: .semibold, design: .serif))
                 .foregroundStyle(currentTheme.textForeground)
-            Text(storeManager.allowsTesterUnlocks ? "Testing controls appear only in sandbox/testing mode." : "Add a RevenueCat API key to enable subscriptions.")
+            Text(storeManager.allowsTesterUnlocks ? "Testing controls appear only in sandbox/testing mode." : "Add a RevenueCat API key to enable purchases.")
                 .font(.system(size: 11, weight: .regular, design: .serif))
                 .foregroundStyle(currentTheme.textForeground.opacity(0.6))
                 .multilineTextAlignment(.center)
@@ -407,80 +449,65 @@ struct HaikuProView: View {
     }
 }
 
-// MARK: - Plan option row
+// MARK: - Offer card
 
-struct PlanOptionRow: View {
+struct LifetimeOfferCard: View {
     let title: String
     let price: String
-    let perMonth: String?
-    let badge: String?
-    let trialLabel: String?
-    let isSelected: Bool
+    let eyebrow: String
+    let subtitle: String
+    let footnote: String
     let theme: AppTheme
-    let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .stroke(isSelected ? theme.accent : theme.textForeground.opacity(0.2), lineWidth: 2)
-                        .frame(width: 20, height: 20)
-                    if isSelected {
-                        Circle()
-                            .fill(theme.accent)
-                            .frame(width: 10, height: 10)
-                    }
-                }
+        VStack(alignment: .leading, spacing: 14) {
+            Text(eyebrow)
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .foregroundStyle(theme.bg)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(theme.accent)
+                .clipShape(Capsule())
 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 8) {
-                        Text(title)
-                            .font(.system(size: 15, weight: .semibold, design: .serif))
-                            .foregroundStyle(theme.textForeground)
-                        if let badge {
-                            Text(badge)
-                                .font(.system(size: 8, weight: .black))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(theme.accent)
-                                .foregroundStyle(theme.bg)
-                                .clipShape(Capsule())
-                        }
-                    }
-                    if let trialLabel {
-                        Text("\(trialLabel) free trial included")
-                            .font(.system(size: 11, design: .serif))
-                            .foregroundStyle(theme.accent.opacity(0.8))
-                    }
+            HStack(alignment: .lastTextBaseline) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 20, weight: .bold, design: .serif))
+                        .foregroundStyle(theme.textForeground)
+
+                    Text(subtitle)
+                        .font(.system(size: 13, weight: .light, design: .serif))
+                        .foregroundStyle(theme.textForeground.opacity(0.65))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 2) {
+                VStack(alignment: .trailing, spacing: 4) {
                     Text(price)
-                        .font(.system(size: 15, weight: .bold, design: .serif))
-                        .foregroundStyle(isSelected ? theme.accent : theme.textForeground)
-                    if let perMonth {
-                        Text(perMonth)
-                            .font(.system(size: 11, design: .serif))
-                            .foregroundStyle(theme.textForeground.opacity(0.45))
-                    }
+                        .font(.system(size: 28, weight: .bold, design: .serif))
+                        .foregroundStyle(theme.accent)
+                    Text("lifetime")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(theme.textForeground.opacity(0.45))
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(theme.fieldBg)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(isSelected ? theme.accent.opacity(0.5) : Color.clear, lineWidth: 1.5)
-                    )
-            )
+
+            Text(footnote)
+                .font(.system(size: 11, design: .serif))
+                .foregroundStyle(theme.textForeground.opacity(0.45))
         }
-        .buttonStyle(.plain)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(theme.fieldBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(theme.accent.opacity(0.35), lineWidth: 1.5)
+                )
+        )
     }
 }
 

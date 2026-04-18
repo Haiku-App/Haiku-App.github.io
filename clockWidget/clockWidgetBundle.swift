@@ -13,6 +13,7 @@ struct clockWidgetBundle: WidgetBundle {
     var body: some Widget {
         clockWidget()
         largeClockWidget()
+        brainDumpWidget()
         clockWidgetControl()
     }
 }

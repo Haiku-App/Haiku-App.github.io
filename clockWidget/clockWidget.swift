@@ -1,6 +1,7 @@
 import WidgetKit
 import SwiftUI
 import EventKit
+import AppIntents
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
@@ -23,6 +24,11 @@ struct Provider: TimelineProvider {
         // However, we will generate the next 60 minutes, updated every minute exactly on the minute mark.
         
         let currentDate = Date()
+        for secondOffset in 0 ... 3 {
+            let entryDate = Calendar.current.date(byAdding: .second, value: secondOffset, to: currentDate) ?? currentDate
+            entries.append(SimpleEntry(date: entryDate))
+        }
+
         let startOfNextMinute = Calendar.current.date(bySetting: .second, value: 0, of: Calendar.current.date(byAdding: .minute, value: 1, to: currentDate)!) ?? currentDate
         
         for minuteOffset in 0 ..< 60 {
@@ -230,7 +236,15 @@ struct clockWidgetEntryView : View {
             } else {
                 // Medium/Large with Legend
                 GeometryReader { geo in
-                    HStack(spacing: 20) {
+                    let legendLimit = family == .systemMedium ? 4 : 5
+                    let legendSpacing: CGFloat = family == .systemMedium ? 9 : 11
+                    let clockWidthRatio = family == .systemMedium ? 0.5 : 0.55
+                    let legendWidth = geo.size.width * (1 - clockWidthRatio) - 16
+                    let contentAlignment: Alignment = family == .systemMedium ? .top : .center
+                    let clockHeight = family == .systemMedium ? geo.size.height - 18 : geo.size.height
+                    let effectiveLegendLimit = family == .systemMedium ? 3 : legendLimit
+
+                    HStack(spacing: 16) {
                         // The clock on the left - takes up ~55% of the space
                         StaticClockView(
                             now: entry.date,
@@ -241,7 +255,8 @@ struct clockWidgetEntryView : View {
                             showText: true,
                             showCenterText: false
                         )
-                        .frame(width: geo.size.width * 0.55)
+                        .frame(width: geo.size.width * clockWidthRatio)
+                        .frame(height: clockHeight, alignment: .top)
                         
                         // The legend on the right
                         if tasks.isEmpty {
@@ -254,10 +269,11 @@ struct clockWidgetEntryView : View {
                                     .font(.system(size: 12, weight: .light))
                                     .foregroundStyle(theme.textForeground.opacity(0.5))
                             }
-                            .frame(width: geo.size.width * 0.45 - 20, alignment: .center)
+                            .frame(width: legendWidth, alignment: .center)
+                            .frame(maxHeight: .infinity, alignment: contentAlignment)
                         } else {
-                            VStack(alignment: .leading, spacing: 12) {
-                                ForEach(tasks.prefix(6)) { task in
+                            VStack(alignment: .leading, spacing: legendSpacing) {
+                                ForEach(tasks.prefix(effectiveLegendLimit)) { task in
                                     HStack(spacing: 8) {
                                         Circle()
                                             .fill(task.color)
@@ -273,21 +289,23 @@ struct clockWidgetEntryView : View {
                                             Text("\(formatTime(minutes: task.startMinutes)) - \(formatTime(minutes: task.endMinutes))")
                                                 .font(.system(size: 10, weight: .regular))
                                                 .foregroundStyle(theme.textForeground.opacity(0.6))
+                                                .lineLimit(1)
                                         }
                                     }
                                 }
                                 
-                                if tasks.count > 6 {
-                                    Text("+\(tasks.count - 6) more")
+                                if tasks.count > effectiveLegendLimit {
+                                    Text("+\(tasks.count - effectiveLegendLimit) more")
                                         .font(.system(size: 10, weight: .medium, design: .serif))
                                         .foregroundStyle(theme.accent)
                                         .padding(.top, 2)
                                 }
                             }
-                            .frame(width: geo.size.width * 0.45 - 20, alignment: .leading)
+                            .frame(width: legendWidth, alignment: .leading)
+                            .frame(maxHeight: .infinity, alignment: contentAlignment)
                         }
                     }
-                    .frame(maxHeight: .infinity, alignment: .center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: contentAlignment)
                 }
                 .padding(16)
             }
@@ -573,5 +591,468 @@ struct lockscreenClockWidget: Widget {
         .configurationDisplayName("Haiku Lock Screen")
         .description("A calm lock screen glance for what matters next.")
         .supportedFamilies([.accessoryInline, .accessoryCircular, .accessoryRectangular])
+    }
+}
+
+private struct WidgetSupportDataLoader {
+    func brainDumpTasks() -> [BrainDumpTask] {
+        AppSupportPersistence.loadBrainDumpTasks()
+    }
+
+    func activeRoutineSessions() -> [RoutineSession] {
+        AppSupportPersistence.loadActiveRoutineSessions().sorted { lhs, rhs in
+            if lhs.progress != rhs.progress {
+                return lhs.progress < rhs.progress
+            }
+            return lhs.createdAt < rhs.createdAt
+        }
+    }
+}
+
+private struct WidgetLockedStateView: View {
+    let theme: AppTheme
+    let title: String
+    let message: String
+    let icon: String
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "crown.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(theme.accent)
+
+            Text(title)
+                .font(.system(size: 14, weight: .bold, design: .serif))
+                .foregroundStyle(theme.textForeground)
+
+            Label(message, systemImage: icon)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(theme.textForeground.opacity(0.68))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+}
+
+private struct WidgetEmptyStateView: View {
+    let theme: AppTheme
+    let title: String
+    let message: String
+    let icon: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(theme.accent.opacity(0.82))
+
+            Text(title)
+                .font(.system(size: 14, weight: .semibold, design: .serif))
+                .foregroundStyle(theme.textForeground)
+
+            Text(message)
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(theme.textForeground.opacity(0.62))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+}
+
+private struct ToDoWidgetEntryView: View {
+    @Environment(\.widgetFamily) private var family
+    var entry: Provider.Entry
+
+    private let dataLoader = WidgetSupportDataLoader()
+
+    private var theme: AppTheme {
+        SharedTaskManager.shared.loadTheme()
+    }
+
+    private var remindersAccent: Color {
+        theme.accent
+    }
+
+    private var remindersPrimaryText: Color {
+        theme.textForeground
+    }
+
+    private var remindersSecondaryText: Color {
+        theme.textForeground.opacity(0.58)
+    }
+
+    private var remindersSeparator: Color {
+        theme.textForeground.opacity(0.12)
+    }
+
+    private var isPro: Bool {
+        SharedTaskManager.shared.loadIsPro()
+    }
+
+    private var inboxTasks: [BrainDumpTask] {
+        brainDumpInboxTasks(from: dataLoader.brainDumpTasks(), now: entry.date)
+    }
+
+    private var visibleInboxTasks: [BrainDumpTask] {
+        inboxTasks.filter { task in
+            guard task.isCompleted else { return true }
+            guard let completedDate = task.completedDate else { return false }
+            return entry.date.timeIntervalSince(completedDate) < 1.0
+        }
+    }
+
+    private var remainingCount: Int {
+        inboxTasks.filter { !$0.isCompleted }.count
+    }
+
+    var body: some View {
+        Group {
+            if !isPro {
+                WidgetLockedStateView(
+                    theme: theme,
+                    title: "Haiku Pro",
+                    message: "To-Do widgets are a Pro feature.",
+                    icon: "checklist"
+                )
+            } else if visibleInboxTasks.isEmpty {
+                WidgetEmptyStateView(
+                    theme: theme,
+                    title: "Inbox Clear",
+                    message: "Nothing needs your attention right now.",
+                    icon: "checkmark.circle"
+                )
+            } else {
+                switch family {
+                case .systemSmall:
+                    remindersLayout(limit: 2, titleSize: 14, countSize: 26, rowSpacing: 10, rowFont: 13, iconSize: 24)
+                        .padding(14)
+                case .systemMedium:
+                    remindersLayout(limit: 3, titleSize: 15, countSize: 28, rowSpacing: 12, rowFont: 14, iconSize: 25)
+                        .padding(16)
+                default:
+                    remindersLayout(limit: 5, titleSize: 16, countSize: 32, rowSpacing: 13, rowFont: 15, iconSize: 26)
+                        .padding(18)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func remindersLayout(
+        limit: Int,
+        titleSize: CGFloat,
+        countSize: CGFloat,
+        rowSpacing: CGFloat,
+        rowFont: CGFloat,
+        iconSize: CGFloat
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(remainingCount)")
+                        .font(.system(size: countSize, weight: .bold, design: .rounded))
+                        .foregroundStyle(remindersPrimaryText)
+
+                    Text("Inbox")
+                        .font(.system(size: titleSize, weight: .semibold))
+                        .foregroundStyle(remindersAccent)
+                }
+
+                Spacer()
+
+                Image(systemName: "list.bullet.circle.fill")
+                    .font(.system(size: iconSize, weight: .regular))
+                    .foregroundStyle(remindersAccent)
+            }
+
+            Divider()
+                .overlay(remindersSeparator)
+                .padding(.top, 8)
+                .padding(.bottom, 10)
+
+            VStack(alignment: .leading, spacing: rowSpacing) {
+                ForEach(visibleInboxTasks.prefix(limit)) { task in
+                    remindersRow(task, rowFont: rowFont)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func remindersRow(_ task: BrainDumpTask, rowFont: CGFloat) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Button(intent: ToggleBrainDumpTaskIntent(taskID: task.id.uuidString)) {
+                remindersCheckGlyph(for: task)
+            }
+            .buttonStyle(.plain)
+
+            Text(task.title)
+                .font(.system(size: rowFont, weight: .medium))
+                .foregroundStyle(remindersPrimaryText)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func remindersCheckGlyph(for task: BrainDumpTask) -> some View {
+        Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 18, weight: .regular))
+            .foregroundStyle(task.isCompleted ? remindersAccent : remindersSecondaryText.opacity(0.55))
+            .frame(width: 22, height: 22)
+            .contentTransition(.symbolEffect(.replace))
+            .symbolEffect(.bounce, value: task.isCompleted)
+    }
+}
+
+private struct RoutineWidgetEntryView: View {
+    @Environment(\.widgetFamily) private var family
+    var entry: Provider.Entry
+
+    private let dataLoader = WidgetSupportDataLoader()
+
+    private var theme: AppTheme {
+        SharedTaskManager.shared.loadTheme()
+    }
+
+    private var isPro: Bool {
+        SharedTaskManager.shared.loadIsPro()
+    }
+
+    private var sessions: [RoutineSession] {
+        dataLoader.activeRoutineSessions()
+    }
+
+    var body: some View {
+        Group {
+            if !isPro {
+                WidgetLockedStateView(
+                    theme: theme,
+                    title: "Haiku Pro",
+                    message: "Routine widgets are a Pro feature.",
+                    icon: "arrow.clockwise"
+                )
+            } else if sessions.isEmpty {
+                WidgetEmptyStateView(
+                    theme: theme,
+                    title: "No Active Routine",
+                    message: "Start a routine in Haiku and it will appear here.",
+                    icon: "figure.run"
+                )
+            } else {
+                switch family {
+                case .systemSmall:
+                    smallView
+                case .systemMedium:
+                    mediumView
+                default:
+                    largeView
+                }
+            }
+        }
+    }
+
+    private var smallView: some View {
+        let session = sessions[0]
+
+        return VStack(alignment: .leading, spacing: 10) {
+            routineHeader(title: "ROUTINE", detail: progressLabel(for: session))
+
+            Text(session.name)
+                .font(.system(size: 15, weight: .bold, design: .serif))
+                .foregroundStyle(theme.textForeground)
+                .lineLimit(2)
+
+            progressBar(for: session)
+
+            VStack(alignment: .leading, spacing: 7) {
+                ForEach(session.items.prefix(2)) { item in
+                    routineItemRow(item, in: session)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+    }
+
+    private var mediumView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            routineHeader(title: "ROUTINES", detail: "\(sessions.count) active")
+
+            Text("Live checklists from To-Do.")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(theme.textForeground.opacity(0.56))
+
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(sessions.prefix(2)) { session in
+                    routineSessionCard(session)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+    }
+
+    private var largeView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            routineHeader(title: "ROUTINES", detail: "\(sessions.count) active")
+
+            Text("The checklists you are moving through right now.")
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(theme.textForeground.opacity(0.56))
+
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(sessions.prefix(3)) { session in
+                    routineSessionCard(session)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+    }
+
+    private func routineSessionCard(_ session: RoutineSession) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(session.name)
+                    .font(.system(size: 13, weight: .bold, design: .serif))
+                    .foregroundStyle(theme.textForeground)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Text(progressLabel(for: session))
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(theme.textForeground.opacity(0.52))
+            }
+
+            progressBar(for: session)
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(session.items.prefix(2)) { item in
+                    routineItemRow(item, in: session)
+                }
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(theme.fieldBg.opacity(theme == .sakura ? 0.84 : 0.92))
+        )
+    }
+
+    private func routineItemRow(_ item: SessionItem, in session: RoutineSession) -> some View {
+        HStack(spacing: 8) {
+            Button(intent: ToggleRoutineSessionItemIntent(
+                sessionID: session.id.uuidString,
+                itemID: item.id.uuidString
+            )) {
+                routineItemGlyph(item)
+            }
+            .buttonStyle(.plain)
+
+            Text(item.title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(item.isCompleted ? theme.textForeground.opacity(0.52) : theme.textForeground)
+                .strikethrough(item.isCompleted, color: theme.textForeground.opacity(0.32))
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func progressBar(for session: RoutineSession) -> some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(theme.textForeground.opacity(0.12))
+
+                Capsule()
+                    .fill(theme.accent)
+                    .frame(width: max(8, geometry.size.width * session.progress))
+            }
+        }
+        .frame(height: 7)
+    }
+
+    private func completedCount(for session: RoutineSession) -> Int {
+        session.items.filter(\.isCompleted).count
+    }
+
+    private func routineItemGlyph(_ item: SessionItem) -> some View {
+        Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(item.isCompleted ? theme.accent : theme.textForeground.opacity(0.32))
+            .frame(width: 18, height: 18)
+            .contentTransition(.symbolEffect(.replace))
+            .symbolEffect(.bounce, value: item.isCompleted)
+    }
+
+    private func progressLabel(for session: RoutineSession) -> String {
+        "\(completedCount(for: session))/\(session.items.count)"
+    }
+
+    private func routineHeader(title: String, detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.system(size: 11, weight: .bold, design: .serif))
+                .foregroundStyle(theme.accent)
+                .tracking(1.4)
+
+            Spacer()
+
+            Text(detail)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(theme.textForeground.opacity(0.58))
+        }
+    }
+}
+
+struct brainDumpWidget: Widget {
+    let kind: String = "brainDumpWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+            if #available(iOS 17.0, *) {
+                ToDoWidgetEntryView(entry: entry)
+                    .containerBackground(for: .widget) {
+                        SharedTaskManager.shared.loadTheme().bg
+                    }
+            } else {
+                ToDoWidgetEntryView(entry: entry)
+                    .background(SharedTaskManager.shared.loadTheme().bg)
+            }
+        }
+        .configurationDisplayName("To-Do List")
+        .description("See your Brain Dump tasks at a glance.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    }
+}
+
+struct routineChecklistWidget: Widget {
+    let kind: String = "routineChecklistWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+            if #available(iOS 17.0, *) {
+                RoutineWidgetEntryView(entry: entry)
+                    .containerBackground(for: .widget) {
+                        SharedTaskManager.shared.loadTheme().bg
+                    }
+            } else {
+                RoutineWidgetEntryView(entry: entry)
+                    .background(SharedTaskManager.shared.loadTheme().bg)
+            }
+        }
+        .configurationDisplayName("Routine Checklist")
+        .description("Track the routines you have started from To-Do.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

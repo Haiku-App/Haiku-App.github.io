@@ -1,0 +1,12 @@
+{
+  "/Users/reswin/Desktop/clock/clock/CalendarManager.swift" : {
+    "abi-baseline-json" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension.abi.json",
+    "const-values" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-primary.swiftconstvalues",
+    "dependencies" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-primary.d",
+    "diagnostics" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-primary.dia",
+    "objc-header" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension-Swift.h",
+    "swiftdoc" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension.swiftdoc",
+    "swiftmodule" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension.swiftmodule",
+    "swiftsourceinfo" : "/Users/reswin/Desktop/clock/build/clock.build/Release-iphoneos/clockWidgetExtension.build/Objects-normal/arm64/clockWidgetExtension.swiftsourceinfo"
+  }
+}
