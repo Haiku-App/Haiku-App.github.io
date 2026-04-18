@@ -26,6 +26,8 @@ struct ContentView: View {
     @State private var isApplyingCloudSnapshot = false
 
     @State private var isFlowState = false
+    @State private var showingHourZoom = false
+    @State private var zoomedHour: Int? = nil
 
     @State private var tasksByDate: [Date: [ClockTask]] = {
         if let saved = SharedTaskManager.shared.load() {
@@ -388,6 +390,21 @@ struct ContentView: View {
                 }
 
                 HStack {
+                    Button(action: {
+                        withAnimation(.spring()) {
+                            showingHourZoom.toggle()
+                            if showingHourZoom {
+                                let hour = Calendar.current.component(.hour, from: now)
+                                zoomedHour = hour
+                            }
+                        }
+                    }) {
+                        Image(systemName: showingHourZoom ? "minus.magnifyingglass" : "plus.magnifyingglass")
+                            .font(.system(size: 18, weight: .light))
+                            .foregroundStyle(goldColor)
+                    }
+                    .padding(.leading, 32)
+
                     Spacer()
                     Button(action: { 
                         prefilledTaskTitle = nil
@@ -801,31 +818,64 @@ struct ContentView: View {
                 .frame(height: 20)
 
             // Clock
-            ClockView(
-                now: now,
-                tasks: currentTasksBinding,
-                isFlowState: $isFlowState,
-                is24HourClock: is24HourClock,
-                theme: currentTheme,
-                onTaskUpdated: { updatedTask in
-                    if isPro {
-                        let day = Calendar.current.startOfDay(for: selectedDate)
-                        switch updatedTask.calendarSyncProvider {
-                        case .google:
-                            GoogleCalendarManager.shared.updateTask(updatedTask, date: day)
-                        case .apple:
-                            calendarManager.updateTask(updatedTask, date: day)
-                        case .none:
-                            syncTaskToActiveCalendarProvider(updatedTask, on: day)
+            HStack(spacing: 15) {
+                if showingHourZoom {
+                    Button(action: {
+                        withAnimation {
+                            let currentH = zoomedHour ?? 0
+                            zoomedHour = (currentH - 1 + 24) % 24
                         }
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(goldColor.opacity(0.6))
+                            .padding(10)
+                            .background(Circle().fill(currentTheme.bg).shadow(color: currentTheme.shadowDark, radius: 4, x: 2, y: 2))
                     }
-                },
-                onTasksPreviewUpdated: { previewTasks in
-                    liveClockTasks = previewTasks
                 }
-            )
-            .frame(width: 280, height: 280)
-            .scaleEffect(isFlowState ? 1.15 : 1.0)
+
+                ClockView(
+                    now: now,
+                    tasks: currentTasksBinding,
+                    isFlowState: $isFlowState,
+                    is24HourClock: is24HourClock,
+                    zoomedHour: showingHourZoom ? zoomedHour : nil,
+                    theme: currentTheme,
+                    onTaskUpdated: { updatedTask in
+                        if isPro {
+                            let day = Calendar.current.startOfDay(for: selectedDate)
+                            switch updatedTask.calendarSyncProvider {
+                            case .google:
+                                GoogleCalendarManager.shared.updateTask(updatedTask, date: day)
+                            case .apple:
+                                calendarManager.updateTask(updatedTask, date: day)
+                            case .none:
+                                syncTaskToActiveCalendarProvider(updatedTask, on: day)
+                            }
+                        }
+                    },
+                    onTasksPreviewUpdated: { previewTasks in
+                        liveClockTasks = previewTasks
+                    }
+                )
+                .frame(width: 280, height: 280)
+                .scaleEffect(isFlowState ? 1.15 : 1.0)
+                
+                if showingHourZoom {
+                    Button(action: {
+                        withAnimation {
+                            let currentH = zoomedHour ?? 0
+                            zoomedHour = (currentH + 1) % 24
+                        }
+                    }) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(goldColor.opacity(0.6))
+                            .padding(10)
+                            .background(Circle().fill(currentTheme.bg).shadow(color: currentTheme.shadowDark, radius: 4, x: 2, y: 2))
+                    }
+                }
+            }
             .background(
                 GeometryReader { geometry in
                     Color.clear

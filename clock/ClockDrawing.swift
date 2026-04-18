@@ -6,6 +6,7 @@ struct ClockView: View {
     @Binding var tasks: [ClockTask]
     @Binding var isFlowState: Bool
     var is24HourClock: Bool = false
+    var zoomedHour: Int? = nil
     var theme: AppTheme = .sage
     var onTaskUpdated: ((ClockTask) -> Void)? = nil
     var onTasksPreviewUpdated: (([ClockTask]?) -> Void)? = nil
@@ -87,12 +88,12 @@ struct ClockView: View {
                     )
                 
                 // Task Tracks (Concentric AM/PM Rings)
-                let ringWidth: CGFloat = is24HourClock ? 24 : 18
+                let ringWidth: CGFloat = zoomedHour != nil ? 40 : (is24HourClock ? 24 : 18)
                 let pmRingRadius = radius - (ringWidth/2)
                 let amRingRadius = pmRingRadius - ringWidth - 4
                 
                 // Neumorphic Base
-                let faceRadius = is24HourClock ? (pmRingRadius - (ringWidth/2) - 4) : (amRingRadius - (ringWidth/2) - 4)
+                let faceRadius = zoomedHour != nil ? (pmRingRadius - (ringWidth/2) - 4) : (is24HourClock ? (pmRingRadius - (ringWidth/2) - 4) : (amRingRadius - (ringWidth/2) - 4))
                 
                 // Outer Bezel / Depth Ring
                 Circle()
@@ -122,7 +123,20 @@ struct ClockView: View {
                     )
                     .allowsHitTesting(false)
                 
-                if is24HourClock {
+                if zoomedHour != nil {
+                    // Larger track for 1H mode
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [shadowDark.opacity(0.7), shadowLight.opacity(0.3)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: ringWidth
+                        )
+                        .frame(width: pmRingRadius * 2, height: pmRingRadius * 2)
+                        .allowsHitTesting(false)
+                } else if is24HourClock {
                     // Empty 24H Track (Outer) - Clean Engraved Look
                     Circle()
                         .stroke(
@@ -212,9 +226,9 @@ struct ClockView: View {
                 scheduledTasksView(ringWidth: ringWidth, amRingRadius: amRingRadius, pmRingRadius: pmRingRadius)
 
                 // Premium Ticks (Baton markers)
-                let numTicks = is24HourClock ? 48 : 60
+                let numTicks = zoomedHour != nil ? 60 : (is24HourClock ? 48 : 60)
                 ForEach(0..<numTicks, id: \.self) { i in
-                    let isHour = is24HourClock ? (i % 4 == 0) : (i % 5 == 0)
+                    let isHour = zoomedHour != nil ? (i % 5 == 0) : (is24HourClock ? (i % 4 == 0) : (i % 5 == 0))
                     
                     let angleDeg = Double(i) * (360.0 / Double(numTicks)) - 90
                     let angle = Angle.degrees(angleDeg)
@@ -234,8 +248,31 @@ struct ClockView: View {
                 }
                 .allowsHitTesting(false)
 
-                // Hour Numbers (Minimalist)
-                if is24HourClock {
+                    // Hour Numbers (Minimalist)
+                    if let zh = zoomedHour {
+                        ForEach([0, 15, 30, 45], id: \.self) { minute in
+                            let angle = Angle.degrees(Double(minute) * 6 - 90)
+                            let dist = faceRadius - 28
+                            let x = cos(CGFloat(angle.radians)) * dist
+                            let y = sin(CGFloat(angle.radians)) * dist
+                            
+                            let label: String = {
+                                if minute == 0 {
+                                    let h = zh % 12
+                                    let displayH = h == 0 ? 12 : h
+                                    let ampm = (zh % 24) < 12 ? "AM" : "PM"
+                                    return "\(displayH)\(ampm)"
+                                } else {
+                                    return "\(minute)"
+                                }
+                            }()
+                            
+                            Text(label)
+                                .font(.system(size: minute == 0 ? 18 : 16, weight: minute == 0 ? .bold : .medium, design: .serif))
+                                .foregroundStyle(goldColor.opacity(minute == 0 ? 1.0 : 0.9))
+                                .position(x: center.x + x, y: center.y + y)
+                        }
+                    } else if is24HourClock {
                     ForEach(0..<12, id: \.self) { i in
                         let hour = i * 2
                         // For 24h clock, each hour is 15 degrees. 24 (0) is at top, 6 at right, 12 at bottom, 18 at left.
@@ -249,7 +286,8 @@ struct ClockView: View {
                             if hour == 6 { return "6AM" }
                             if hour == 12 { return "12PM" }
                             if hour == 18 { return "6PM" }
-                            return "\(hour % 12 == 0 ? 12 : hour % 12)"
+                            let h = hour % 12
+                            return "\(h == 0 ? 12 : h)"
                         }()
                         
                         let isMain = hour % 6 == 0
@@ -326,13 +364,14 @@ struct ClockView: View {
                 let secondHandLength = faceRadius * 0.85
 
                 // Hour Hand
-                TaperedHand(now: now, is24HourClock: is24HourClock, length: hourHandLength, width: 6)
+                TaperedHand(now: now, is24HourClock: is24HourClock, zoomedHour: zoomedHour, length: hourHandLength, width: 6)
                     .fill(goldColor)
                     .shadow(color: .black.opacity(0.3), radius: 4, x: 2, y: 3)
                     .allowsHitTesting(false)
+                    .opacity(zoomedHour != nil ? 0 : 1)
 
                 // Minute Hand
-                TaperedHand(now: now, is24HourClock: false, length: minuteHandLength, width: 4, isMinute: true)
+                TaperedHand(now: now, is24HourClock: false, zoomedHour: zoomedHour, length: minuteHandLength, width: 4, isMinute: true)
                     .fill(goldColor)
                     .shadow(color: .black.opacity(0.3), radius: 4, x: 2, y: 4)
                     .allowsHitTesting(false)
@@ -390,7 +429,26 @@ struct ClockView: View {
         let isActive = activeTask?.id == task.id && !isDragging
         let glowRadius: CGFloat = (isActive && (pulseState || isFlowState)) ? (isFlowState ? 16 : 8) : (isDragging ? 4 : 0)
         let glowColor = task.color.opacity((isActive && (pulseState || isFlowState)) ? (isFlowState ? 0.6 : 0.4) : (isDragging ? 0.6 : 0))
-        let fragments = is24HourClock ? [TaskFragment(id: "\(task.id.uuidString)-0", isAM: false, startMinutes: Double(taskForClock.startMinutes), endMinutes: Double(taskForClock.endMinutes), task: taskForClock)] : getFragments(for: taskForClock)
+        
+        let fragments: [TaskFragment] = {
+            if let zh = zoomedHour {
+                // Filter tasks that intersect with the zoomed hour
+                let hourStart = zh * 60
+                let hourEnd = hourStart + 60
+                
+                if task.startMinutes < hourEnd && task.normalizedEndMinutes > hourStart {
+                    // Adjust fragment for zoomed view
+                    let visibleStart = max(Double(task.startMinutes), Double(hourStart))
+                    let visibleEnd = min(Double(task.normalizedEndMinutes), Double(hourEnd))
+                    
+                    return [TaskFragment(id: "\(task.id.uuidString)-zoom", isAM: false, startMinutes: visibleStart - Double(hourStart), endMinutes: visibleEnd - Double(hourStart), task: task)]
+                } else {
+                    return []
+                }
+            } else {
+                return is24HourClock ? [TaskFragment(id: "\(task.id.uuidString)-0", isAM: false, startMinutes: Double(taskForClock.startMinutes), endMinutes: Double(taskForClock.endMinutes), task: taskForClock)] : getFragments(for: taskForClock)
+            }
+        }()
 
         ForEach(fragments) { fragment in
             scheduledFragmentView(
@@ -408,13 +466,13 @@ struct ClockView: View {
 
     @ViewBuilder
     private func scheduledFragmentView(fragment: TaskFragment, task: ClockTask, isDragging: Bool, glowColor: Color, glowRadius: CGFloat, ringWidth: CGFloat, amRingRadius: CGFloat, pmRingRadius: CGFloat) -> some View {
-        let radius = is24HourClock ? pmRingRadius : (fragment.isAM ? amRingRadius : pmRingRadius)
+        let radius = zoomedHour != nil ? pmRingRadius : (is24HourClock ? pmRingRadius : (fragment.isAM ? amRingRadius : pmRingRadius))
 
         Group {
             if isDragging || dayStatus > 0 {
-                TaskSegmentView(start: fragment.startMinutes, end: fragment.endMinutes, color: task.color, opacity: 1.0, isFuture: true, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
+                TaskSegmentView(start: fragment.startMinutes, end: fragment.endMinutes, color: task.color, opacity: 1.0, isFuture: true, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock, zoomedHour: zoomedHour)
             } else if dayStatus < 0 {
-                TaskSegmentView(start: fragment.startMinutes, end: fragment.endMinutes, color: task.color, opacity: 0.3, isFuture: false, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
+                TaskSegmentView(start: fragment.startMinutes, end: fragment.endMinutes, color: task.color, opacity: 0.3, isFuture: false, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock, zoomedHour: zoomedHour)
             } else {
                 todayFragmentView(fragment: fragment, task: task, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth)
             }
@@ -432,19 +490,33 @@ struct ClockView: View {
     private func todayFragmentView(fragment: TaskFragment, task: ClockTask, glowColor: Color, glowRadius: CGFloat, ringWidth: CGFloat) -> some View {
         let fragmentStart = fragment.startMinutes
         let fragmentEnd = fragment.endMinutes
-        let absoluteStart = is24HourClock ? fragmentStart : (fragment.isAM ? fragmentStart : fragmentStart + 720)
-        let absoluteEnd = is24HourClock ? fragmentEnd : (fragment.isAM ? fragmentEnd : fragmentEnd + 720)
+        
+        let (absoluteStart, absoluteEnd, current): (Double, Double, Double) = {
+            if let zh = zoomedHour {
+                return (fragmentStart, fragmentEnd, currentMinute - Double(zh * 60))
+            } else {
+                let start = is24HourClock ? fragmentStart : (fragment.isAM ? fragmentStart : fragmentStart + 720)
+                let end = is24HourClock ? fragmentEnd : (fragment.isAM ? fragmentEnd : fragmentEnd + 720)
+                return (start, end, currentMinute)
+            }
+        }()
 
-        if currentMinute >= absoluteEnd {
-            TaskSegmentView(start: fragmentStart, end: fragmentEnd, color: task.color, opacity: 0.3, isFuture: false, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
-        } else if currentMinute <= absoluteStart {
-            TaskSegmentView(start: fragmentStart, end: fragmentEnd, color: task.color, opacity: 1.0, isFuture: true, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
+        if current >= absoluteEnd {
+            TaskSegmentView(start: fragmentStart, end: fragmentEnd, color: task.color, opacity: 0.3, isFuture: false, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock, zoomedHour: zoomedHour)
+        } else if current <= absoluteStart {
+            TaskSegmentView(start: fragmentStart, end: fragmentEnd, color: task.color, opacity: 1.0, isFuture: true, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock, zoomedHour: zoomedHour)
         } else {
-            let splitPoint = is24HourClock ? currentMinute : (fragment.isAM ? currentMinute : currentMinute - 720)
+            let splitPoint: Double = {
+                if zoomedHour != nil {
+                    return current
+                } else {
+                    return is24HourClock ? currentMinute : (fragment.isAM ? currentMinute : currentMinute - 720)
+                }
+            }()
 
             ZStack {
-                TaskSegmentView(start: fragmentStart, end: splitPoint, color: task.color, opacity: 0.3, isFuture: false, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
-                TaskSegmentView(start: splitPoint, end: fragmentEnd, color: task.color, opacity: 1.0, isFuture: true, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock)
+                TaskSegmentView(start: fragmentStart, end: splitPoint, color: task.color, opacity: 0.3, isFuture: false, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock, zoomedHour: zoomedHour)
+                TaskSegmentView(start: splitPoint, end: fragmentEnd, color: task.color, opacity: 1.0, isFuture: true, glowColor: glowColor, glowRadius: glowRadius, ringWidth: ringWidth, is24HourClock: is24HourClock, zoomedHour: zoomedHour)
             }
         }
     }
@@ -458,48 +530,109 @@ struct ClockView: View {
         let dist = sqrt(dx*dx + dy*dy)
         let radius = size.width / 2
         
-        let ringWidth: CGFloat = is24HourClock ? 24 : 18
+        let ringWidth: CGFloat = zoomedHour != nil ? 40 : (is24HourClock ? 24 : 18)
         let pmRingRadius = radius - (ringWidth/2)
         let amRingRadius = pmRingRadius - ringWidth - 4
         
-        let isAMClick = is24HourClock ? false : abs(dist - amRingRadius) < abs(dist - pmRingRadius)
-        
-        let targetRadius = is24HourClock ? pmRingRadius : (isAMClick ? amRingRadius : pmRingRadius)
-        if abs(dist - targetRadius) > 30 { return }
-        
-        let min12h = minute(from: location, in: size)
-        let absoluteMinute = is24HourClock ? (min12h * 2) : (isAMClick ? min12h : min12h + 720)
-        
-        for task in interactiveTasks {
-            if task.isCompleted { continue }
-            
-            let touchBuffer: Double = 10.0
-            let absMinWrap = absoluteMinute + 1440
-            
-            // Check if touch is within task bounds (handling midnight wrap)
-            let taskForClock = task.normalizedForClock
-            let duration = Double(taskForClock.endMinutes - taskForClock.startMinutes)
-            let inNormal = absoluteMinute >= (Double(taskForClock.startMinutes) - touchBuffer) && absoluteMinute <= (Double(taskForClock.endMinutes) + touchBuffer)
-            let inWrap = absMinWrap >= (Double(taskForClock.startMinutes) - touchBuffer) && absMinWrap <= (Double(taskForClock.endMinutes) + touchBuffer)
-            
-            if inNormal || inWrap {
-                let effAbsolute = inWrap && !inNormal ? absMinWrap : absoluteMinute
-                let distToStart = abs(effAbsolute - Double(taskForClock.startMinutes))
-                let distToEnd = abs(effAbsolute - Double(taskForClock.endMinutes))
-                
-                var mode: DragInfo.Mode = .move
-                if duration <= 15 {
-                    if distToStart <= 5 && distToStart < distToEnd { mode = .resizeStart }
-                    else if distToEnd <= 5 { mode = .resizeEnd }
-                } else {
-                    if distToStart <= 15 { mode = .resizeStart }
-                    else if distToEnd <= 15 { mode = .resizeEnd }
+        let mouseMinute = minute(from: location, in: size)
+
+        // Find which task/ring we are hitting
+        // Priority: PM ring (outer) first, then AM ring (inner)
+        if zoomedHour != nil {
+             if abs(dist - pmRingRadius) < ringWidth {
+                 if let taskIndex = interactiveTasks.firstIndex(where: {
+                     let hourStart = Double(zoomedHour! * 60)
+                     let hourEnd = hourStart + 60
+                     return Double($0.startMinutes) < hourEnd && Double($0.normalizedEndMinutes) > hourStart &&
+                            mouseMinute >= max(Double($0.startMinutes), hourStart) && mouseMinute <= min(Double($0.normalizedEndMinutes), hourEnd)
+                 }) {
+                     startDragging(taskIndex: taskIndex, mouseMinute: mouseMinute, location: location, size: size)
+                     return
+                 }
+             }
+        } else if is24HourClock {
+            if abs(dist - pmRingRadius) < ringWidth {
+                if let taskIndex = interactiveTasks.firstIndex(where: { mouseMinute >= Double($0.startMinutes) && mouseMinute <= Double($0.normalizedEndMinutes) }) {
+                    startDragging(taskIndex: taskIndex, mouseMinute: mouseMinute, location: location, size: size)
+                    return
                 }
-                
-                activeDrag = DragInfo(taskId: task.id, mode: mode, initialMouseMinute: min12h, lastMouseMinute: min12h, accumulatedDelta: 0, initialStartMinutes: taskForClock.startMinutes, initialEndMinutes: taskForClock.endMinutes)
-                return
+            }
+        } else {
+            if abs(dist - pmRingRadius) < ringWidth {
+                if let taskIndex = interactiveTasks.firstIndex(where: { Double($0.startMinutes) >= 720 && mouseMinute >= Double($0.startMinutes) - 720 && mouseMinute <= Double($0.normalizedEndMinutes) - 720 }) {
+                    startDragging(taskIndex: taskIndex, mouseMinute: mouseMinute, location: location, size: size)
+                    return
+                }
+            } else if abs(dist - amRingRadius) < ringWidth {
+                if let taskIndex = interactiveTasks.firstIndex(where: { Double($0.startMinutes) < 720 && mouseMinute >= Double($0.startMinutes) && mouseMinute <= Double($0.normalizedEndMinutes) }) {
+                    startDragging(taskIndex: taskIndex, mouseMinute: mouseMinute, location: location, size: size)
+                    return
+                }
             }
         }
+
+        // If no task hit, create new
+        if zoomedHour == nil {
+            createNewTask(at: mouseMinute, dist: dist, amRingRadius: amRingRadius, pmRingRadius: pmRingRadius, ringWidth: ringWidth)
+        }
+    }
+
+    private func startDragging(taskIndex: Int, mouseMinute: Double, location: CGPoint, size: CGSize) {
+        let task = interactiveTasks[taskIndex]
+        let mode: DragInfo.Mode
+        
+        let startMin = zoomedHour != nil ? Double(task.startMinutes) : (is24HourClock ? Double(task.startMinutes) : (Double(task.startMinutes) >= 720 ? Double(task.startMinutes) - 720 : Double(task.startMinutes)))
+        let endMin = zoomedHour != nil ? Double(task.normalizedEndMinutes) : (is24HourClock ? Double(task.normalizedEndMinutes) : (Double(task.normalizedEndMinutes) >= 720 ? Double(task.normalizedEndMinutes) - 720 : Double(task.normalizedEndMinutes)))
+
+        if abs(mouseMinute - startMin) < 15 {
+            mode = .resizeStart
+        } else if abs(mouseMinute - endMin) < 15 {
+            mode = .resizeEnd
+        } else {
+            mode = .move
+        }
+
+        activeDrag = DragInfo(
+            taskId: task.id,
+            mode: mode,
+            initialMouseMinute: mouseMinute,
+            lastMouseMinute: mouseMinute,
+            accumulatedDelta: 0,
+            initialStartMinutes: task.startMinutes,
+            initialEndMinutes: task.endMinutes
+        )
+        
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    private func createNewTask(at mouseMinute: Double, dist: CGFloat, amRingRadius: CGFloat, pmRingRadius: CGFloat, ringWidth: CGFloat) {
+        let isPM = abs(dist - pmRingRadius) < ringWidth
+        let isAM = abs(dist - amRingRadius) < ringWidth
+        
+        guard isPM || isAM else { return }
+        
+        let startMin = Int(mouseMinute)
+        let absoluteStart = isPM ? (is24HourClock ? startMin : startMin + 720) : startMin
+        
+        let newTask = ClockTask(
+            title: "New Task",
+            startMinutes: absoluteStart,
+            endMinutes: absoluteStart + 30,
+            color: goldColor
+        )
+        
+        interactiveTasks.append(newTask)
+        activeDrag = DragInfo(
+            taskId: newTask.id,
+            mode: .create,
+            initialMouseMinute: mouseMinute,
+            lastMouseMinute: mouseMinute,
+            accumulatedDelta: 0,
+            initialStartMinutes: absoluteStart,
+            initialEndMinutes: absoluteStart
+        )
+        
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     private func handleDragChange(location: CGPoint, size: CGSize) {
@@ -541,15 +674,18 @@ struct ClockView: View {
         var delta = min12h - drag.lastMouseMinute
         
         // Handle angular wrap-around (crossing 12 o'clock)
-        if delta > 360 { delta -= 720 }
-        else if delta < -360 { delta += 720 }
+        let limit = zoomedHour != nil ? 60.0 : 720.0
+        if delta > limit / 2 { delta -= limit }
+        else if delta < -limit / 2 { delta += limit }
         
         drag.accumulatedDelta += delta
         drag.lastMouseMinute = min12h
         activeDrag = drag // Update state
         
         var totalDelta = drag.accumulatedDelta
-        if is24HourClock {
+        if zoomedHour != nil {
+            // totalDelta is already in minutes because minute() returns minutes in zoom mode
+        } else if is24HourClock {
             totalDelta *= 2 // 360 degrees = 1440 minutes for 24h clock
         }
         
@@ -559,6 +695,12 @@ struct ClockView: View {
         
         // Smoother Aim Assist: snap to nearest 15 mins if within 4 minutes
         func snap(_ val: Int) -> Int {
+            if zoomedHour != nil {
+                let remainder = ((val % 5) + 5) % 5
+                if remainder < 2 { return val - remainder }
+                if remainder > 3 { return val + (5 - remainder) }
+                return val
+            }
             let remainder = ((val % 15) + 15) % 15
             if remainder < 4 { return val - remainder }
             if remainder > 11 { return val + (15 - remainder) }
@@ -573,18 +715,23 @@ struct ClockView: View {
             var start = rawStart
             var end = max(rawEnd, rawStart + minimumTaskDuration)
             
-            while start < 0 {
-                start += 1440
-                end += 1440
+            let limit = zoomedHour != nil ? 144000 : 1440 // Avoid wrapping too much in zoom mode for now
+            
+            if zoomedHour == nil {
+                while start < 0 {
+                    start += 1440
+                    end += 1440
+                }
+                
+                while start >= 1440 {
+                    start -= 1440
+                    end -= 1440
+                }
             }
             
-            while start >= 1440 {
-                start -= 1440
-                end -= 1440
-            }
-            
-            if end - start > maximumTaskDuration {
-                end = start + maximumTaskDuration
+            let maxDuration = zoomedHour != nil ? 60 : maximumTaskDuration
+            if end - start > maxDuration {
+                end = start + maxDuration
             }
             
             return (start, end)
@@ -642,7 +789,11 @@ struct ClockView: View {
         var angle = atan2(dy, dx) * 180 / .pi
         angle += 90 // Shift 0 to 12 o'clock
         if angle < 0 { angle += 360 }
-        return (angle / 360) * 720
+        
+        if let zh = zoomedHour {
+            return Double(zh * 60) + (angle / 360.0) * 60.0
+        }
+        return is24HourClock ? (angle / 360) * 1440 : (angle / 360) * 720
     }
     
     private func minDiff(_ a: Double, _ b: Double) -> Double {
@@ -662,6 +813,7 @@ struct ClockView: View {
 struct TaperedHand: Shape {
     var now: Date
     var is24HourClock: Bool = false
+    var zoomedHour: Int? = nil
     var length: CGFloat
     var width: CGFloat
     var isMinute: Bool = false
@@ -676,7 +828,13 @@ struct TaperedHand: Shape {
         let second = Double(comps.second ?? 0)
 
         let angleDeg: Double
-        if isMinute {
+        if zoomedHour != nil {
+            if isMinute {
+                angleDeg = minute * 6 + second * 0.1 - 90
+            } else {
+                angleDeg = 0 - 90 // Hide hour hand or keep it static
+            }
+        } else if isMinute {
             let totalMinutes = minute + second/60
             angleDeg = totalMinutes * 6 - 90
         } else {
@@ -743,6 +901,7 @@ struct ElegantSecondHand: Shape {
 struct TimeHand: Shape {
     var now: Date
     var is24HourClock: Bool = false
+    var zoomedHour: Int? = nil
 
     func path(in rect: CGRect) -> Path {
         var p = Path()
@@ -755,7 +914,11 @@ struct TimeHand: Shape {
         let second = Double(comps.second ?? 0)
 
         let angleDeg: Double
-        if is24HourClock {
+        if let zh = zoomedHour {
+            let totalMinutes = hour * 60 + minute + second/60
+            let mins = totalMinutes - Double(zh * 60)
+            angleDeg = mins * 6.0 - 90
+        } else if is24HourClock {
             let totalMinutes24h = hour * 60 + minute + second/60
             angleDeg = totalMinutes24h * 0.25 - 90
         } else {
@@ -833,6 +996,7 @@ struct TaskArc: Shape {
     var startMinutes: Double
     var endMinutes: Double
     var is24HourClock: Bool = false
+    var zoomedHour: Int? = nil
 
     func path(in rect: CGRect) -> Path {
         var p = Path()
@@ -840,7 +1004,12 @@ struct TaskArc: Shape {
         let radius = min(rect.width, rect.height)/2
 
         func angle(for minutes: Double) -> Angle {
-            let deg = is24HourClock ? (minutes * 0.25 - 90) : (minutes * 0.5 - 90)
+            let deg: Double
+            if zoomedHour != nil {
+                deg = minutes * 6.0 - 90
+            } else {
+                deg = is24HourClock ? (minutes * 0.25 - 90) : (minutes * 0.5 - 90)
+            }
             return .degrees(deg)
         }
 
@@ -926,24 +1095,24 @@ struct TaskSegmentView: View {
     let glowRadius: CGFloat
     let ringWidth: CGFloat
     let is24HourClock: Bool
+    var zoomedHour: Int? = nil
 
     var body: some View {
         ZStack {
             // Subtle Bottom Shadow
-            TaskArc(startMinutes: start, endMinutes: end, is24HourClock: is24HourClock)
+            TaskArc(startMinutes: start, endMinutes: end, is24HourClock: is24HourClock, zoomedHour: zoomedHour)
                 .stroke(Color.black.opacity(0.15 * opacity), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
                 .offset(x: 0.5, y: 0.5)
-            
+
             // Main Task Fill
-            TaskArc(startMinutes: start, endMinutes: end, is24HourClock: is24HourClock)
+            TaskArc(startMinutes: start, endMinutes: end, is24HourClock: is24HourClock, zoomedHour: zoomedHour)
                 .stroke(
                     color.opacity(opacity),
                     style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
                 )
-            
+
             // Very subtle Top Highlight
-            TaskArc(startMinutes: start, endMinutes: end, is24HourClock: is24HourClock)
-                .stroke(
+            TaskArc(startMinutes: start, endMinutes: end, is24HourClock: is24HourClock, zoomedHour: zoomedHour)                .stroke(
                     LinearGradient(colors: [.white.opacity(0.2 * opacity), .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
                     style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
                 )
