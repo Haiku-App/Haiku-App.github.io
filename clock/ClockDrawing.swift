@@ -719,13 +719,13 @@ struct ClockView: View {
             
             if zoomedHour == nil {
                 while start < 0 {
-                    start += 1440
-                    end += 1440
+                    start += limit
+                    end += limit
                 }
                 
-                while start >= 1440 {
-                    start -= 1440
-                    end -= 1440
+                while start >= limit {
+                    start -= limit
+                    end -= limit
                 }
             }
             

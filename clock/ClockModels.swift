@@ -835,7 +835,9 @@ struct ToggleBrainDumpTaskIntent: AppIntent {
             return .result()
         }
 
-        AppSupportPersistence.toggleBrainDumpTaskCompletion(id: uuid)
+        await MainActor.run {
+            AppSupportPersistence.toggleBrainDumpTaskCompletion(id: uuid)
+        }
         return .result()
     }
 }
@@ -862,7 +864,9 @@ struct ToggleRoutineSessionItemIntent: AppIntent {
             return .result()
         }
 
-        AppSupportPersistence.toggleRoutineSessionItem(sessionId: sessionUUID, itemId: itemUUID)
+        await MainActor.run {
+            AppSupportPersistence.toggleRoutineSessionItem(sessionId: sessionUUID, itemId: itemUUID)
+        }
         return .result()
     }
 }
