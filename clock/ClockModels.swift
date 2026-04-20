@@ -1300,3 +1300,83 @@ class RoutineManager: ObservableObject {
         }
     }
 }
+import SwiftUI
+
+enum AppTab: String, Codable, CaseIterable, Identifiable {
+    case clock, weekly, todo, routines, analytics, profile
+    
+    var id: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .clock: return "clock"
+        case .weekly: return "calendar"
+        case .todo: return "list.bullet"
+        case .routines: return "rectangle.stack.badge.plus"
+        case .analytics: return "chart.pie"
+        case .profile: return "person"
+        }
+    }
+    
+    var text: String {
+        switch self {
+        case .clock: return "Clock"
+        case .weekly: return "Weekly"
+        case .todo: return "To-Do"
+        case .routines: return "Routines"
+        case .analytics: return "Analytics"
+        case .profile: return "Profile"
+        }
+    }
+}
+
+class TabManager: ObservableObject {
+    static let shared = TabManager()
+    
+    @AppStorage("tabOrder") private var tabOrderString: String = "clock,weekly,todo,routines,analytics,profile"
+    @AppStorage("hiddenTabs") private var hiddenTabsString: String = ""
+    
+    @Published var tabs: [AppTab] = []
+    @Published var hiddenTabs: Set<AppTab> = []
+    
+    init() {
+        load()
+    }
+    
+    private func load() {
+        let order = tabOrderString.split(separator: ",").compactMap { AppTab(rawValue: String($0)) }
+        let missing = AppTab.allCases.filter { !order.contains($0) }
+        tabs = order + missing
+        
+        let hidden = hiddenTabsString.split(separator: ",").compactMap { AppTab(rawValue: String($0)) }
+        hiddenTabs = Set(hidden)
+    }
+    
+    func save() {
+        tabOrderString = tabs.map { $0.rawValue }.joined(separator: ",")
+        hiddenTabsString = hiddenTabs.map { $0.rawValue }.joined(separator: ",")
+    }
+    
+    var visibleTabs: [AppTab] {
+        tabs.filter { !hiddenTabs.contains($0) || $0 == .profile }
+    }
+    
+    func isHidden(_ tab: AppTab) -> Bool {
+        tab != .profile && hiddenTabs.contains(tab)
+    }
+    
+    func toggleHidden(_ tab: AppTab) {
+        if tab == .profile { return }
+        if hiddenTabs.contains(tab) {
+            hiddenTabs.remove(tab)
+        } else {
+            hiddenTabs.insert(tab)
+        }
+        save()
+    }
+    
+    func moveTab(from source: IndexSet, to destination: Int) {
+        tabs.move(fromOffsets: source, toOffset: destination)
+        save()
+    }
+}

@@ -11,6 +11,7 @@ struct ProfileSettingsView: View {
     @ObservedObject var googleCalendarManager = GoogleCalendarManager.shared
     @ObservedObject private var reminderManager = ReminderManager.shared
     @StateObject private var calendarManager = CalendarManager()
+    @StateObject private var tabManager = TabManager.shared
     @State private var appleCalendarStatus: EKAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
     @State private var appleRemindersStatus: EKAuthorizationStatus = ReminderManager.currentAuthorizationStatus()
     
@@ -313,6 +314,91 @@ struct ProfileSettingsView: View {
                             .padding(.vertical, 12)
                             .padding(.horizontal, 4)
                         }
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("NAVIGATION TABS")
+                            .font(.system(size: 12, weight: .regular, design: .serif))
+                            .foregroundStyle(goldColor)
+                            .tracking(1)
+                            .padding(.horizontal, 4)
+
+                        VStack(spacing: 0) {
+                            ForEach(tabManager.tabs.indices, id: \.self) { index in
+                                let tab = tabManager.tabs[index]
+                                HStack(spacing: 12) {
+                                    Image(systemName: tab.icon)
+                                        .frame(width: 20)
+                                        .foregroundColor(currentTheme.accent)
+                                        .font(.system(size: 14))
+                                    
+                                    Text(tab.text)
+                                        .font(.system(size: 14, design: .serif))
+                                        .foregroundColor(currentTheme.textForeground)
+                                    
+                                    Spacer()
+                                    
+                                    if tab != .profile {
+                                        Toggle("", isOn: Binding(
+                                            get: { !tabManager.isHidden(tab) },
+                                            set: { _ in tabManager.toggleHidden(tab) }
+                                        ))
+                                        .labelsHidden()
+                                        .scaleEffect(0.8)
+                                        .tint(currentTheme.accent)
+                                    } else {
+                                        Text("Always On")
+                                            .font(.system(size: 9, design: .serif))
+                                            .foregroundColor(currentTheme.textForeground.opacity(0.4))
+                                            .italic()
+                                    }
+                                    
+                                    HStack(spacing: 0) {
+                                        Button(action: {
+                                            if index > 0 {
+                                                withAnimation {
+                                                    tabManager.moveTab(from: IndexSet(integer: index), to: index - 1)
+                                                }
+                                            }
+                                        }) {
+                                            Image(systemName: "chevron.up")
+                                                .font(.system(size: 12))
+                                                .frame(width: 24, height: 24)
+                                                .foregroundColor(index > 0 ? currentTheme.textForeground : currentTheme.textForeground.opacity(0.2))
+                                        }
+                                        .disabled(index == 0)
+                                        
+                                        Button(action: {
+                                            if index < tabManager.tabs.count - 1 {
+                                                withAnimation {
+                                                    tabManager.moveTab(from: IndexSet(integer: index), to: index + 2)
+                                                }
+                                            }
+                                        }) {
+                                            Image(systemName: "chevron.down")
+                                                .font(.system(size: 12))
+                                                .frame(width: 24, height: 24)
+                                                .foregroundColor(index < tabManager.tabs.count - 1 ? currentTheme.textForeground : currentTheme.textForeground.opacity(0.2))
+                                        }
+                                        .disabled(index == tabManager.tabs.count - 1)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 16)
+                                
+                                if index < tabManager.tabs.count - 1 {
+                                    Divider()
+                                        .background(currentTheme.textForeground.opacity(0.05))
+                                        .padding(.horizontal, 12)
+                                }
+                            }
+                        }
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(currentTheme.fieldBg)
+                                .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
+                                .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
+                        )
                     }
 
                     VStack(alignment: .leading, spacing: 12) {

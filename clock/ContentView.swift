@@ -57,10 +57,8 @@ struct ContentView: View {
     private var bgColor: Color { currentTheme.bg }
     private var goldColor: Color { currentTheme.accent }
 
-    enum Tab {
-        case clock, weekly, todo, routines, analytics, profile
-    }
-    @State private var selectedTab: Tab = .clock
+    @StateObject private var tabManager = TabManager.shared
+    @State private var selectedTab: AppTab = .clock
     @State private var showingAddTask = false
     @State private var showingDatePicker = false
     @State private var showingCustomOffsetAlert = false
@@ -275,7 +273,7 @@ struct ContentView: View {
         }
     }
 
-    private func handleSelectedTabChange(oldTab: Tab, newTab: Tab) {
+    private func handleSelectedTabChange(oldTab: AppTab, newTab: AppTab) {
         if oldTab == .clock || newTab == .clock {
             resetClockInteractionState()
         }
@@ -474,32 +472,17 @@ struct ContentView: View {
 
     @ViewBuilder
     private func tabBarView() -> some View {
-        HStack {
-            TabBarButton(icon: "clock", text: "Clock", isSelected: selectedTab == .clock) {
-                selectedTab = .clock
+        HStack(spacing: 8) {
+            Spacer(minLength: 0)
+            ForEach(tabManager.visibleTabs.indices, id: \.self) { index in
+                let tab = tabManager.visibleTabs[index]
+                TabBarButton(icon: tab.icon, text: tab.text, isSelected: selectedTab == tab) {
+                    selectedTab = tab
+                }
             }
-            Spacer()
-            TabBarButton(icon: "calendar", text: "Weekly", isSelected: selectedTab == .weekly) {
-                selectedTab = .weekly
-            }
-            Spacer()
-            TabBarButton(icon: "list.bullet", text: "To-Do", isSelected: selectedTab == .todo) {
-                selectedTab = .todo
-            }
-            Spacer()
-            TabBarButton(icon: "rectangle.stack.badge.plus", text: "Routines", isSelected: selectedTab == .routines) {
-                selectedTab = .routines
-            }
-            Spacer()
-            TabBarButton(icon: "chart.pie", text: "Analytics", isSelected: selectedTab == .analytics) {
-                selectedTab = .analytics
-            }
-            Spacer()
-            TabBarButton(icon: "person", text: "Profile", isSelected: selectedTab == .profile) {
-                selectedTab = .profile
-            }
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, 16)
         .padding(.top, 16)
         .padding(.bottom, 12)
         .background(
@@ -1503,6 +1486,8 @@ struct TabBarButton: View {
                     .font(.system(size: 10))
                     .foregroundStyle(isSelected ? currentTheme.textForeground : currentTheme.textForeground.opacity(0.5))
             }
+            .frame(minWidth: 50, maxWidth: 80)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

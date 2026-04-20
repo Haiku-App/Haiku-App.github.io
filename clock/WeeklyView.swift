@@ -7,7 +7,7 @@ struct WeeklyView: View {
     
     var tasksByDate: [Date: [ClockTask]]
     @Binding var selectedDate: Date
-    @Binding var selectedTab: ContentView.Tab
+    @Binding var selectedTab: AppTab
     var onAppear: ((Date) -> Void)? = nil
     var onWeekChanged: ((Date) -> Void)? = nil
     
@@ -276,7 +276,7 @@ struct StandardCalendarLayout: View {
     let currentTheme: AppTheme
     let is24HourClock: Bool
     @Binding var selectedDate: Date
-    @Binding var selectedTab: ContentView.Tab
+    @Binding var selectedTab: AppTab
     
     private let hourHeight: CGFloat = 60
     private let timeWidth: CGFloat = 50
