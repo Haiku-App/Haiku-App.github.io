@@ -118,6 +118,13 @@ struct ContentView: View {
 
     private var syncObservedRootLayout: some View {
         presentationConfiguredRootLayout
+            .onChange(of: tabManager.hiddenTabs) { oldTabs, newTabs in
+                if newTabs.contains(selectedTab) {
+                    if let firstVisible = tabManager.visibleTabs.first {
+                        selectedTab = firstVisible
+                    }
+                }
+            }
             .onChange(of: selectedTab) { oldTab, newTab in
                 handleSelectedTabChange(oldTab: oldTab, newTab: newTab)
             }
@@ -255,6 +262,11 @@ struct ContentView: View {
     }
 
     private func handleOnAppear() {
+        if tabManager.isHidden(selectedTab) {
+            if let firstVisible = tabManager.visibleTabs.first {
+                selectedTab = firstVisible
+            }
+        }
         migrateLegacyCalendarSyncProviderIfNeeded()
         BrainDumpManager.shared.reloadFromSharedStoreIfNeeded()
         if hasCompletedOnboarding && !hasSeenTutorial {
