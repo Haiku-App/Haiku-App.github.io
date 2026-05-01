@@ -3,6 +3,7 @@ import SwiftUI
 struct WeeklyView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     @AppStorage("is24HourClock") private var is24HourClock = true
+    @AppStorage(ClockTaskDisplayStyle.storageKey) private var taskDisplayStyle: ClockTaskDisplayStyle = .rings
     @State private var isCalendarLayout = false
     
     var tasksByDate: [Date: [ClockTask]]
@@ -133,7 +134,7 @@ struct WeeklyView: View {
 
                                     HStack(alignment: .center, spacing: 18) {
                                         ZStack {
-                                            StaticClockView(now: Date(), tasks: tasks, is24HourClock: is24HourClock, theme: currentTheme, showHands: true, showText: true)
+                                            StaticClockView(now: Date(), tasks: tasks, is24HourClock: is24HourClock, taskDisplayStyle: taskDisplayStyle, theme: currentTheme, showHands: true, showText: true)
                                                 .frame(width: 146, height: 146)
                                                 .padding(4)
                                                 .background(

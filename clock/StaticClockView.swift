@@ -4,6 +4,7 @@ struct StaticClockView: View {
     var now: Date
     var tasks: [ClockTask]
     var is24HourClock: Bool = false
+    var taskDisplayStyle: ClockTaskDisplayStyle = .rings
     var theme: AppTheme = .sage
     var showHands: Bool = true
     var showText: Bool = true
@@ -17,6 +18,7 @@ struct StaticClockView: View {
     private var goldColor: Color { theme.accent }
     private var textForeground: Color { theme.textForeground }
     private var taskTrackColor: Color { theme.taskTrack }
+    private var usesTaskSections: Bool { is24HourClock && taskDisplayStyle == .sections }
     
     // Helper to get current minutes from midnight
     private var currentMinute: Double {
@@ -38,13 +40,13 @@ struct StaticClockView: View {
 
             ZStack {
                 // Proportional constants
-                let ringWidth: CGFloat = size * (is24HourClock ? 0.08 : 0.06)
+                let ringWidth: CGFloat = size * (usesTaskSections ? 0.025 : (is24HourClock ? 0.08 : 0.06))
                 let ringSpacing: CGFloat = size * 0.015
                 let pmRingRadius = radius - (ringWidth/2)
                 let amRingRadius = pmRingRadius - ringWidth - ringSpacing
                 
                 // Neumorphic Base (Push it out more to make face larger)
-                let faceRadius = is24HourClock ? (pmRingRadius - (ringWidth/2) - ringSpacing) : (amRingRadius - (ringWidth/2) - ringSpacing)
+                let faceRadius = usesTaskSections ? (radius - size * 0.035) : (is24HourClock ? (pmRingRadius - (ringWidth/2) - ringSpacing) : (amRingRadius - (ringWidth/2) - ringSpacing))
                 
                 Circle()
                     .fill(
@@ -57,7 +59,11 @@ struct StaticClockView: View {
                         Circle().stroke(textForeground.opacity(0.1), lineWidth: 1)
                     )
                 
-                if is24HourClock {
+                if usesTaskSections {
+                    Circle()
+                        .stroke(textForeground.opacity(0.16), lineWidth: max(1, size * 0.006))
+                        .frame(width: faceRadius * 2, height: faceRadius * 2)
+                } else if is24HourClock {
                     Circle()
                         .stroke(
                             LinearGradient(
@@ -140,28 +146,41 @@ struct StaticClockView: View {
                     ForEach(Array(frags.enumerated()), id: \.offset) { index, frag in
                         let r = is24HourClock ? pmRingRadius : (frag.isAM ? amRingRadius : pmRingRadius)
 
-                        ZStack {
-                            // Depth shadow
-                            TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
-                                .trim(from: 0, to: animationProgress)
-                                .stroke(Color.black.opacity(0.15 * opacity), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
-                                .offset(x: 0.5, y: 0.5)
-                            
-                            // Main Task Fill
-                            TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
-                                .trim(from: 0, to: animationProgress)
-                                .stroke(task.color.opacity(opacity), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
-                            
-                            // Highlight
-                            TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
-                                .trim(from: 0, to: animationProgress)
-                                .stroke(
-                                    LinearGradient(colors: [.white.opacity(0.2 * opacity), .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
-                                    style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
-                                )
-                                .blendMode(.overlay)
+                        if usesTaskSections {
+                            ZStack {
+                                TaskSector(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: true, insetMinutes: 1)
+                                    .trim(from: 0, to: animationProgress)
+                                    .fill(task.color.opacity(0.48 * opacity))
+
+                                TaskSector(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: true, insetMinutes: 1)
+                                    .trim(from: 0, to: animationProgress)
+                                    .stroke(textForeground.opacity(0.18 * opacity), lineWidth: max(0.5, size * 0.003))
+                            }
+                            .frame(width: faceRadius * 2, height: faceRadius * 2)
+                        } else {
+                            ZStack {
+                                // Depth shadow
+                                TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
+                                    .trim(from: 0, to: animationProgress)
+                                    .stroke(Color.black.opacity(0.15 * opacity), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
+                                    .offset(x: 0.5, y: 0.5)
+                                
+                                // Main Task Fill
+                                TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
+                                    .trim(from: 0, to: animationProgress)
+                                    .stroke(task.color.opacity(opacity), style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
+                                
+                                // Highlight
+                                TaskArc(startMinutes: frag.startMinutes, endMinutes: frag.endMinutes, is24HourClock: is24HourClock)
+                                    .trim(from: 0, to: animationProgress)
+                                    .stroke(
+                                        LinearGradient(colors: [.white.opacity(0.2 * opacity), .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                        style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
+                                    )
+                                    .blendMode(.overlay)
+                            }
+                            .frame(width: r * 2, height: r * 2)
                         }
-                        .frame(width: r * 2, height: r * 2)
                     }
                 }
 

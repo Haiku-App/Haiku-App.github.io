@@ -15,6 +15,7 @@ import PostHog
 struct clockApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("hasShownPostOnboardingPaywall") private var hasShownPostOnboardingPaywall = false
     @StateObject private var storeManager = StoreManager()
     @State private var showingPaywall = false
 
@@ -76,6 +77,22 @@ struct clockApp: App {
                     }
                 }
             }
+            .onChange(of: hasCompletedOnboarding) { oldValue, newValue in
+                guard !oldValue, newValue else { return }
+                schedulePostOnboardingPaywall()
+            }
+        }
+    }
+
+    private func schedulePostOnboardingPaywall() {
+        guard !hasShownPostOnboardingPaywall, !storeManager.isPro else { return }
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard hasCompletedOnboarding, !hasShownPostOnboardingPaywall, !storeManager.isPro else { return }
+            hasShownPostOnboardingPaywall = true
+            showingPaywall = true
+            AnalyticsManager.shared.capture("post_onboarding_paywall_shown")
         }
     }
 }

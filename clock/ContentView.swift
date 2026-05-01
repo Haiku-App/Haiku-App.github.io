@@ -72,6 +72,7 @@ struct ContentView: View {
     @State private var lastGoogleCalendarRefreshAt: Date? = nil
     @AppStorage(CalendarSyncProvider.storageKey) private var activeCalendarSyncProvider: CalendarSyncProvider = .none
     @AppStorage("is24HourClock") private var is24HourClock = true
+    @AppStorage(ClockTaskDisplayStyle.storageKey) private var taskDisplayStyle: ClockTaskDisplayStyle = .rings
     @AppStorage("notificationOffsetsData") private var notificationOffsetsData = ""
     private let googleCalendarRefreshInterval: TimeInterval = 30
     private let routineAutoScheduleWindowDays = 28
@@ -98,6 +99,10 @@ struct ContentView: View {
         syncObservedRootLayout
             .onChange(of: is24HourClock) { oldVal, newVal in
                 handleClockFormatChange(oldVal: oldVal, newVal: newVal)
+            }
+            .onChange(of: taskDisplayStyle) { oldVal, newVal in
+                SharedTaskManager.shared.save(taskDisplayStyle: newVal)
+                WidgetCenter.shared.reloadAllTimelines()
             }
             .onChange(of: currentTheme) { oldVal, newVal in
                 SharedTaskManager.shared.save(theme: newVal)
@@ -276,6 +281,7 @@ struct ContentView: View {
             }
         }
         SharedTaskManager.shared.save(is24HourClock: is24HourClock)
+        SharedTaskManager.shared.save(taskDisplayStyle: taskDisplayStyle)
         SharedTaskManager.shared.save(theme: currentTheme)
         NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: tasksByDate, offsets: notificationOffsets)
         reconcileAutoScheduledRoutines()
@@ -476,7 +482,7 @@ struct ContentView: View {
             } else if selectedTab == .analytics {
                 ProfileAnalyticsView(tasksByDate: tasksByDate)
             } else if selectedTab == .profile {
-                ProfileSettingsView(is24HourClock: $is24HourClock, showingCustomOffsetAlert: $showingCustomOffsetAlert)
+                ProfileSettingsView(is24HourClock: $is24HourClock, taskDisplayStyle: $taskDisplayStyle, showingCustomOffsetAlert: $showingCustomOffsetAlert)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -814,6 +820,8 @@ struct ContentView: View {
 
             // Clock
             HStack(spacing: 15) {
+                let clockSize: CGFloat = (is24HourClock && taskDisplayStyle == .sections && !showingHourZoom) ? 310 : 280
+
                 if showingHourZoom {
                     Button(action: {
                         withAnimation {
@@ -834,6 +842,7 @@ struct ContentView: View {
                     tasks: currentTasksBinding,
                     isFlowState: $isFlowState,
                     is24HourClock: is24HourClock,
+                    taskDisplayStyle: taskDisplayStyle,
                     zoomedHour: showingHourZoom ? zoomedHour : nil,
                     theme: currentTheme,
                     onTaskUpdated: { updatedTask in
@@ -853,7 +862,7 @@ struct ContentView: View {
                         liveClockTasks = previewTasks
                     }
                 )
-                .frame(width: 280, height: 280)
+                .frame(width: clockSize, height: clockSize)
                 .scaleEffect(isFlowState ? 1.15 : 1.0)
                 
                 if showingHourZoom {

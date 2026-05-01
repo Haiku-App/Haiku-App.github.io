@@ -1,15 +1,22 @@
 import SwiftUI
+import StoreKit
 
 struct TodoView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     @AppStorage(ReminderManager.syncEnabledKey) private var isAppleRemindersSyncEnabled = false
+    @AppStorage("todoCompletedTaskCountForReview") private var completedTaskCountForReview = 0
+    @AppStorage("hasRequestedTodoReview") private var hasRequestedTodoReview = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.requestReview) private var requestReview
     @EnvironmentObject var storeManager: StoreManager
     @StateObject private var brainDumpManager = BrainDumpManager.shared
     @ObservedObject private var reminderManager = ReminderManager.shared
     @State private var newTaskTitle: String = ""
     @FocusState private var isFocused: Bool
     @State private var showingBulkImport = false
+    @State private var selectedListId: UUID? = nil
+    @State private var showingNewListAlert = false
+    @State private var newListName = ""
     
     enum Filter: String, CaseIterable {
         case active = "Inbox"
@@ -46,11 +53,18 @@ struct TodoView: View {
             routine.autoScheduleDays.contains(where: { $0.rawValue == Calendar.current.component(.weekday, from: today) })
         }
     }
+    private var selectedListName: String {
+        guard let selectedListId,
+              let list = brainDumpManager.lists.first(where: { $0.id == selectedListId }) else {
+            return "Inbox"
+        }
+        return list.name
+    }
 
     var filteredTasks: [BrainDumpTask] {
         switch selectedFilter {
         case .active:
-            return brainDumpInboxTasks(from: brainDumpManager.tasks)
+            return brainDumpInboxTasks(from: brainDumpManager.tasks).filter { $0.listId == selectedListId }
         case .completed:
             return brainDumpCompletedArchiveTasks(from: brainDumpManager.tasks)
         case .routine:
@@ -101,6 +115,12 @@ struct TodoView: View {
                 }
                 .padding(.horizontal, 40)
                 .padding(.bottom, 12)
+
+                if selectedFilter == .active {
+                    todoListSelector
+                        .padding(.bottom, 14)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 if selectedFilter == .completed {
                     HStack {
@@ -182,7 +202,7 @@ struct TodoView: View {
                         Image(systemName: selectedFilter == .active ? "brain.head.profile" : "checkmark.seal")
                             .font(.system(size: 32))
                             .foregroundStyle(goldColor.opacity(0.5) as Color)
-                        Text(selectedFilter == .active ? "Clear your mind" : "No completed tasks yet")
+                        Text(selectedFilter == .active ? (selectedListId == nil ? "Clear your mind" : "No tasks in \(selectedListName)") : "No completed tasks yet")
                             .font(.system(size: 14, weight: .light))
                             .foregroundStyle(currentTheme.textForeground.opacity(0.5) as Color)
                     }
@@ -199,6 +219,8 @@ struct TodoView: View {
                                 isSelected: selectedTaskIds.contains(task.id),
                                 isSelectionMode: isSelectionMode,
                                 repeatFrequency: task.repeatFrequency,
+                                lists: brainDumpManager.lists,
+                                listId: task.listId,
                                 onToggle: {
                                     if isSelectionMode {
                                         if selectedTaskIds.contains(task.id) {
@@ -262,6 +284,7 @@ struct TodoView: View {
                                                 AnalyticsManager.shared.capture("brain_dump_task_completed")
                                                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                                                 SoundManager.shared.playBing()
+                                                handleTodoCompletionForReviewPrompt()
                                             } else if wasCompleted && !nowCompleted {
                                                 AnalyticsManager.shared.capture("brain_dump_task_reactivated")
                                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -276,6 +299,9 @@ struct TodoView: View {
                                         brainDumpManager.tasks[index].repeatFrequency = freq
                                         AnalyticsManager.shared.capture("brain_dump_task_repeat_set", properties: ["frequency": freq.rawValue])
                                     }
+                                },
+                                onMoveToList: { listId in
+                                    moveTask(task, to: listId)
                                 }
                             )
                             .listRowBackground(SwiftUI.Color.clear.opacity(0.001) as Color)
@@ -364,7 +390,7 @@ struct TodoView: View {
             .padding(.bottom, 24)
         }
         .sheet(isPresented: $showingBulkImport) {
-            BulkImportView(isPresented: $showingBulkImport, manager: brainDumpManager)
+            BulkImportView(isPresented: $showingBulkImport, manager: brainDumpManager, listId: selectedListId)
         }
         .alert("Clear Done Tasks?", isPresented: $showingClearAlert) {
             Button("Cancel", role: .cancel) { }
@@ -374,6 +400,16 @@ struct TodoView: View {
             }
         } message: {
             Text("Are you sure you want to clear your done list? This action cannot be undone.")
+        }
+        .alert("New List", isPresented: $showingNewListAlert) {
+            TextField("List name", text: $newListName)
+            Button("Cancel", role: .cancel) { }
+            Button("Create") {
+                createList()
+            }
+            .disabled(newListName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } message: {
+            Text("Create a list for related to-dos.")
         }
         .onAppear {
             brainDumpManager.reloadFromSharedStoreIfNeeded()
@@ -400,11 +436,17 @@ struct TodoView: View {
                 selectedFilter = .active
             }
         }
+        .onChange(of: brainDumpManager.lists) { _, newLists in
+            if let selectedListId, !newLists.contains(where: { $0.id == selectedListId }) {
+                self.selectedListId = nil
+            }
+        }
     }
     
     private func addTask() {
         guard !newTaskTitle.isEmpty else { return }
-        let newTask = BrainDumpTask(title: newTaskTitle)
+        var newTask = BrainDumpTask(title: newTaskTitle)
+        newTask.listId = selectedListId
         withAnimation {
             brainDumpManager.tasks.insert(newTask, at: 0)
         }
@@ -413,9 +455,76 @@ struct TodoView: View {
         newTaskTitle = ""
         isFocused = true
     }
+
+    private func handleTodoCompletionForReviewPrompt() {
+        guard !hasRequestedTodoReview else { return }
+
+        completedTaskCountForReview += 1
+        guard (15...20).contains(completedTaskCountForReview) else { return }
+
+        hasRequestedTodoReview = true
+        AnalyticsManager.shared.capture("todo_review_prompt_requested", properties: [
+            "completed_task_count": completedTaskCountForReview
+        ])
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            requestReview()
+        }
+    }
+
+    private func createList() {
+        let trimmedName = newListName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+
+        let newList = BrainDumpList(name: trimmedName)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            brainDumpManager.lists.append(newList)
+            selectedListId = newList.id
+        }
+        AnalyticsManager.shared.capture("brain_dump_list_created")
+        newListName = ""
+    }
+
+    private func deleteList(_ list: BrainDumpList) {
+        withAnimation(.easeInOut) {
+            for index in brainDumpManager.tasks.indices where brainDumpManager.tasks[index].listId == list.id {
+                brainDumpManager.tasks[index].listId = nil
+            }
+            brainDumpManager.lists.removeAll { $0.id == list.id }
+            if selectedListId == list.id {
+                selectedListId = nil
+            }
+        }
+        AnalyticsManager.shared.capture("brain_dump_list_deleted")
+    }
+
+    private func moveTask(_ task: BrainDumpTask, to listId: UUID?) {
+        guard let index = brainDumpManager.tasks.firstIndex(where: { $0.id == task.id }) else { return }
+        withAnimation(.easeInOut) {
+            brainDumpManager.tasks[index].listId = listId
+        }
+        AnalyticsManager.shared.capture("brain_dump_task_moved_to_list")
+    }
     
     private func moveTask(from source: IndexSet, to destination: Int) {
-        brainDumpManager.tasks.move(fromOffsets: source, toOffset: destination)
+        let visibleTasks = filteredTasks
+        let movingTasks = source.compactMap { index in
+            visibleTasks.indices.contains(index) ? visibleTasks[index] : nil
+        }
+        let movingIDs = Set(movingTasks.map(\.id))
+
+        brainDumpManager.tasks.removeAll { movingIDs.contains($0.id) }
+
+        let remainingVisibleTasks = filteredTasks
+        let insertionIndex: Int
+        if destination < remainingVisibleTasks.count,
+           let destinationIndex = brainDumpManager.tasks.firstIndex(where: { $0.id == remainingVisibleTasks[destination].id }) {
+            insertionIndex = destinationIndex
+        } else {
+            insertionIndex = brainDumpManager.tasks.count
+        }
+
+        brainDumpManager.tasks.insert(contentsOf: movingTasks, at: insertionIndex)
     }
 
     private func clearCurrentFilter() {
@@ -472,8 +581,11 @@ struct BrainDumpRow: View {
     var isSelected: Bool = false
     var isSelectionMode: Bool = false
     var repeatFrequency: RepeatFrequency = .never
+    var lists: [BrainDumpList] = []
+    var listId: UUID? = nil
     var onToggle: () -> Void
     var onSetRepeat: (RepeatFrequency) -> Void = { _ in }
+    var onMoveToList: (UUID?) -> Void = { _ in }
     
     @State private var confettiCounter = 0
 
@@ -553,8 +665,67 @@ struct BrainDumpRow: View {
                         }
                     }
                 }
+
+                if !lists.isEmpty {
+                    Menu("Move to List") {
+                        Button(action: { onMoveToList(nil) }) {
+                            HStack {
+                                Text("Inbox")
+                                if listId == nil {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        ForEach(lists) { list in
+                            Button(action: { onMoveToList(list.id) }) {
+                                HStack {
+                                    Text(list.name)
+                                    if listId == list.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+struct TodoListChip: View {
+    let title: String
+    let systemImage: String
+    let isSelected: Bool
+    let theme: AppTheme
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+
+                Text(title)
+                    .font(.system(size: 12, weight: .bold, design: .serif))
+                    .tracking(0.5)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(isSelected ? theme.bg : theme.textForeground.opacity(0.72))
+            .padding(.horizontal, 14)
+            .frame(height: 36)
+            .background(
+                Capsule()
+                    .fill(isSelected ? theme.accent : theme.fieldBg)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(isSelected ? Color.white.opacity(0.2) : theme.textForeground.opacity(0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -663,6 +834,59 @@ struct ConfettiPiece: View {
 }
 
 extension TodoView {
+    private var todoListSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                TodoListChip(
+                    title: "Inbox",
+                    systemImage: "tray.fill",
+                    isSelected: selectedListId == nil,
+                    theme: currentTheme,
+                    action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            selectedListId = nil
+                        }
+                    }
+                )
+
+                ForEach(brainDumpManager.lists) { list in
+                    TodoListChip(
+                        title: list.name,
+                        systemImage: "list.bullet",
+                        isSelected: selectedListId == list.id,
+                        theme: currentTheme,
+                        action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                selectedListId = list.id
+                            }
+                        }
+                    )
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            deleteList(list)
+                        } label: {
+                            Label("Delete List", systemImage: "trash")
+                        }
+                    }
+                }
+
+                Button(action: {
+                    newListName = ""
+                    showingNewListAlert = true
+                }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(goldColor)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(currentTheme.fieldBg))
+                        .overlay(Circle().stroke(goldColor.opacity(0.28), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 40)
+        }
+    }
+
     private var routineTasksListView: some View {
         ScrollView {
             VStack(spacing: 18) {
@@ -671,10 +895,6 @@ extension TodoView {
                         .font(.system(size: 12, weight: .bold, design: .serif))
                         .foregroundStyle(goldColor)
                         .tracking(1)
-
-                    Text(hasAutoScheduledRoutineToday ? "Started routines stay here as live checklists while their scheduled blocks stay in sync on the clock." : "Started routines stay here as live checklists until you finish or end them.")
-                        .font(.system(size: 12, weight: .light))
-                        .foregroundStyle(currentTheme.textForeground.opacity(0.55))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
@@ -777,10 +997,6 @@ extension TodoView {
             Text("No active routine")
                 .font(.system(size: 14, weight: .light))
                 .foregroundStyle(currentTheme.textForeground.opacity(0.5) as Color)
-            
-            Text("Go to the Routine tab to start one. Started routines appear here as active checklists.")
-                .font(.system(size: 12))
-                .foregroundStyle(currentTheme.textForeground.opacity(0.4) as Color)
             Spacer()
         }
     }

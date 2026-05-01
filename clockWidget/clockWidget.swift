@@ -215,6 +215,7 @@ struct clockWidgetEntryView : View {
                     now: entry.date,
                     tasks: tasks,
                     is24HourClock: fetchIs24HourClock(),
+                    taskDisplayStyle: fetchTaskDisplayStyle(),
                     theme: theme,
                     showHands: true,
                     showText: true,
@@ -227,6 +228,7 @@ struct clockWidgetEntryView : View {
                     now: entry.date,
                     tasks: tasks,
                     is24HourClock: fetchIs24HourClock(),
+                    taskDisplayStyle: fetchTaskDisplayStyle(),
                     theme: theme,
                     showHands: true,
                     showText: true,
@@ -250,6 +252,7 @@ struct clockWidgetEntryView : View {
                             now: entry.date,
                             tasks: tasks,
                             is24HourClock: fetchIs24HourClock(),
+                            taskDisplayStyle: fetchTaskDisplayStyle(),
                             theme: theme,
                             showHands: true,
                             showText: true,
@@ -326,6 +329,10 @@ struct clockWidgetEntryView : View {
 
     private func fetchIs24HourClock() -> Bool {
         return SharedTaskManager.shared.loadIs24HourClock()
+    }
+
+    private func fetchTaskDisplayStyle() -> ClockTaskDisplayStyle {
+        return SharedTaskManager.shared.loadTaskDisplayStyle()
     }
     
     // Fetch today's tasks from the App Group, falling back to EventKit if not found

@@ -11,6 +11,8 @@ enum AppSupportDefaults {
     static let categoriesLastModifiedKey = "userCategoriesLastModified"
     static let brainDumpTasksKey = "brainDumpTasks"
     static let brainDumpTasksLastModifiedKey = "brainDumpTasksLastModified"
+    static let brainDumpListsKey = "brainDumpLists"
+    static let brainDumpListsLastModifiedKey = "brainDumpListsLastModified"
     static let routinesKey = "savedRoutines"
     static let routinesLastModifiedKey = "savedRoutinesLastModified"
     static let activeRoutineSessionsKey = "activeRoutineSessions"
@@ -18,7 +20,25 @@ enum AppSupportDefaults {
 
 enum AppSupportNotifications {
     static let brainDumpTasksDidChange = "group.reswink.haiku.brainDumpTasksDidChange"
+    static let brainDumpListsDidChange = "group.reswink.haiku.brainDumpListsDidChange"
     static let activeRoutineSessionsDidChange = "group.reswink.haiku.activeRoutineSessionsDidChange"
+}
+
+enum ClockTaskDisplayStyle: String, CaseIterable, Identifiable {
+    case rings
+    case sections
+
+    static let storageKey = "clockTaskDisplayStyle"
+    static let sharedStorageKey = "clockTaskDisplayStyleSetting"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .rings: return "Rings"
+        case .sections: return "Sections"
+        }
+    }
 }
 
 struct RGB: Codable, Equatable {
@@ -34,7 +54,10 @@ private func latestAppSupportModifiedAt(fallback: Date) -> Date {
             AppSupportPersistence.loadCategoriesLastModifiedAt() ?? fallback,
             AppSupportPersistence.loadBrainDumpTasksLastModifiedAt() ?? fallback
         ),
-        AppSupportPersistence.loadRoutinesLastModifiedAt() ?? fallback
+        max(
+            AppSupportPersistence.loadBrainDumpListsLastModifiedAt() ?? fallback,
+            AppSupportPersistence.loadRoutinesLastModifiedAt() ?? fallback
+        )
     )
 }
 
@@ -88,6 +111,15 @@ enum AppSupportPersistence {
         return decoded
     }
 
+    static func loadBrainDumpLists() -> [BrainDumpList] {
+        guard let data = AppSupportDefaults.userDefaults.data(forKey: AppSupportDefaults.brainDumpListsKey),
+              let decoded = try? JSONDecoder().decode([BrainDumpList].self, from: data) else {
+            return []
+        }
+
+        return sortedBrainDumpLists(decoded)
+    }
+
     static func loadRoutines() -> [Routine] {
         guard let data = AppSupportDefaults.userDefaults.data(forKey: AppSupportDefaults.routinesKey),
               let decoded = try? JSONDecoder().decode([Routine].self, from: data) else {
@@ -126,6 +158,19 @@ enum AppSupportPersistence {
         )
     }
 
+    static func saveBrainDumpLists(_ lists: [BrainDumpList], modifiedAt: Date = Date()) {
+        guard let data = try? JSONEncoder().encode(sortedBrainDumpLists(lists)) else { return }
+        AppSupportDefaults.userDefaults.set(data, forKey: AppSupportDefaults.brainDumpListsKey)
+        AppSupportDefaults.userDefaults.set(modifiedAt, forKey: AppSupportDefaults.brainDumpListsLastModifiedKey)
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(AppSupportNotifications.brainDumpListsDidChange as CFString),
+            nil,
+            nil,
+            true
+        )
+    }
+
     static func saveRoutines(_ routines: [Routine], modifiedAt: Date = Date()) {
         guard let data = try? JSONEncoder().encode(routines) else { return }
         AppSupportDefaults.userDefaults.set(data, forKey: AppSupportDefaults.routinesKey)
@@ -158,6 +203,10 @@ enum AppSupportPersistence {
 
     static func loadBrainDumpTasksLastModifiedAt() -> Date? {
         AppSupportDefaults.userDefaults.object(forKey: AppSupportDefaults.brainDumpTasksLastModifiedKey) as? Date
+    }
+
+    static func loadBrainDumpListsLastModifiedAt() -> Date? {
+        AppSupportDefaults.userDefaults.object(forKey: AppSupportDefaults.brainDumpListsLastModifiedKey) as? Date
     }
 
     static func loadRoutinesLastModifiedAt() -> Date? {
@@ -226,6 +275,7 @@ enum AppSupportBootstrap {
 struct AppSupportCloudSnapshot {
     let categories: [Category]
     let brainDumpTasks: [BrainDumpTask]
+    let brainDumpLists: [BrainDumpList]
     let routines: [Routine]
     let modifiedAt: Date
 }
@@ -275,12 +325,14 @@ actor AppSupportCloudSyncManager {
 
             if mergedSnapshot.categories != remoteSnapshot.categories ||
                 mergedSnapshot.brainDumpTasks != remoteSnapshot.brainDumpTasks ||
+                mergedSnapshot.brainDumpLists != remoteSnapshot.brainDumpLists ||
                 mergedSnapshot.routines != remoteSnapshot.routines {
                 await upload(snapshot: mergedSnapshot, existingRecord: record)
             }
 
             if mergedSnapshot.categories != localSnapshot.categories ||
                 mergedSnapshot.brainDumpTasks != localSnapshot.brainDumpTasks ||
+                mergedSnapshot.brainDumpLists != localSnapshot.brainDumpLists ||
                 mergedSnapshot.routines != localSnapshot.routines ||
                 mergedSnapshot.modifiedAt != localSnapshot.modifiedAt {
                 return mergedSnapshot
@@ -373,7 +425,12 @@ actor AppSupportCloudSyncManager {
     }
 
     private func encodeSnapshot(_ snapshot: AppSupportCloudSnapshot) -> Data? {
-        let payload = Payload(categories: snapshot.categories, brainDumpTasks: snapshot.brainDumpTasks, routines: snapshot.routines)
+        let payload = Payload(
+            categories: snapshot.categories,
+            brainDumpTasks: snapshot.brainDumpTasks,
+            brainDumpLists: snapshot.brainDumpLists,
+            routines: snapshot.routines
+        )
         return try? JSONEncoder().encode(payload)
     }
 
@@ -387,6 +444,7 @@ actor AppSupportCloudSyncManager {
         return AppSupportCloudSnapshot(
             categories: decoded.categories,
             brainDumpTasks: decoded.brainDumpTasks,
+            brainDumpLists: decoded.brainDumpLists ?? [],
             routines: decoded.routines,
             modifiedAt: modifiedAt
         )
@@ -400,6 +458,7 @@ actor AppSupportCloudSyncManager {
         AppSupportCloudSnapshot(
             categories: mergeCategories(local: local.categories, remote: remote.categories, preferLocal: preferLocal),
             brainDumpTasks: mergeBrainDumpTasks(local: local.brainDumpTasks, remote: remote.brainDumpTasks, preferLocal: preferLocal),
+            brainDumpLists: mergeBrainDumpLists(local: local.brainDumpLists, remote: remote.brainDumpLists, preferLocal: preferLocal),
             routines: mergeRoutines(local: local.routines, remote: remote.routines, preferLocal: preferLocal),
             modifiedAt: max(local.modifiedAt, remote.modifiedAt)
         )
@@ -469,6 +528,26 @@ actor AppSupportCloudSyncManager {
         }
     }
 
+    private func mergeBrainDumpLists(
+        local: [BrainDumpList],
+        remote: [BrainDumpList],
+        preferLocal: Bool
+    ) -> [BrainDumpList] {
+        var mergedByID: [UUID: BrainDumpList] = [:]
+        let firstPass = preferLocal ? remote : local
+        let secondPass = preferLocal ? local : remote
+
+        for list in firstPass {
+            mergedByID[list.id] = list
+        }
+
+        for list in secondPass {
+            mergedByID[list.id] = list
+        }
+
+        return sortedBrainDumpLists(Array(mergedByID.values))
+    }
+
     private func mergeRoutines(
         local: [Routine],
         remote: [Routine],
@@ -500,6 +579,7 @@ actor AppSupportCloudSyncManager {
     private struct Payload: Codable {
         let categories: [Category]
         let brainDumpTasks: [BrainDumpTask]
+        let brainDumpLists: [BrainDumpList]?
         let routines: [Routine]
     }
 }
@@ -546,6 +626,7 @@ class CategoryManager: ObservableObject {
                 snapshot: AppSupportCloudSnapshot(
                     categories: AppSupportPersistence.loadCategories(),
                     brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    brainDumpLists: AppSupportPersistence.loadBrainDumpLists(),
                     routines: AppSupportPersistence.loadRoutines(),
                     modifiedAt: latestAppSupportModifiedAt(fallback: modifiedAt)
                 )
@@ -564,6 +645,7 @@ class CategoryManager: ObservableObject {
                 : AppSupportCloudSnapshot(
                     categories: AppSupportPersistence.loadCategories(),
                     brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    brainDumpLists: AppSupportPersistence.loadBrainDumpLists(),
                     routines: AppSupportPersistence.loadRoutines(),
                     modifiedAt: localModifiedAt
                 )
@@ -575,7 +657,7 @@ class CategoryManager: ObservableObject {
 
             await MainActor.run {
                 CategoryManager.shared.applyCloudCategories(snapshot.categories, modifiedAt: snapshot.modifiedAt)
-                BrainDumpManager.shared.applyCloudTasks(snapshot.brainDumpTasks, modifiedAt: snapshot.modifiedAt)
+                BrainDumpManager.shared.applyCloudBrainDump(tasks: snapshot.brainDumpTasks, lists: snapshot.brainDumpLists, modifiedAt: snapshot.modifiedAt)
                 RoutineManager.shared.applyCloudRoutines(snapshot.routines, modifiedAt: snapshot.modifiedAt)
             }
         }
@@ -751,6 +833,21 @@ private func sortedRoutines(_ routines: [Routine]) -> [Routine] {
     }
 }
 
+struct BrainDumpList: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var name: String
+    var createdAt: Date = Date()
+}
+
+private func sortedBrainDumpLists(_ lists: [BrainDumpList]) -> [BrainDumpList] {
+    lists.sorted {
+        if $0.createdAt != $1.createdAt {
+            return $0.createdAt < $1.createdAt
+        }
+        return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+    }
+}
+
 struct BrainDumpTask: Identifiable, Codable, Equatable {
     var id = UUID()
     var title: String
@@ -760,6 +857,7 @@ struct BrainDumpTask: Identifiable, Codable, Equatable {
     var reminderDueDate: Date? = nil
     var externalReminderId: String? = nil
     var repeatFrequency: RepeatFrequency = .never
+    var listId: UUID? = nil
 }
 
 private func brainDumpSortDate(for task: BrainDumpTask) -> Date? {
@@ -878,7 +976,14 @@ class BrainDumpManager: ObservableObject {
     @Published var tasks: [BrainDumpTask] = [] {
         didSet {
             guard !isApplyingRemoteSnapshot, !isSynchronizingSharedState else { return }
-            persistAndSync()
+            persistTasksAndSync()
+        }
+    }
+
+    @Published var lists: [BrainDumpList] = [] {
+        didSet {
+            guard !isApplyingRemoteSnapshot, !isSynchronizingSharedState else { return }
+            persistListsAndSync()
         }
     }
 
@@ -894,6 +999,7 @@ class BrainDumpManager: ObservableObject {
 
     init() {
         self.tasks = AppSupportPersistence.loadBrainDumpTasks()
+        self.lists = AppSupportPersistence.loadBrainDumpLists()
         loadActiveRoutineSessions()
         sortTasks()
         startObservingSharedStore()
@@ -1009,13 +1115,17 @@ class BrainDumpManager: ObservableObject {
 
     func reloadFromSharedStoreIfNeeded() {
         let sharedTasks = AppSupportPersistence.loadBrainDumpTasks()
+        let sharedLists = AppSupportPersistence.loadBrainDumpLists()
         let sharedSessions = AppSupportPersistence.loadActiveRoutineSessions()
 
-        guard sharedTasks != tasks || sharedSessions != activeRoutineSessions else { return }
+        guard sharedTasks != tasks || sharedLists != lists || sharedSessions != activeRoutineSessions else { return }
 
         isSynchronizingSharedState = true
         if sharedTasks != tasks {
             tasks = sharedTasks
+        }
+        if sharedLists != lists {
+            lists = sharedLists
         }
         if sharedSessions != activeRoutineSessions {
             activeRoutineSessions = sharedSessions
@@ -1034,6 +1144,15 @@ class BrainDumpManager: ObservableObject {
     func applyCloudTasks(_ tasks: [BrainDumpTask], modifiedAt: Date) {
         isApplyingRemoteSnapshot = true
         self.tasks = sortedBrainDumpTasks(tasks)
+        AppSupportPersistence.saveBrainDumpTasks(self.tasks, modifiedAt: modifiedAt)
+        isApplyingRemoteSnapshot = false
+    }
+
+    func applyCloudBrainDump(tasks: [BrainDumpTask], lists: [BrainDumpList], modifiedAt: Date) {
+        isApplyingRemoteSnapshot = true
+        self.lists = sortedBrainDumpLists(lists)
+        self.tasks = sortedBrainDumpTasks(tasks)
+        AppSupportPersistence.saveBrainDumpLists(self.lists, modifiedAt: modifiedAt)
         AppSupportPersistence.saveBrainDumpTasks(self.tasks, modifiedAt: modifiedAt)
         isApplyingRemoteSnapshot = false
     }
@@ -1123,15 +1242,25 @@ class BrainDumpManager: ObservableObject {
         return result
     }
 
-    private func persistAndSync() {
+    private func persistTasksAndSync() {
         let modifiedAt = Date()
         AppSupportPersistence.saveBrainDumpTasks(tasks, modifiedAt: modifiedAt)
+        uploadSupportSnapshot(modifiedAt: modifiedAt)
+    }
 
+    private func persistListsAndSync() {
+        let modifiedAt = Date()
+        AppSupportPersistence.saveBrainDumpLists(lists, modifiedAt: modifiedAt)
+        uploadSupportSnapshot(modifiedAt: modifiedAt)
+    }
+
+    private func uploadSupportSnapshot(modifiedAt: Date) {
         Task {
             await AppSupportCloudSyncManager.shared.uploadLocalSnapshot(
                 snapshot: AppSupportCloudSnapshot(
                     categories: AppSupportPersistence.loadCategories(),
                     brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    brainDumpLists: AppSupportPersistence.loadBrainDumpLists(),
                     routines: AppSupportPersistence.loadRoutines(),
                     modifiedAt: latestAppSupportModifiedAt(fallback: modifiedAt)
                 )
@@ -1150,6 +1279,7 @@ class BrainDumpManager: ObservableObject {
                 : AppSupportCloudSnapshot(
                     categories: AppSupportPersistence.loadCategories(),
                     brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    brainDumpLists: AppSupportPersistence.loadBrainDumpLists(),
                     routines: AppSupportPersistence.loadRoutines(),
                     modifiedAt: localModifiedAt
                 )
@@ -1161,7 +1291,7 @@ class BrainDumpManager: ObservableObject {
 
             await MainActor.run {
                 CategoryManager.shared.applyCloudCategories(snapshot.categories, modifiedAt: snapshot.modifiedAt)
-                BrainDumpManager.shared.applyCloudTasks(snapshot.brainDumpTasks, modifiedAt: snapshot.modifiedAt)
+                BrainDumpManager.shared.applyCloudBrainDump(tasks: snapshot.brainDumpTasks, lists: snapshot.brainDumpLists, modifiedAt: snapshot.modifiedAt)
                 RoutineManager.shared.applyCloudRoutines(snapshot.routines, modifiedAt: snapshot.modifiedAt)
             }
         }
@@ -1183,6 +1313,14 @@ class BrainDumpManager: ObservableObject {
             observer,
             callback,
             AppSupportNotifications.brainDumpTasksDidChange as CFString,
+            nil,
+            .deliverImmediately
+        )
+        CFNotificationCenterAddObserver(
+            center,
+            observer,
+            callback,
+            AppSupportNotifications.brainDumpListsDidChange as CFString,
             nil,
             .deliverImmediately
         )
@@ -1265,6 +1403,7 @@ class RoutineManager: ObservableObject {
                 snapshot: AppSupportCloudSnapshot(
                     categories: AppSupportPersistence.loadCategories(),
                     brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    brainDumpLists: AppSupportPersistence.loadBrainDumpLists(),
                     routines: AppSupportPersistence.loadRoutines(),
                     modifiedAt: latestAppSupportModifiedAt(fallback: modifiedAt)
                 )
@@ -1283,6 +1422,7 @@ class RoutineManager: ObservableObject {
                 : AppSupportCloudSnapshot(
                     categories: AppSupportPersistence.loadCategories(),
                     brainDumpTasks: AppSupportPersistence.loadBrainDumpTasks(),
+                    brainDumpLists: AppSupportPersistence.loadBrainDumpLists(),
                     routines: AppSupportPersistence.loadRoutines(),
                     modifiedAt: localModifiedAt
                 )
@@ -1294,7 +1434,7 @@ class RoutineManager: ObservableObject {
 
             await MainActor.run {
                 CategoryManager.shared.applyCloudCategories(snapshot.categories, modifiedAt: snapshot.modifiedAt)
-                BrainDumpManager.shared.applyCloudTasks(snapshot.brainDumpTasks, modifiedAt: snapshot.modifiedAt)
+                BrainDumpManager.shared.applyCloudBrainDump(tasks: snapshot.brainDumpTasks, lists: snapshot.brainDumpLists, modifiedAt: snapshot.modifiedAt)
                 RoutineManager.shared.applyCloudRoutines(snapshot.routines, modifiedAt: snapshot.modifiedAt)
             }
         }

@@ -6,6 +6,7 @@ struct BulkImportView: View {
     @EnvironmentObject var storeManager: StoreManager
     @Binding var isPresented: Bool
     @ObservedObject var manager: BrainDumpManager
+    var listId: UUID? = nil
     @ObservedObject private var reminderManager = ReminderManager.shared
     @State private var text: String = ""
     
@@ -102,7 +103,8 @@ struct BulkImportView: View {
                 title = title.trimmingCharacters(in: .whitespacesAndNewlines)
                 
                 if !title.isEmpty {
-                    let task = BrainDumpTask(title: title)
+                    var task = BrainDumpTask(title: title)
+                    task.listId = listId
                     manager.tasks.insert(task, at: 0)
                     importedTaskIDs.append(task.id)
                     importedCount += 1

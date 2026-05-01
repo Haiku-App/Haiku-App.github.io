@@ -176,6 +176,7 @@ class SharedTaskManager {
     private let is24HourKey = "is24HourClockSetting"
     private let isProKey = "isProSetting"
     private let hasUnlockedFreeProKey = "hasUnlockedFreeProSetting"
+    private let taskDisplayStyleKey = ClockTaskDisplayStyle.sharedStorageKey
 
     init() {
         self.userDefaults = UserDefaults(suiteName: "group.reswink.haiku") ?? UserDefaults.standard
@@ -257,6 +258,19 @@ class SharedTaskManager {
             return true
         }
         return userDefaults.bool(forKey: is24HourKey)
+    }
+
+    func save(taskDisplayStyle: ClockTaskDisplayStyle) {
+        userDefaults.set(taskDisplayStyle.rawValue, forKey: taskDisplayStyleKey)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    func loadTaskDisplayStyle() -> ClockTaskDisplayStyle {
+        guard let rawValue = userDefaults.string(forKey: taskDisplayStyleKey),
+              let style = ClockTaskDisplayStyle(rawValue: rawValue) else {
+            return .rings
+        }
+        return style
     }
 
     func save(theme: AppTheme) {

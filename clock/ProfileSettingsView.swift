@@ -16,6 +16,7 @@ struct ProfileSettingsView: View {
     @State private var appleRemindersStatus: EKAuthorizationStatus = ReminderManager.currentAuthorizationStatus()
     
     @Binding var is24HourClock: Bool
+    @Binding var taskDisplayStyle: ClockTaskDisplayStyle
     @Binding var showingCustomOffsetAlert: Bool
     @State private var showingPaywall = false
     @State private var paywallFocusFeature: String? = nil
@@ -198,6 +199,38 @@ struct ProfileSettingsView: View {
                                 .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
                                 .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
                         )
+
+                    if is24HourClock {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("24-HOUR TASK DISPLAY")
+                                .font(.system(size: 12, weight: .regular, design: .serif))
+                                .foregroundStyle(goldColor)
+                                .tracking(1)
+                                .padding(.horizontal, 4)
+
+                            HStack(spacing: 12) {
+                                ForEach(ClockTaskDisplayStyle.allCases) { style in
+                                    ClockTaskDisplayStyleButton(
+                                        style: style,
+                                        isSelected: taskDisplayStyle == style,
+                                        theme: currentTheme
+                                    ) {
+                                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                                            taskDisplayStyle = style
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(currentTheme.fieldBg)
+                                .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
+                                .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
+                        )
+                    }
 
                     VStack(alignment: .leading, spacing: 12) {
                         Text("NOTIFICATIONS")
@@ -650,6 +683,9 @@ struct ProfileSettingsView: View {
         .onChange(of: is24HourClock) { oldVal, newVal in
             AnalyticsManager.shared.capture("clock_format_toggled", properties: ["is_24_hour": newVal])
         }
+        .onChange(of: taskDisplayStyle) { oldVal, newVal in
+            AnalyticsManager.shared.capture("clock_task_display_style_changed", properties: ["style": newVal.rawValue])
+        }
         .onChange(of: googleCalendarManager.isSignedIn) { oldValue, newValue in
             if !newValue && activeCalendarSyncProvider == .google {
                 activeCalendarSyncProvider = .none
@@ -657,6 +693,84 @@ struct ProfileSettingsView: View {
         }
         .onChange(of: reminderManager.eventsDidChange) { _, _ in
             refreshAppleRemindersStatus()
+        }
+    }
+}
+
+private struct ClockTaskDisplayStyleButton: View {
+    let style: ClockTaskDisplayStyle
+    let isSelected: Bool
+    let theme: AppTheme
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                ClockTaskDisplayStyleGlyph(style: style, theme: theme, isSelected: isSelected)
+                    .frame(width: 36, height: 36)
+
+                Text(style.label)
+                    .font(.system(size: 13, weight: .bold, design: .serif))
+                    .foregroundStyle(isSelected ? theme.bg : theme.textForeground.opacity(0.78))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .frame(minHeight: 86)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected ? theme.accent : theme.bg.opacity(0.34))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isSelected ? Color.white.opacity(0.22) : theme.textForeground.opacity(0.08), lineWidth: 1)
+            )
+            .shadow(color: isSelected ? theme.accent.opacity(0.22) : Color.clear, radius: 8, y: 4)
+            .overlay(alignment: .topTrailing) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(isSelected ? theme.bg.opacity(0.95) : theme.textForeground.opacity(0.22))
+                    .padding(8)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct ClockTaskDisplayStyleGlyph: View {
+    let style: ClockTaskDisplayStyle
+    let theme: AppTheme
+    let isSelected: Bool
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(isSelected ? theme.bg.opacity(0.16) : theme.fieldBg)
+                .overlay(Circle().stroke((isSelected ? theme.bg : theme.accent).opacity(0.55), lineWidth: 1))
+
+            if style == .rings {
+                Circle()
+                    .trim(from: 0.08, to: 0.34)
+                    .stroke(isSelected ? theme.bg : theme.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .padding(7)
+
+                Circle()
+                    .trim(from: 0.54, to: 0.78)
+                    .stroke((isSelected ? theme.bg : theme.accent).opacity(0.62), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .padding(7)
+            } else {
+                TaskSector(startMinutes: 90, endMinutes: 430, is24HourClock: true, insetMinutes: 6)
+                    .fill((isSelected ? theme.bg : theme.accent).opacity(0.68))
+                    .padding(5)
+
+                TaskSector(startMinutes: 610, endMinutes: 930, is24HourClock: true, insetMinutes: 6)
+                    .fill((isSelected ? theme.bg : theme.accent).opacity(0.42))
+                    .padding(5)
+            }
         }
     }
 }
