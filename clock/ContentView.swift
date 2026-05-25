@@ -25,7 +25,6 @@ struct ContentView: View {
     @State private var liveClockTasks: [ClockTask]? = nil
     @State private var isApplyingCloudSnapshot = false
 
-    @State private var isFlowState = false
     @State private var showingHourZoom = false
     @State private var zoomedHour: Int? = nil
 
@@ -451,8 +450,8 @@ struct ContentView: View {
             }
         }
         .padding(.top, 24)
-        .opacity(selectedTab == .clock && !isFlowState ? 1 : 0)
-        .frame(height: selectedTab == .clock && !isFlowState ? nil : 0)
+        .opacity(selectedTab == .clock ? 1 : 0)
+        .frame(height: selectedTab == .clock ? nil : 0)
         .clipped()
     }
 
@@ -528,8 +527,6 @@ struct ContentView: View {
                 .ignoresSafeArea()
         )
         .foregroundStyle(currentTheme.textForeground.opacity(0.4))
-        .opacity(isFlowState ? 0 : 1)
-        .animation(.easeInOut, value: isFlowState)
     }
 
     @ViewBuilder
@@ -861,7 +858,6 @@ struct ContentView: View {
                 ClockView(
                     now: now,
                     tasks: currentTasksBinding,
-                    isFlowState: $isFlowState,
                     is24HourClock: is24HourClock,
                     taskDisplayStyle: taskDisplayStyle,
                     zoomedHour: showingHourZoom ? zoomedHour : nil,
@@ -887,7 +883,6 @@ struct ContentView: View {
                     }
                 )
                 .frame(width: clockSize, height: clockSize)
-                .scaleEffect(isFlowState ? 1.15 : 1.0)
                 
                 if showingHourZoom {
                     Button(action: {
@@ -939,7 +934,6 @@ struct ContentView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
                 .padding(.top, 24)
-                .opacity(isFlowState ? 0 : 1)
 
             Spacer()
                 .frame(height: 26)
@@ -988,7 +982,6 @@ struct ContentView: View {
                     .scrollContentBackground(.hidden)
                 }
             }
-            .opacity(isFlowState ? 0 : 1)
 
             Spacer()
         }
@@ -1243,7 +1236,6 @@ struct ContentView: View {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
             selectedDate = today
             selectedTab = .todo
-            isFlowState = false
         }
 
         AnalyticsManager.shared.capture("routine_started_now", properties: [
@@ -1522,7 +1514,6 @@ struct ContentView: View {
 
     private func resetClockInteractionState() {
         liveClockTasks = nil
-        isFlowState = false
         taskListResetToken = UUID()
     }
 

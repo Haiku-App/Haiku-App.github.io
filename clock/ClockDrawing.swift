@@ -4,7 +4,6 @@ struct ClockView: View {
     var now: Date
     var displayedDate: Date = Date()
     @Binding var tasks: [ClockTask]
-    @Binding var isFlowState: Bool
     var is24HourClock: Bool = false
     var taskDisplayStyle: ClockTaskDisplayStyle = .rings
     var zoomedHour: Int? = nil
@@ -336,7 +335,7 @@ struct ClockView: View {
                     }
                 }
 
-                // Central Status Text & Flow State Toggle
+                // Central Status Text
                 if let active = activeTask {
                     let minsRemaining = active.endMinutes - Int(currentMinute)
                     let h = minsRemaining / 60
@@ -349,30 +348,11 @@ struct ClockView: View {
                         }
                     }()
                     
-                    Button(action: {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                            isFlowState.toggle()
-                            logAnalytics("flow_state_toggled", properties: ["is_active": isFlowState])
-                        }
-                    }) {
-                        VStack(spacing: 4) {
-                            if isFlowState {
-                                Text(active.title.uppercased())
-                                    .font(.system(size: 11, weight: .black, design: .rounded))
-                                    .tracking(2)
-                                    .foregroundStyle(active.color.opacity(0.8))
-                                    .transition(.asymmetric(insertion: .opacity.combined(with: .scale), removal: .opacity))
-                            } else {
-                                Text(timeLabel)
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(active.color.opacity(0.001))
-                            }
-                        }
-                        .padding(24)
-                        .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .position(x: center.x, y: center.y + faceRadius - (isFlowState ? 50 : 45))
+                    Text(timeLabel)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(active.color.opacity(0.65))
+                        .position(x: center.x, y: center.y + faceRadius - 45)
+                        .allowsHitTesting(false)
                     
                 } else {
                     Text(formatTime(now).uppercased())
@@ -452,8 +432,8 @@ struct ClockView: View {
         let taskForClock = task.normalizedForClock
         let isDragging = activeDrag?.taskId == task.id
         let isActive = activeTask?.id == task.id && !isDragging
-        let glowRadius: CGFloat = (isActive && (pulseState || isFlowState)) ? (isFlowState ? 16 : 8) : (isDragging ? 4 : 0)
-        let glowColor = task.color.opacity((isActive && (pulseState || isFlowState)) ? (isFlowState ? 0.6 : 0.4) : (isDragging ? 0.6 : 0))
+        let glowRadius: CGFloat = (isActive && pulseState) ? 8 : (isDragging ? 4 : 0)
+        let glowColor = task.color.opacity((isActive && pulseState) ? 0.4 : (isDragging ? 0.6 : 0))
         
         let fragments: [TaskFragment] = {
             if let zh = zoomedHour {

@@ -517,6 +517,7 @@ struct AddTaskView: View {
         let categoryId = cat?.id
         let categoryName = cat?.name
         persistTaskDefaults(categoryId: categoryId, colorIndex: selectedColorIndex)
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         
         let day = cal.startOfDay(for: taskDate)
         
@@ -532,7 +533,7 @@ struct AddTaskView: View {
             }
             
             var updatedTask = toEdit
-            updatedTask.title = title.isEmpty ? "Updated Task" : title
+            updatedTask.title = trimmedTitle.isEmpty ? toEdit.title : trimmedTitle
             updatedTask.startMinutes = sMin
             updatedTask.endMinutes = normalizedEndMinutes
             updatedTask.color = colorToUse
@@ -573,7 +574,7 @@ struct AddTaskView: View {
         } else {
             // Create the first instance
             let firstTask = ClockTask(
-                title: title.isEmpty ? "New Task" : title,
+                title: trimmedTitle.isEmpty ? "New Task" : trimmedTitle,
                 startMinutes: sMin,
                 endMinutes: normalizedEndMinutes,
                 color: colorToUse,
