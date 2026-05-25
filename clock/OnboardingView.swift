@@ -213,6 +213,7 @@ struct OnboardingView: View {
                 now: Calendar.current.date(bySettingHour: 10, minute: 15, second: 0, of: Date()) ?? Date(),
                 tasks: mockTasks,
                 is24HourClock: true,
+                taskDisplayStyle: .sections,
                 theme: currentTheme,
                 showHands: true,
                 showText: true,
@@ -335,6 +336,7 @@ struct OnboardingView: View {
                     now: clockPreviewDate,
                     tasks: [builtTask],
                     is24HourClock: true,
+                    taskDisplayStyle: .sections,
                     theme: currentTheme,
                     showHands: true,
                     showText: true,
@@ -402,6 +404,7 @@ struct OnboardingView: View {
                     now: clockPreviewDate,
                     tasks: [builtTask],
                     is24HourClock: true,
+                    taskDisplayStyle: .sections,
                     theme: currentTheme,
                     showHands: true,
                     showText: true,
@@ -421,6 +424,13 @@ struct OnboardingView: View {
                         .foregroundStyle(currentTheme.textForeground.opacity(0.65))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
+
+                    Text("You can change it anytime. For now, this is enough to begin.")
+                        .font(.system(size: 14, weight: .regular, design: .serif))
+                        .foregroundStyle(currentTheme.textForeground.opacity(0.52))
+                        .lineSpacing(4)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 36)
                 }
 
                 VStack(spacing: 12) {

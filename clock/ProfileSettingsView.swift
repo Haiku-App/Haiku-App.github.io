@@ -30,8 +30,15 @@ struct ProfileSettingsView: View {
             set: { storeManager.setTestingProEnabled($0) }
         )
     }
+    @AppStorage(DemoScreenshotData.storageKey) private var isDemoScreenshotDataEnabled = false
+    private var demoScreenshotDataBinding: Binding<Bool> {
+        Binding(
+            get: { AppConfiguration.isTestingMode && isDemoScreenshotDataEnabled },
+            set: { isDemoScreenshotDataEnabled = AppConfiguration.isTestingMode && $0 }
+        )
+    }
     private var appVersionText: String {
-        return "Version 1.7"
+        return "Version 1.9"
     }
 
     private var isAppleConnected: Bool {
@@ -618,7 +625,19 @@ struct ProfileSettingsView: View {
                                         .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
                                 )
 
-                            Text("This toggle is only available in sandbox/testing mode and won’t appear in normal builds.")
+                            Toggle("Demo Screenshot Data", isOn: demoScreenshotDataBinding)
+                                .font(.system(size: 16, weight: .medium, design: .serif))
+                                .foregroundStyle(currentTheme.textForeground.opacity(0.9))
+                                .padding()
+                                .tint(goldColor)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(currentTheme.fieldBg)
+                                        .shadow(color: currentTheme.shadowDark, radius: 5, x: 4, y: 4)
+                                        .shadow(color: currentTheme.shadowLight, radius: 5, x: -4, y: -4)
+                                )
+
+                            Text("Testing controls are sandbox-only. Demo data fills Clock, Weekly, and Analytics for screenshots without overwriting your real tasks.")
                                 .font(.system(size: 11, weight: .regular))
                                 .foregroundStyle(currentTheme.textForeground.opacity(0.6))
                                 .multilineTextAlignment(.center)

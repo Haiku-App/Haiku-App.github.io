@@ -4,13 +4,14 @@ struct WeeklyView: View {
     @AppStorage("appTheme") private var currentTheme: AppTheme = .sage
     @AppStorage("is24HourClock") private var is24HourClock = true
     @AppStorage(ClockTaskDisplayStyle.storageKey) private var taskDisplayStyle: ClockTaskDisplayStyle = .rings
-    @State private var isCalendarLayout = false
+    @AppStorage("weeklyUsesCalendarLayout") private var isCalendarLayout = true
     
     var tasksByDate: [Date: [ClockTask]]
     @Binding var selectedDate: Date
     @Binding var selectedTab: AppTab
     var onAppear: ((Date) -> Void)? = nil
     var onWeekChanged: ((Date) -> Void)? = nil
+    var onTaskSelected: ((Date, ClockTask) -> Void)? = nil
     
     @State private var displayWeek: Date = {
         let cal = Calendar.current
@@ -92,7 +93,15 @@ struct WeeklyView: View {
             .padding(.bottom, 28)
             
             if isCalendarLayout {
-                StandardCalendarLayout(tasksByDate: tasksByDate, displayWeek: displayWeek, currentTheme: currentTheme, is24HourClock: is24HourClock, selectedDate: $selectedDate, selectedTab: $selectedTab)
+                StandardCalendarLayout(
+                    tasksByDate: tasksByDate,
+                    displayWeek: displayWeek,
+                    currentTheme: currentTheme,
+                    is24HourClock: is24HourClock,
+                    selectedDate: $selectedDate,
+                    selectedTab: $selectedTab,
+                    onTaskSelected: onTaskSelected
+                )
                     .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .trailing)), removal: .opacity))
             } else {
                 // Grid of Large Clocks
@@ -102,6 +111,7 @@ struct WeeklyView: View {
                         ForEach(0..<days.count, id: \.self) { index in
                             if let date = days[index] {
                                 let tasks = tasksByDate[date, default: []]
+                                let displayTasks = tasks.collapsedForRoutineDisplay()
                                 let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
                                 let dayName = daysOfWeek[index]
                                 let dayNum = Calendar.current.component(.day, from: date)
@@ -119,8 +129,8 @@ struct WeeklyView: View {
 
                                         Spacer()
 
-                                        if !tasks.isEmpty {
-                                            Text("\(tasks.count) task\(tasks.count == 1 ? "" : "s")")
+                                        if !displayTasks.isEmpty {
+                                            Text("\(displayTasks.count) task\(displayTasks.count == 1 ? "" : "s")")
                                                 .font(.system(size: 11, weight: .bold, design: .rounded))
                                                 .foregroundStyle(currentTheme.accent.opacity(0.8))
                                                 .padding(.horizontal, 10)
@@ -134,7 +144,7 @@ struct WeeklyView: View {
 
                                     HStack(alignment: .center, spacing: 18) {
                                         ZStack {
-                                            StaticClockView(now: Date(), tasks: tasks, is24HourClock: is24HourClock, taskDisplayStyle: taskDisplayStyle, theme: currentTheme, showHands: true, showText: true)
+                                            StaticClockView(now: Date(), tasks: displayTasks, is24HourClock: is24HourClock, taskDisplayStyle: taskDisplayStyle, theme: currentTheme, showHands: true, showText: true)
                                                 .frame(width: 146, height: 146)
                                                 .padding(4)
                                                 .background(
@@ -157,8 +167,8 @@ struct WeeklyView: View {
                                         }
 
                                         VStack(alignment: .leading, spacing: 10) {
-                                            if !tasks.isEmpty {
-                                                ForEach(tasks.prefix(3)) { task in
+                                            if !displayTasks.isEmpty {
+                                                ForEach(displayTasks.prefix(3)) { task in
                                                     HStack(alignment: .top, spacing: 8) {
                                                         Circle()
                                                             .fill(task.color)
@@ -179,8 +189,8 @@ struct WeeklyView: View {
                                                     }
                                                 }
 
-                                                if tasks.count > 3 {
-                                                    Text("+\(tasks.count - 3) more")
+                                                if displayTasks.count > 3 {
+                                                    Text("+\(displayTasks.count - 3) more")
                                                         .font(.system(size: 10, weight: .bold, design: .rounded))
                                                         .foregroundStyle(currentTheme.accent.opacity(0.75))
                                                 }
@@ -278,6 +288,7 @@ struct StandardCalendarLayout: View {
     let is24HourClock: Bool
     @Binding var selectedDate: Date
     @Binding var selectedTab: AppTab
+    var onTaskSelected: ((Date, ClockTask) -> Void)? = nil
     
     private let hourHeight: CGFloat = 60
     private let timeWidth: CGFloat = 50
@@ -337,7 +348,7 @@ struct StandardCalendarLayout: View {
                         let days = getDaysInWeek()
                         ForEach(0..<7) { dayIndex in
                             if let date = days[dayIndex] {
-                                let tasks = tasksByDate[date, default: []]
+                                let tasks = tasksByDate[date, default: []].collapsedForRoutineDisplay()
                                 ZStack(alignment: .topLeading) {
                                     Color.clear // Container for the day
                                     
@@ -362,8 +373,7 @@ struct StandardCalendarLayout: View {
                                             .offset(y: start)
                                             .onTapGesture {
                                                 withAnimation {
-                                                    selectedDate = date
-                                                    selectedTab = .clock
+                                                    onTaskSelected?(date, task)
                                                 }
                                             }
                                     }

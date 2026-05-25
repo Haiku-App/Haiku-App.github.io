@@ -160,6 +160,60 @@ extension ClockTask {
         guard let externalEventId else { return .none }
         return externalEventId.hasPrefix("google_") ? .google : .apple
     }
+
+    var isRoutineDisplayGroup: Bool {
+        routineSourceId != nil && routineSourceStepId == nil
+    }
+}
+
+private struct RoutineDisplayGroupKey: Hashable {
+    let routineId: UUID
+    let anchorDate: Date
+}
+
+extension Array where Element == ClockTask {
+    func collapsedForRoutineDisplay() -> [ClockTask] {
+        var groupedRoutineTasks: [RoutineDisplayGroupKey: [ClockTask]] = [:]
+        var displayTasks: [ClockTask] = []
+
+        for task in self {
+            if let routineId = task.routineSourceId,
+               let routineName = task.routineSourceName?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !routineName.isEmpty {
+                let anchorDate = task.routineAnchorDate ?? Date.distantPast
+                let key = RoutineDisplayGroupKey(routineId: routineId, anchorDate: anchorDate)
+                groupedRoutineTasks[key, default: []].append(task)
+            } else {
+                displayTasks.append(task)
+            }
+        }
+
+        for routineTasks in groupedRoutineTasks.values {
+            guard let firstTask = routineTasks.sorted(by: { $0.startMinutes < $1.startMinutes }).first else { continue }
+            let startMinutes = routineTasks.map(\.startMinutes).min() ?? firstTask.startMinutes
+            let endMinutes = routineTasks.map(\.normalizedEndMinutes).max() ?? firstTask.normalizedEndMinutes
+
+            var displayTask = firstTask
+            displayTask.title = firstTask.routineSourceName ?? firstTask.title
+            displayTask.startMinutes = startMinutes
+            displayTask.endMinutes = endMinutes
+            displayTask.externalEventId = nil
+            displayTask.routineSourceStepId = nil
+            displayTasks.append(displayTask)
+        }
+
+        return displayTasks.sorted {
+            if $0.startMinutes != $1.startMinutes {
+                return $0.startMinutes < $1.startMinutes
+            }
+
+            if $0.endMinutes != $1.endMinutes {
+                return $0.endMinutes < $1.endMinutes
+            }
+
+            return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+        }
+    }
 }
 
 struct TaskGroup: Codable {

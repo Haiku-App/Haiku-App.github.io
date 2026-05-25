@@ -88,7 +88,7 @@ struct clockApp: App {
         guard !hasShownPostOnboardingPaywall, !storeManager.isPro else { return }
 
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: .seconds(4))
             guard hasCompletedOnboarding, !hasShownPostOnboardingPaywall, !storeManager.isPro else { return }
             hasShownPostOnboardingPaywall = true
             showingPaywall = true

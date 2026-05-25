@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Haiku Web</title>
+  <meta name="description" content="Haiku for desktop planning." />
+  <link rel="icon" type="image/png" href="../favicon.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <main class="haiku-app" aria-label="Haiku web app">
+    <header class="app-header">
+      <h1>HAIKU</h1>
+
+      <div class="date-controls" aria-label="Date controls">
+        <button id="zoomClock" class="header-icon" type="button" aria-label="Zoom clock">
+          <span data-icon="zoom-in"></span>
+        </button>
+        <div class="date-center">
+          <button id="prevDay" class="chevron-button" type="button" aria-label="Previous day">
+            <span data-icon="chevron-left"></span>
+          </button>
+          <button id="dateButton" class="date-button" type="button">
+            <span id="dateLabel">Today</span>
+          </button>
+          <input id="datePicker" class="date-input" type="date" aria-label="Choose date" />
+          <button id="nextDay" class="chevron-button" type="button" aria-label="Next day">
+            <span data-icon="chevron-right"></span>
+          </button>
+        </div>
+        <button id="quickAdd" class="header-icon" type="button" aria-label="Add task">
+          <span data-icon="plus"></span>
+        </button>
+      </div>
+
+      <p id="weekdayLabel" class="day-status">Today</p>
+    </header>
+
+    <section id="dayView" class="view is-visible clock-screen" aria-label="Clock">
+      <div class="clock-stage">
+        <svg id="clockSvg" viewBox="0 0 420 420" role="img" aria-labelledby="clockTitle"></svg>
+        <span id="clockTitle" class="sr-only">Tasks arranged on the Haiku clock</span>
+      </div>
+
+      <p id="dailyQuote" class="daily-quote"></p>
+
+      <div class="task-strip">
+        <div id="taskList" class="ios-task-list"></div>
+      </div>
+    </section>
+
+    <section id="upcomingView" class="view weekly-screen" aria-label="Weekly">
+      <h2>WEEKLY</h2>
+      <div id="upcomingList" class="week-list"></div>
+    </section>
+
+    <section id="routinesView" class="view todo-screen" aria-label="To-Do">
+      <h2>BRAIN DUMP</h2>
+      <form id="todoForm" class="quick-task">
+        <input id="todoInput" type="text" autocomplete="off" placeholder="Quick task..." />
+        <button type="submit" aria-label="Add quick task">
+          <span data-icon="plus"></span>
+        </button>
+      </form>
+      <div id="routineList" class="brain-dump-list"></div>
+    </section>
+
+    <section id="insightsView" class="view insights-screen" aria-label="Analytics">
+      <h2>INSIGHTS</h2>
+      <div id="insightStats" class="insight-cards"></div>
+      <section class="focus-window">
+        <p>PEAK FOCUS WINDOW</p>
+        <h3 id="insightTitle">Your rhythm peaks at 4 PM</h3>
+        <div id="insightBars" class="native-bars"></div>
+      </section>
+    </section>
+
+    <section id="profileView" class="view profile-screen" aria-label="Profile">
+      <h2>PROFILE</h2>
+      <div class="settings-list">
+        <button id="openPairing" class="settings-row" type="button">
+          <span class="settings-icon" data-icon="monitor"></span>
+          <span>
+            <strong id="deviceTitle">Link a Computer</strong>
+            <small id="deviceStatus">Pair this browser once.</small>
+          </span>
+          <span data-icon="chevron-right"></span>
+        </button>
+        <button id="syncNow" class="settings-row" type="button">
+          <span class="settings-icon" data-icon="refresh"></span>
+          <span>
+            <strong>Sync</strong>
+            <small>Push local changes</small>
+          </span>
+          <span data-icon="chevron-right"></span>
+        </button>
+        <button id="unlinkDevice" class="settings-row hidden" type="button">
+          <span class="settings-icon" data-icon="unlink"></span>
+          <span>
+            <strong>Unlink Browser</strong>
+            <small>Remove this computer</small>
+          </span>
+          <span data-icon="chevron-right"></span>
+        </button>
+      </div>
+    </section>
+
+    <nav class="tab-bar" aria-label="Haiku tabs">
+      <button class="tab-item is-active" type="button" data-view="day">
+        <span data-icon="clock"></span>
+        <span>Clock</span>
+      </button>
+      <button class="tab-item" type="button" data-view="upcoming">
+        <span data-icon="calendar"></span>
+        <span>Weekly</span>
+      </button>
+      <button class="tab-item" type="button" data-view="routines">
+        <span data-icon="list"></span>
+        <span>To-Do</span>
+      </button>
+      <button class="tab-item" type="button" data-view="insights">
+        <span data-icon="pie"></span>
+        <span>Analytics</span>
+      </button>
+      <button class="tab-item" type="button" data-view="profile">
+        <span data-icon="person"></span>
+        <span>Profile</span>
+      </button>
+    </nav>
+  </main>
+
+  <dialog id="taskDialog" class="sheet-dialog">
+    <form id="taskForm" class="native-sheet">
+      <div class="sheet-header">
+        <button id="closeTaskDialog" type="button">Close</button>
+        <h2>New Task</h2>
+        <button type="submit">Save</button>
+      </div>
+
+      <label>
+        <span>TASK NAME</span>
+        <input id="taskTitle" type="text" name="title" autocomplete="off" placeholder="Enter title..." required />
+      </label>
+
+      <label>
+        <span>DATE</span>
+        <input id="taskDate" type="date" />
+      </label>
+
+      <label>
+        <span>SCHEDULE</span>
+        <div class="time-card">
+          <div>
+            <span>Start</span>
+            <input id="taskStart" type="time" name="start" required />
+          </div>
+          <div>
+            <span>End</span>
+            <input id="taskEnd" type="time" name="end" required />
+          </div>
+        </div>
+      </label>
+
+      <label>
+        <span>CATEGORIES</span>
+        <select id="taskCategory" name="category"></select>
+      </label>
+
+      <div class="swatches" id="colorSwatches" aria-label="Task color"></div>
+    </form>
+  </dialog>
+
+  <dialog id="pairingDialog" class="sheet-dialog">
+    <div class="native-sheet pairing-sheet">
+      <div class="sheet-header">
+        <button id="closePairing" type="button">Close</button>
+        <h2>Link Computer</h2>
+        <button id="refreshPairCode" type="button">Refresh</button>
+      </div>
+
+      <div id="qrCode" class="qr-code" aria-label="Pairing QR code"></div>
+      <div class="pair-code" id="pairCode" aria-label="Pairing code">------</div>
+      <p id="pairExpiry" class="sheet-note">Expires soon</p>
+
+      <label>
+        <span>BROWSER NAME</span>
+        <input id="browserName" type="text" autocomplete="off" />
+      </label>
+
+      <button id="simulatePairing" class="gold-action" type="button">Confirm Pairing</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

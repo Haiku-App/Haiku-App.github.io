@@ -38,20 +38,31 @@ struct ContentView: View {
 
     private var currentTasksBinding: Binding<[ClockTask]> {
         Binding(
-            get: { tasksByDate[selectedDate, default: []] },
-            set: { tasksByDate[selectedDate] = $0 }
+            get: { visibleTasksByDate[selectedDate, default: []] },
+            set: { newTasks in
+                guard !usesDemoScreenshotData else {
+                    liveClockTasks = newTasks
+                    return
+                }
+
+                tasksByDate[selectedDate] = newTasks
+            }
         )
     }
 
     private var displayedTasks: [ClockTask] {
-        liveClockTasks ?? tasksByDate[selectedDate, default: []]
+        liveClockTasks ?? visibleTasksByDate[selectedDate, default: []]
+    }
+
+    private var displayedClockTasks: [ClockTask] {
+        displayedTasks.collapsedForRoutineDisplay()
     }
 
     private var activeClockTask: ClockTask? {
         guard Calendar.current.isDateInToday(selectedDate) else { return nil }
         let comps = Calendar.current.dateComponents([.hour, .minute], from: now)
         let minute = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
-        return displayedTasks.first { minute >= $0.startMinutes && minute < $0.normalizedEndMinutes }
+        return displayedClockTasks.first { minute >= $0.startMinutes && minute < $0.normalizedEndMinutes }
     }
 
     private var bgColor: Color { currentTheme.bg }
@@ -72,23 +83,31 @@ struct ContentView: View {
     @State private var lastGoogleCalendarRefreshAt: Date? = nil
     @AppStorage(CalendarSyncProvider.storageKey) private var activeCalendarSyncProvider: CalendarSyncProvider = .none
     @AppStorage("is24HourClock") private var is24HourClock = true
-    @AppStorage(ClockTaskDisplayStyle.storageKey) private var taskDisplayStyle: ClockTaskDisplayStyle = .rings
+    @AppStorage(ClockTaskDisplayStyle.storageKey) private var taskDisplayStyle: ClockTaskDisplayStyle = .sections
     @AppStorage("notificationOffsetsData") private var notificationOffsetsData = ""
+    @AppStorage(DemoScreenshotData.storageKey) private var isDemoScreenshotDataEnabled = false
     private let googleCalendarRefreshInterval: TimeInterval = 30
     private let routineAutoScheduleWindowDays = 28
+
+    private var usesDemoScreenshotData: Bool {
+        AppConfiguration.isTestingMode && isDemoScreenshotDataEnabled
+    }
+
+    private var visibleTasksByDate: [Date: [ClockTask]] {
+        if usesDemoScreenshotData {
+            return DemoScreenshotData.tasksByDate(relativeTo: now)
+        }
+
+        return tasksByDate
+    }
 
     private var notificationOffsets: [Int] {
         if notificationOffsetsData.isEmpty { return [] }
         return notificationOffsetsData.split(separator: ",").compactMap { Int($0) }
     }
 
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage("hasSeenTutorial") private var hasSeenTutorial = false
-    @AppStorage("hasSeenTwelveHourTutorial") private var hasSeenTwelveHourTutorial = false
-    @State private var showingTutorial = false
-
     private var shouldBlurContent: Bool {
-        showingCustomOffsetAlert || showingTutorial
+        showingCustomOffsetAlert
     }
 
     var body: some View {
@@ -108,11 +127,16 @@ struct ContentView: View {
                 SharedTaskManager.shared.save(theme: newVal)
                 WidgetCenter.shared.reloadAllTimelines()
             }
+            .onChange(of: isDemoScreenshotDataEnabled) { _, _ in
+                resetClockInteractionState()
+            }
             .onChange(of: calendarManager.eventsDidChange) {
+                guard !usesDemoScreenshotData else { return }
                 guard activeCalendarSyncProvider == .apple else { return }
                 syncCalendar(for: selectedDate)
             }
             .onChange(of: GoogleCalendarManager.shared.eventsDidChange) {
+                guard !usesDemoScreenshotData else { return }
                 guard activeCalendarSyncProvider == .google else { return }
                 syncCalendar(for: selectedDate)
             }
@@ -149,6 +173,7 @@ struct ContentView: View {
                 handleRoutinesChanged(oldRoutines: oldRoutines, newRoutines: newRoutines)
             }
             .onChange(of: notificationOffsetsData) {
+                guard !usesDemoScreenshotData else { return }
                 NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: tasksByDate, offsets: notificationOffsets)
             }
     }
@@ -186,10 +211,6 @@ struct ContentView: View {
                 customNotificationAlertView()
             }
             
-            if showingTutorial {
-                TutorialOverlayView(isPresented: $showingTutorial)
-                    .transition(.opacity)
-            }
         }
     }
 
@@ -274,20 +295,16 @@ struct ContentView: View {
         }
         migrateLegacyCalendarSyncProviderIfNeeded()
         BrainDumpManager.shared.reloadFromSharedStoreIfNeeded()
-        if hasCompletedOnboarding && !hasSeenTutorial {
-            withAnimation(.easeInOut(duration: 0.4)) {
-                showingTutorial = true
-                hasSeenTutorial = true
-            }
-        }
         SharedTaskManager.shared.save(is24HourClock: is24HourClock)
         SharedTaskManager.shared.save(taskDisplayStyle: taskDisplayStyle)
         SharedTaskManager.shared.save(theme: currentTheme)
-        NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: tasksByDate, offsets: notificationOffsets)
-        reconcileAutoScheduledRoutines()
-        refreshVisibleCalendar(force: true)
-        Task {
-            await syncTasksWithCloud()
+        if !usesDemoScreenshotData {
+            NotificationManager.shared.scheduleEarlyNotifications(tasksByDate: tasksByDate, offsets: notificationOffsets)
+            reconcileAutoScheduledRoutines()
+            refreshVisibleCalendar(force: true)
+            Task {
+                await syncTasksWithCloud()
+            }
         }
     }
 
@@ -295,7 +312,7 @@ struct ContentView: View {
         if oldTab == .clock || newTab == .clock {
             resetClockInteractionState()
         }
-        if newTab == .clock || newTab == .weekly {
+        if !usesDemoScreenshotData && (newTab == .clock || newTab == .weekly) {
             refreshVisibleCalendar(force: true)
         }
         AnalyticsManager.shared.capture("tab_changed", properties: ["target_tab": "\(newTab)"])
@@ -303,11 +320,13 @@ struct ContentView: View {
 
     private func handleSelectedDateChange(oldDate: Date, newDate: Date) {
         resetClockInteractionState()
+        guard !usesDemoScreenshotData else { return }
         syncCalendar(for: newDate)
     }
 
     private func handleCalendarSyncProviderChange(oldProvider: CalendarSyncProvider, newProvider: CalendarSyncProvider) {
         guard oldProvider != newProvider else { return }
+        guard !usesDemoScreenshotData else { return }
 
         purgeTasksForInactiveCalendarProviders()
         resetClockInteractionState()
@@ -320,6 +339,7 @@ struct ContentView: View {
 
     private func handleRoutinesChanged(oldRoutines: [Routine], newRoutines: [Routine]) {
         guard oldRoutines != newRoutines else { return }
+        guard !usesDemoScreenshotData else { return }
         reconcileAutoScheduledRoutines()
     }
 
@@ -342,10 +362,12 @@ struct ContentView: View {
     private func handleScenePhaseChange(oldPhase: ScenePhase, newPhase: ScenePhase) {
         if newPhase == .active {
             BrainDumpManager.shared.reloadFromSharedStoreIfNeeded()
-            reconcileAutoScheduledRoutines()
-            refreshVisibleCalendar(force: true)
-            Task {
-                await syncTasksWithCloud()
+            if !usesDemoScreenshotData {
+                reconcileAutoScheduledRoutines()
+                refreshVisibleCalendar(force: true)
+                Task {
+                    await syncTasksWithCloud()
+                }
             }
         } else {
             resetClockInteractionState()
@@ -355,13 +377,6 @@ struct ContentView: View {
     private func handleClockFormatChange(oldVal: Bool, newVal: Bool) {
         SharedTaskManager.shared.save(is24HourClock: newVal)
         WidgetCenter.shared.reloadAllTimelines()
-        // Show the 12-hour ring tutorial the first time user switches to 12h mode
-        if !newVal && !hasSeenTwelveHourTutorial {
-            withAnimation(.easeInOut(duration: 0.4)) {
-                hasSeenTwelveHourTutorial = true
-                showingTutorial = true
-            }
-        }
     }
 
     private func handleGoogleSignInChange(oldVal: Bool, newVal: Bool) {
@@ -375,7 +390,7 @@ struct ContentView: View {
     @ViewBuilder
     private func headerView() -> some View {
         VStack(spacing: 6) {
-            Text("HAIKU")
+            Text("HAIKU RING")
                 .font(.system(size: 24, weight: .light, design: .serif))
                 .foregroundStyle(goldColor)
                 .tracking(4)
@@ -450,7 +465,7 @@ struct ContentView: View {
                     .transition(.asymmetric(insertion: .opacity, removal: .opacity))
             } else if selectedTab == .weekly {
                 WeeklyView(
-                    tasksByDate: tasksByDate,
+                    tasksByDate: visibleTasksByDate,
                     selectedDate: $selectedDate,
                     selectedTab: $selectedTab,
                     onAppear: { weekStart in
@@ -460,6 +475,9 @@ struct ContentView: View {
                     onWeekChanged: { weekStart in
                         let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
                         syncCalendarRange(from: weekStart, to: weekEnd)
+                    },
+                    onTaskSelected: { date, task in
+                        openTask(task, on: date)
                     }
                 )
             } else if selectedTab == .todo {
@@ -480,7 +498,7 @@ struct ContentView: View {
                     }
                 )
             } else if selectedTab == .analytics {
-                ProfileAnalyticsView(tasksByDate: tasksByDate)
+                ProfileAnalyticsView(tasksByDate: visibleTasksByDate)
             } else if selectedTab == .profile {
                 ProfileSettingsView(is24HourClock: $is24HourClock, taskDisplayStyle: $taskDisplayStyle, showingCustomOffsetAlert: $showingCustomOffsetAlert)
             }
@@ -619,6 +637,7 @@ struct ContentView: View {
     }
 
     private func refreshVisibleCalendar(force: Bool) {
+        guard !usesDemoScreenshotData else { return }
         guard isPro else { return }
         guard activeCalendarSyncProvider != .none else { return }
 
@@ -636,6 +655,7 @@ struct ContentView: View {
     }
 
     private func pollGoogleCalendarIfNeeded(at date: Date) {
+        guard !usesDemoScreenshotData else { return }
         guard scenePhase == .active else { return }
         guard isPro else { return }
         guard activeCalendarSyncProvider == .google else { return }
@@ -658,6 +678,7 @@ struct ContentView: View {
     }
 
     private func syncCalendarRange(from startDate: Date, to endDate: Date) {
+        guard !usesDemoScreenshotData else { return }
         guard isPro else { return }
 
         switch activeCalendarSyncProvider {
@@ -845,7 +866,10 @@ struct ContentView: View {
                     taskDisplayStyle: taskDisplayStyle,
                     zoomedHour: showingHourZoom ? zoomedHour : nil,
                     theme: currentTheme,
+                    displayTasks: displayedClockTasks,
                     onTaskUpdated: { updatedTask in
+                        guard !usesDemoScreenshotData else { return }
+
                         if isPro {
                             let day = Calendar.current.startOfDay(for: selectedDate)
                             switch updatedTask.calendarSyncProvider {
@@ -922,7 +946,7 @@ struct ContentView: View {
 
             // Task List
             Group {
-                if displayedTasks.isEmpty {
+                if displayedClockTasks.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "cup.and.saucer")
                             .font(.system(size: 32))
@@ -933,11 +957,10 @@ struct ContentView: View {
                     }
                 } else {
                     List {
-                        ForEach(displayedTasks) { task in
+                        ForEach(displayedClockTasks) { task in
                             let timeString = "\(formatTime(minutes: task.startMinutes)) - \(formatTime(minutes: task.endMinutes))"
                             Button(action: {
-                                taskToEdit = task
-                                showingAddTask = true
+                                openTask(task, on: selectedDate)
                             }) {
                                 TaskRow(
                                     time: timeString,
@@ -953,21 +976,7 @@ struct ContentView: View {
                             .listRowSeparator(.hidden)
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
-                                    if let index = tasksByDate[selectedDate]?.firstIndex(where: { $0.id == task.id }) {
-                                        if isPro, let extId = task.externalEventId {
-                                            deletedExternalIds.insert(extId)
-                                            if extId.hasPrefix("google_") {
-                                                GoogleCalendarManager.shared.deleteTask(externalId: extId)
-                                            } else {
-                                                calendarManager.deleteTask(externalId: extId)
-                                            }
-                                        }
-                                        // PostHog: Track task deletion
-                                        AnalyticsManager.shared.capture("task_deleted")
-                                        _ = withAnimation(.easeInOut) {
-                                            tasksByDate[selectedDate]?.remove(at: index)
-                                        }
-                                    }
+                                    deleteDisplayedTask(task, on: selectedDate)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -1085,6 +1094,76 @@ struct ContentView: View {
             return "\(hours)h \(minutes)m left"
         } else {
             return "\(minutes)m left"
+        }
+    }
+
+    private func openTask(_ task: ClockTask, on date: Date) {
+        guard !usesDemoScreenshotData else { return }
+
+        selectedDate = Calendar.current.startOfDay(for: date)
+
+        if task.isRoutineDisplayGroup {
+            selectedTab = .routines
+            return
+        }
+
+        prefilledTaskTitle = nil
+        prefilledTaskId = nil
+        taskToEdit = task
+        showingAddTask = true
+    }
+
+    private func deleteDisplayedTask(_ displayTask: ClockTask, on date: Date) {
+        guard !usesDemoScreenshotData else { return }
+
+        let day = Calendar.current.startOfDay(for: date)
+        let tasksToDelete = tasksByDate[day, default: []].filter {
+            task($0, isRepresentedBy: displayTask)
+        }
+
+        guard !tasksToDelete.isEmpty else { return }
+
+        if isPro {
+            for task in tasksToDelete {
+                guard let extId = task.externalEventId else { continue }
+                deletedExternalIds.insert(extId)
+
+                if extId.hasPrefix("google_") {
+                    GoogleCalendarManager.shared.deleteTask(externalId: extId)
+                } else {
+                    calendarManager.deleteTask(externalId: extId)
+                }
+            }
+        }
+
+        AnalyticsManager.shared.capture("task_deleted", properties: [
+            "source": displayTask.isRoutineDisplayGroup ? "routine_group" : "single_task"
+        ])
+
+        withAnimation(.easeInOut) {
+            tasksByDate[day]?.removeAll {
+                task($0, isRepresentedBy: displayTask)
+            }
+        }
+    }
+
+    private func task(_ task: ClockTask, isRepresentedBy displayTask: ClockTask) -> Bool {
+        guard displayTask.isRoutineDisplayGroup else {
+            return task.id == displayTask.id
+        }
+
+        return task.routineSourceId == displayTask.routineSourceId &&
+            routineAnchor(task.routineAnchorDate, matches: displayTask.routineAnchorDate)
+    }
+
+    private func routineAnchor(_ lhs: Date?, matches rhs: Date?) -> Bool {
+        switch (lhs, rhs) {
+        case (.none, .none):
+            return true
+        case let (.some(lhs), .some(rhs)):
+            return Calendar.current.isDate(lhs, inSameDayAs: rhs)
+        default:
+            return false
         }
     }
 

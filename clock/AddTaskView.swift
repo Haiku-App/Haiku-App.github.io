@@ -28,8 +28,12 @@ struct AddTaskView: View {
     @State private var newCategoryName = ""
     @State private var draggedCategory: Category?
     @State private var repeatFrequency: RepeatFrequency = .never
+    @State private var showingOptions: Bool
     
     @State private var selectedColorIndex: Int
+
+    private static let lastTaskCategoryIdKey = "lastTaskCategoryId"
+    private static let lastTaskColorIndexKey = "lastTaskColorIndex"
     
     init(tasksByDate: Binding<[Date: [ClockTask]]>, selectedDate: Binding<Date>, prefilledTitle: String? = nil, brainDumpTaskId: UUID? = nil, taskToEdit: ClockTask? = nil) {
         self._tasksByDate = tasksByDate
@@ -51,9 +55,18 @@ struct AddTaskView: View {
             self._startTime = State(initialValue: cal.date(byAdding: .minute, value: toEdit.startMinutes, to: dayStart) ?? Date())
             self._endTime = State(initialValue: cal.date(byAdding: .minute, value: toEdit.normalizedEndMinutes, to: dayStart) ?? Date())
             self._selectedColorIndex = State(initialValue: aestheticColors.firstIndex(where: { $0.color == toEdit.color }) ?? 0)
+            self._showingOptions = State(initialValue: true)
         } else {
+            let defaultStart = Self.defaultStartTime(for: initialDate)
+            let defaultEnd = Calendar.current.date(byAdding: .hour, value: 1, to: defaultStart) ?? defaultStart
+            let initialCategoryId = Self.initialCategoryId()
+
             self._title = State(initialValue: prefilledTitle ?? "")
-            self._selectedColorIndex = State(initialValue: Int.random(in: 0..<aestheticColors.count))
+            self._selectedCategoryId = State(initialValue: initialCategoryId)
+            self._startTime = State(initialValue: defaultStart)
+            self._endTime = State(initialValue: defaultEnd)
+            self._selectedColorIndex = State(initialValue: Self.initialColorIndex(for: initialCategoryId))
+            self._showingOptions = State(initialValue: false)
         }
     }
     
@@ -62,7 +75,15 @@ struct AddTaskView: View {
     private var goldColor: Color { currentTheme.accent }
     private var shadowLight: Color { currentTheme.shadowLight }
     private var shadowDark: Color { currentTheme.shadowDark }
-    private var requiresCategorySelection: Bool { taskToEdit == nil && selectedCategoryId == nil }
+    private var selectedCategory: Category? {
+        categoryManager.categories.first { $0.id == selectedCategoryId }
+    }
+
+    private var optionsSummary: String {
+        let repeatText = repeatFrequency == .never ? nil : repeatFrequency.rawValue
+        let categoryText = selectedCategory?.name ?? "No category"
+        return [repeatText, categoryText].compactMap { $0 }.joined(separator: ", ")
+    }
 
     var body: some View {
         NavigationStack {
@@ -109,28 +130,6 @@ struct AddTaskView: View {
                                 )
                         }
 
-                        // Repeat Selection
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("REPEAT")
-                                .font(.system(size: 12, weight: .regular, design: .serif))
-                                .foregroundStyle(goldColor)
-                                .tracking(1)
-                            
-                            Picker("Repeat", selection: $repeatFrequency) {
-                                ForEach(RepeatFrequency.allCases) { freq in
-                                    Text(freq.rawValue).tag(freq)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .padding(4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(fieldBgColor)
-                                    .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
-                                    .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
-                            )
-                        }
-
                         // Time Selection
                         VStack(alignment: .leading, spacing: 8) {
                             Text("SCHEDULE")
@@ -161,122 +160,8 @@ struct AddTaskView: View {
                                     .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
                             )
                         }
-                        // Categories
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("CATEGORIES")
-                                .font(.system(size: 12, weight: .regular, design: .serif))
-                                .foregroundStyle(goldColor)
-                                .tracking(1)
-                                .padding(.horizontal, 4)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                ScrollViewReader { proxy in
-                                    HStack(spacing: 16) {
-                                        ForEach(categoryManager.categories) { cat in
-                                            Button(action: {
-                                                selectedCategoryId = cat.id
-                                            }) {
-                                                VStack(spacing: 12) {
-                                                    Image(systemName: cat.icon)
-                                                        .font(.system(size: 24))
-                                                        .foregroundStyle(cat.color)
-                                                    Text(cat.name)
-                                                        .font(.system(size: 12, weight: .medium))
-                                                        .foregroundStyle(currentTheme.textForeground.opacity(0.8))
-                                                }
-                                                .frame(width: 100, height: 100)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 16)
-                                                        .fill(fieldBgColor)
-                                                        .overlay(
-                                                            RoundedRectangle(cornerRadius: 16)
-                                                                .stroke(selectedCategoryId == cat.id ? cat.color : Color.clear, lineWidth: 2)
-                                                        )
-                                                        .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
-                                                        .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
-                                                )
-                                            }
-                                            .id(cat.id)
-                                            .buttonStyle(.plain)
-                                            .contextMenu {
-                                                Button(role: .destructive, action: {
-                                                    if let index = categoryManager.categories.firstIndex(where: { $0.id == cat.id }) {
-                                                        AnalyticsManager.shared.capture("category_deleted", properties: ["name": cat.name])
-                                                        categoryManager.categories.remove(at: index)
-                                                        if selectedCategoryId == cat.id {
-                                                            selectedCategoryId = nil
-                                                        }
-                                                    }
-                                                }) {
-                                                    Label("Delete Category", systemImage: "trash")
-                                                }
-                                            }
-                                            .onDrag {
-                                                self.draggedCategory = cat
-                                                return NSItemProvider(object: cat.id.uuidString as NSString)
-                                            }
-                                            .onDrop(of: [.text], delegate: CategoryDropDelegate(item: cat, items: $categoryManager.categories, draggedItem: $draggedCategory, proxy: proxy))
-                                        }
-                                        
-                                        // Add new category button
-                                        Button(action: {
-                                            showingNewCategory = true
-                                        }) {
-                                            VStack(spacing: 12) {
-                                                Image(systemName: "plus")
-                                                    .font(.system(size: 24))
-                                                    .foregroundStyle(goldColor)
-                                                Text("New")
-                                                    .font(.system(size: 12, weight: .medium))
-                                                    .foregroundStyle(currentTheme.textForeground.opacity(0.8))
-                                            }
-                                            .frame(width: 100, height: 100)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 16)
-                                                    .fill(fieldBgColor)
-                                                    .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
-                                                    .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
-                                            )
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 8)
-                                }
-                            }
-                        }
-                        
-                        // Color Selection
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("TASK COLOR")
-                                .font(.system(size: 12, weight: .regular, design: .serif))
-                                .foregroundStyle(goldColor)
-                                .tracking(1)
-                                .padding(.horizontal, 4)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(0..<aestheticColors.count, id: \.self) { index in
-                                        Button(action: {
-                                            selectedColorIndex = index
-                                            AnalyticsManager.shared.capture("manual_color_selected", properties: ["color_index": index])
-                                        }) {
-                                            Circle()
-                                                .fill(aestheticColors[index].color)
-                                                .frame(width: 44, height: 44)
-                                                .overlay(
-                                                    Circle()
-                                                        .stroke(selectedColorIndex == index ? currentTheme.textForeground : Color.clear, lineWidth: 3)
-                                                )
-                                                .shadow(color: shadowDark, radius: 3, x: 2, y: 2)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 8)
-                            }
-                        }
+
+                        optionalDetailsSection
 
                     }
                     .padding(32)
@@ -288,26 +173,18 @@ struct AddTaskView: View {
                         .background(goldColor.opacity(0.2))
                     
                     VStack(spacing: 8) {
-                        if requiresCategorySelection {
-                            Text("Please select a category")
-                                .font(.system(size: 12, weight: .medium, design: .serif))
-                                .foregroundStyle(goldColor.opacity(0.8))
-                                .transition(.opacity)
-                        }
-                        
                         Button(action: saveTask) {
                             Text(taskToEdit == nil ? "Schedule Task" : "Update Task")
                                 .font(.system(size: 16, weight: .bold, design: .serif))
-                                .foregroundStyle(requiresCategorySelection ? goldColor.opacity(0.3) : (currentTheme == .sakura ? currentTheme.textForeground : bgColor))
+                                .foregroundStyle(currentTheme == .sakura ? currentTheme.textForeground : bgColor)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 18)
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .fill(requiresCategorySelection ? goldColor.opacity(0.1) : goldColor)
-                                        .shadow(color: .black.opacity(requiresCategorySelection ? 0 : 0.2), radius: 10, x: 0, y: 5)
+                                        .fill(goldColor)
+                                        .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
                                 )
                         }
-                        .disabled(requiresCategorySelection)
                     }
                     .padding(.horizontal, 32)
                     .padding(.vertical, 24)
@@ -329,16 +206,280 @@ struct AddTaskView: View {
                         .foregroundStyle(goldColor)
                 }
             }
-            .onAppear {
-                if taskToEdit == nil {
-                    pickDistinctColor()
-                }
+            .onChange(of: selectedCategoryId) { _, newCategoryId in
+                guard let newCategoryId,
+                      let category = categoryManager.categories.first(where: { $0.id == newCategoryId }) else { return }
+                selectedColorIndex = Self.closestColorIndex(to: category.rgb)
             }
             .sheet(isPresented: $showingNewCategory) {
                 NewCategoryView(categoryManager: categoryManager, selectedCategoryId: $selectedCategoryId, theme: currentTheme)
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private var optionalDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    showingOptions.toggle()
+                }
+            }) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("OPTIONS")
+                            .font(.system(size: 12, weight: .regular, design: .serif))
+                            .foregroundStyle(goldColor)
+                            .tracking(1)
+
+                        Text(optionsSummary)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(currentTheme.textForeground.opacity(0.65))
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(goldColor)
+                        .rotationEffect(.degrees(showingOptions ? 180 : 0))
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(fieldBgColor)
+                        .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
+                        .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
+                )
+            }
+            .buttonStyle(.plain)
+
+            if showingOptions {
+                VStack(spacing: 28) {
+                    repeatSection
+                    categorySection
+                    colorSection
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private var repeatSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("REPEAT")
+                .font(.system(size: 12, weight: .regular, design: .serif))
+                .foregroundStyle(goldColor)
+                .tracking(1)
+
+            RepeatFrequencyPicker(
+                selection: $repeatFrequency,
+                theme: currentTheme
+            )
+            .padding(4)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(fieldBgColor)
+                    .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
+                    .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
+            )
+        }
+    }
+
+    private var categorySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("CATEGORY")
+                .font(.system(size: 12, weight: .regular, design: .serif))
+                .foregroundStyle(goldColor)
+                .tracking(1)
+                .padding(.horizontal, 4)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                ScrollViewReader { proxy in
+                    HStack(spacing: 16) {
+                        Button(action: {
+                            selectedCategoryId = nil
+                        }) {
+                            VStack(spacing: 12) {
+                                Image(systemName: "circle.slash")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.55))
+                                Text("None")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.8))
+                            }
+                            .frame(width: 100, height: 100)
+                            .background(categoryTileBackground(isSelected: selectedCategoryId == nil, strokeColor: goldColor))
+                        }
+                        .buttonStyle(.plain)
+
+                        ForEach(categoryManager.categories) { cat in
+                            Button(action: {
+                                selectedCategoryId = cat.id
+                                selectedColorIndex = Self.closestColorIndex(to: cat.rgb)
+                            }) {
+                                VStack(spacing: 12) {
+                                    Image(systemName: cat.icon)
+                                        .font(.system(size: 24))
+                                        .foregroundStyle(cat.color)
+                                    Text(cat.name)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(currentTheme.textForeground.opacity(0.8))
+                                }
+                                .frame(width: 100, height: 100)
+                                .background(categoryTileBackground(isSelected: selectedCategoryId == cat.id, strokeColor: cat.color))
+                            }
+                            .id(cat.id)
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button(role: .destructive, action: {
+                                    if let index = categoryManager.categories.firstIndex(where: { $0.id == cat.id }) {
+                                        AnalyticsManager.shared.capture("category_deleted", properties: ["name": cat.name])
+                                        categoryManager.categories.remove(at: index)
+                                        if selectedCategoryId == cat.id {
+                                            selectedCategoryId = nil
+                                        }
+                                    }
+                                }) {
+                                    Label("Delete Category", systemImage: "trash")
+                                }
+                            }
+                            .onDrag {
+                                self.draggedCategory = cat
+                                return NSItemProvider(object: cat.id.uuidString as NSString)
+                            }
+                            .onDrop(of: [.text], delegate: CategoryDropDelegate(item: cat, items: $categoryManager.categories, draggedItem: $draggedCategory, proxy: proxy))
+                        }
+
+                        Button(action: {
+                            showingNewCategory = true
+                        }) {
+                            VStack(spacing: 12) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(goldColor)
+                                Text("New")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(currentTheme.textForeground.opacity(0.8))
+                            }
+                            .frame(width: 100, height: 100)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(fieldBgColor)
+                                    .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
+                                    .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+    }
+
+    private var colorSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("COLOR")
+                .font(.system(size: 12, weight: .regular, design: .serif))
+                .foregroundStyle(goldColor)
+                .tracking(1)
+                .padding(.horizontal, 4)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(0..<aestheticColors.count, id: \.self) { index in
+                        Button(action: {
+                            selectedColorIndex = index
+                            AnalyticsManager.shared.capture("manual_color_selected", properties: ["color_index": index])
+                        }) {
+                            Circle()
+                                .fill(aestheticColors[index].color)
+                                .frame(width: 44, height: 44)
+                                .overlay(
+                                    Circle()
+                                        .stroke(selectedColorIndex == index ? currentTheme.textForeground : Color.clear, lineWidth: 3)
+                                )
+                                .shadow(color: shadowDark, radius: 3, x: 2, y: 2)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 8)
+            }
+        }
+    }
+
+    private func categoryTileBackground(isSelected: Bool, strokeColor: Color) -> some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(fieldBgColor)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isSelected ? strokeColor : Color.clear, lineWidth: 2)
+            )
+            .shadow(color: shadowDark, radius: 5, x: 4, y: 4)
+            .shadow(color: shadowLight, radius: 5, x: -4, y: -4)
+    }
+
+    private static func defaultStartTime(for selectedDate: Date) -> Date {
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: selectedDate)
+        let nowComponents = calendar.dateComponents([.hour, .minute], from: Date())
+        let currentMinutes = (nowComponents.hour ?? 0) * 60 + (nowComponents.minute ?? 0)
+        let roundedMinutes = min(((currentMinutes + 14) / 15) * 15, (24 * 60) - 15)
+        return calendar.date(byAdding: .minute, value: roundedMinutes, to: dayStart) ?? selectedDate
+    }
+
+    private static func initialCategoryId() -> UUID? {
+        let categories = AppSupportPersistence.loadCategories()
+        let defaults = UserDefaults.standard
+
+        if let storedValue = defaults.string(forKey: lastTaskCategoryIdKey) {
+            guard !storedValue.isEmpty else { return nil }
+            if let savedId = UUID(uuidString: storedValue),
+               categories.contains(where: { $0.id == savedId }) {
+                return savedId
+            }
+        }
+
+        return categories.first {
+            $0.name.caseInsensitiveCompare("Personal") == .orderedSame
+        }?.id
+    }
+
+    private static func initialColorIndex(for categoryId: UUID?) -> Int {
+        let categories = AppSupportPersistence.loadCategories()
+
+        if let categoryId,
+           let category = categories.first(where: { $0.id == categoryId }) {
+            return closestColorIndex(to: category.rgb)
+        }
+
+        let savedIndex = UserDefaults.standard.integer(forKey: lastTaskColorIndexKey)
+        if aestheticColors.indices.contains(savedIndex) {
+            return savedIndex
+        }
+
+        return Int.random(in: 0..<aestheticColors.count)
+    }
+
+    private static func closestColorIndex(to rgb: RGB) -> Int {
+        aestheticColors.indices.min { lhs, rhs in
+            colorDistance(aestheticColors[lhs], rgb) < colorDistance(aestheticColors[rhs], rgb)
+        } ?? 0
+    }
+
+    private static func colorDistance(_ lhs: RGB, _ rhs: RGB) -> Double {
+        pow(lhs.r - rhs.r, 2) + pow(lhs.g - rhs.g, 2) + pow(lhs.b - rhs.b, 2)
+    }
+
+    private func persistTaskDefaults(categoryId: UUID?, colorIndex: Int) {
+        let defaults = UserDefaults.standard
+        defaults.set(categoryId?.uuidString ?? "", forKey: Self.lastTaskCategoryIdKey)
+        defaults.set(colorIndex, forKey: Self.lastTaskColorIndexKey)
     }
     
     private func pickDistinctColor() {
@@ -375,6 +516,7 @@ struct AddTaskView: View {
         let cat = categoryManager.categories.first(where: { $0.id == selectedCategoryId })
         let categoryId = cat?.id
         let categoryName = cat?.name
+        persistTaskDefaults(categoryId: categoryId, colorIndex: selectedColorIndex)
         
         let day = cal.startOfDay(for: taskDate)
         
@@ -553,6 +695,37 @@ struct AddTaskView: View {
             }
             return nil
         }
+    }
+}
+
+private struct RepeatFrequencyPicker: View {
+    @Binding var selection: RepeatFrequency
+    let theme: AppTheme
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(RepeatFrequency.allCases) { frequency in
+                Button(action: { selection = frequency }) {
+                    Text(frequency.rawValue)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .foregroundStyle(selection == frequency ? theme.bg : theme.textForeground.opacity(0.72))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            Capsule()
+                                .fill(selection == frequency ? theme.accent : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(
+            Capsule()
+                .fill(theme.textForeground.opacity(0.08))
+        )
     }
 }
 

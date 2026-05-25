@@ -9,6 +9,7 @@ struct ClockView: View {
     var taskDisplayStyle: ClockTaskDisplayStyle = .rings
     var zoomedHour: Int? = nil
     var theme: AppTheme = .sage
+    var displayTasks: [ClockTask]? = nil
     var onTaskUpdated: ((ClockTask) -> Void)? = nil
     var onTasksPreviewUpdated: (([ClockTask]?) -> Void)? = nil
 
@@ -60,7 +61,11 @@ struct ClockView: View {
     private var activeTask: ClockTask? {
         // Return first task that is currently happening
         let min = Int(currentMinute)
-        return interactiveTasks.first { min >= $0.startMinutes && min < $0.normalizedEndMinutes }
+        return tasksForDisplay.first { min >= $0.startMinutes && min < $0.normalizedEndMinutes }
+    }
+
+    private var tasksForDisplay: [ClockTask] {
+        displayTasks ?? interactiveTasks
     }
 
     var body: some View {
@@ -437,7 +442,7 @@ struct ClockView: View {
 
     @ViewBuilder
     private func scheduledTasksView(ringWidth: CGFloat, amRingRadius: CGFloat, pmRingRadius: CGFloat, faceRadius: CGFloat) -> some View {
-        ForEach(interactiveTasks) { task in
+        ForEach(tasksForDisplay) { task in
             scheduledFragmentsView(for: task, ringWidth: ringWidth, amRingRadius: amRingRadius, pmRingRadius: pmRingRadius, faceRadius: faceRadius)
         }
     }
